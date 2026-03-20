@@ -205,6 +205,9 @@ class CanvasRenderer {
   }
 
   drawRemoteCursor(ctx, user) {
+    // Skip inactive users
+    if (user.inactive) return;
+
     const x = user.x;
     const y = user.y;
 

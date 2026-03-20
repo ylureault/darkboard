@@ -21,6 +21,9 @@ function createElement(type, props) {
 // Default sticky colors
 const STICKY_COLORS = ['#FFD966', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#DDA0DD', '#F4A460'];
 
+// Envelope colors
+const ENVELOPE_COLORS = ['#4a9eff', '#ff6b6b', '#4ecdc4', '#ffd966', '#96ceb4', '#ff9ff3', '#54a0ff', '#5f27cd'];
+
 function createSticky(x, y) {
   const color = STICKY_COLORS[Math.floor(Math.random() * STICKY_COLORS.length)];
   return createElement('sticky', {
@@ -57,6 +60,22 @@ function createFrame(x, y, w, h, title) {
     text: title || 'Zone',
     fontSize: 16,
     zIndex: 1
+  });
+}
+
+function createEnvelope(x, y, w, h) {
+  const color = ENVELOPE_COLORS[Math.floor(Math.random() * ENVELOPE_COLORS.length)];
+  return createElement('envelope', {
+    x, y,
+    width: w || 300,
+    height: h || 250,
+    fill: color + '15', // very transparent
+    stroke: color,
+    strokeWidth: 2,
+    text: 'Enveloppe',
+    fontSize: 14,
+    children: [], // array of element IDs
+    zIndex: 2
   });
 }
 
@@ -113,7 +132,44 @@ function renderElement(ctx, el, selected, camera) {
     case 'image':
       drawImage(ctx, el);
       break;
+    case 'envelope':
+      drawEnvelope(ctx, el);
+      break;
   }
+
+  ctx.restore();
+}
+
+// Render vote badge on an element (called separately after main render)
+function renderVoteBadge(ctx, el, count, hasVoted) {
+  if (count <= 0 && !hasVoted) return;
+  const bounds = getElementBounds(el);
+  if (!bounds) return;
+
+  const badgeX = bounds.x + bounds.w - 4;
+  const badgeY = bounds.y - 4;
+  const badgeR = 14;
+
+  ctx.save();
+
+  // Badge circle
+  ctx.beginPath();
+  ctx.arc(badgeX, badgeY, badgeR, 0, Math.PI * 2);
+  ctx.fillStyle = hasVoted ? '#4a9eff' : '#e94560';
+  ctx.fill();
+
+  // Border
+  ctx.strokeStyle = 'white';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Count text
+  ctx.fillStyle = 'white';
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+  ctx.fillText(String(count), badgeX, badgeY);
+  ctx.textAlign = 'left';
 
   ctx.restore();
 }
@@ -131,7 +187,6 @@ function drawRect(ctx, el) {
     ctx.lineWidth = el.strokeWidth;
     ctx.stroke();
   }
-  // Text inside shape
   if (el.text) {
     ctx.fillStyle = '#e0e0e0';
     ctx.font = `${el.fontSize || 16}px -apple-system, BlinkMacSystemFont, sans-serif`;
@@ -156,7 +211,6 @@ function drawCircle(ctx, el) {
     ctx.lineWidth = el.strokeWidth;
     ctx.stroke();
   }
-  // Text inside shape
   if (el.text) {
     ctx.fillStyle = '#e0e0e0';
     ctx.font = `${el.fontSize || 16}px -apple-system, BlinkMacSystemFont, sans-serif`;
@@ -191,7 +245,6 @@ function drawArrow(ctx, el) {
   ctx.lineCap = 'round';
   ctx.stroke();
 
-  // Arrowhead
   ctx.beginPath();
   ctx.moveTo(el.x2, el.y2);
   ctx.lineTo(el.x2 - headLen * Math.cos(angle - Math.PI / 6), el.y2 - headLen * Math.sin(angle - Math.PI / 6));
@@ -202,7 +255,6 @@ function drawArrow(ctx, el) {
 
 function drawSticky(ctx, el) {
   const r = 6;
-  // Shadow
   ctx.shadowColor = 'rgba(0,0,0,0.3)';
   ctx.shadowBlur = 12;
   ctx.shadowOffsetY = 4;
@@ -214,7 +266,6 @@ function drawSticky(ctx, el) {
 
   ctx.shadowColor = 'transparent';
 
-  // Corner fold
   const foldSize = 24;
   ctx.beginPath();
   ctx.moveTo(el.x + el.width - foldSize, el.y);
@@ -224,7 +275,6 @@ function drawSticky(ctx, el) {
   ctx.fillStyle = 'rgba(0,0,0,0.1)';
   ctx.fill();
 
-  // Text
   if (el.text) {
     ctx.fillStyle = '#1a1a1a';
     ctx.font = `${el.fontSize || 16}px -apple-system, BlinkMacSystemFont, sans-serif`;
@@ -246,13 +296,11 @@ function drawFreehand(ctx, el) {
   ctx.beginPath();
   ctx.moveTo(el.points[0].x, el.points[0].y);
 
-  // Smooth curve using quadratic bezier
   for (let i = 1; i < el.points.length - 1; i++) {
     const xc = (el.points[i].x + el.points[i + 1].x) / 2;
     const yc = (el.points[i].y + el.points[i + 1].y) / 2;
     ctx.quadraticCurveTo(el.points[i].x, el.points[i].y, xc, yc);
   }
-  // Last point
   const last = el.points[el.points.length - 1];
   ctx.lineTo(last.x, last.y);
 
@@ -265,7 +313,6 @@ function drawFreehand(ctx, el) {
 
 function drawFrame(ctx, el) {
   const r = 8;
-  // Background
   ctx.beginPath();
   ctx.roundRect(el.x, el.y, el.width, el.height, r);
   if (el.fill && el.fill !== 'transparent') {
@@ -273,14 +320,12 @@ function drawFrame(ctx, el) {
     ctx.fill();
   }
 
-  // Dashed border
   ctx.strokeStyle = el.stroke || '#4a9eff';
   ctx.lineWidth = el.strokeWidth || 2;
   ctx.setLineDash([8, 4]);
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Title label at top
   if (el.text) {
     const fontSize = el.fontSize || 16;
     ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
@@ -288,24 +333,101 @@ function drawFrame(ctx, el) {
     const labelPad = 8;
     const labelH = fontSize + labelPad * 2;
 
-    // Label background
     ctx.fillStyle = el.stroke || '#4a9eff';
     ctx.beginPath();
     ctx.roundRect(el.x, el.y - labelH, textWidth + labelPad * 2, labelH, [r, r, 0, 0]);
     ctx.fill();
 
-    // Label text
     ctx.fillStyle = 'white';
     ctx.textBaseline = 'top';
     ctx.fillText(el.text, el.x + labelPad, el.y - labelH + labelPad);
   }
 }
 
+function drawEnvelope(ctx, el) {
+  const r = 12;
+  const headerH = 36;
+  const color = el.stroke || '#4a9eff';
+  const childCount = (el.children && el.children.length) || 0;
+
+  // Shadow
+  ctx.shadowColor = 'rgba(0,0,0,0.2)';
+  ctx.shadowBlur = 16;
+  ctx.shadowOffsetY = 4;
+
+  // Body
+  ctx.beginPath();
+  ctx.roundRect(el.x, el.y, el.width, el.height, r);
+  ctx.fillStyle = el.fill || (color + '15');
+  ctx.fill();
+
+  ctx.shadowColor = 'transparent';
+
+  // Border
+  ctx.strokeStyle = color;
+  ctx.lineWidth = el.strokeWidth || 2;
+  ctx.stroke();
+
+  // Header bar
+  ctx.beginPath();
+  ctx.roundRect(el.x, el.y, el.width, headerH, [r, r, 0, 0]);
+  ctx.fillStyle = color;
+  ctx.fill();
+
+  // Envelope icon in header
+  ctx.save();
+  ctx.translate(el.x + 14, el.y + headerH / 2);
+  ctx.strokeStyle = 'white';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(-6, -5, 12, 10, 1);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-6, -5);
+  ctx.lineTo(0, 1);
+  ctx.lineTo(6, -5);
+  ctx.stroke();
+  ctx.restore();
+
+  // Title text
+  const fontSize = el.fontSize || 14;
+  ctx.fillStyle = 'white';
+  ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+  ctx.textBaseline = 'middle';
+  ctx.fillText(el.text || 'Enveloppe', el.x + 30, el.y + headerH / 2, el.width - 70);
+
+  // Count badge
+  if (childCount > 0) {
+    const badgeX = el.x + el.width - 30;
+    const badgeY = el.y + headerH / 2;
+    ctx.beginPath();
+    ctx.arc(badgeX, badgeY, 12, 0, Math.PI * 2);
+    ctx.fillStyle = 'white';
+    ctx.fill();
+
+    ctx.fillStyle = color;
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(String(childCount), badgeX, badgeY);
+    ctx.textAlign = 'left';
+  }
+
+  // Flap pattern (envelope flap aesthetic at bottom)
+  ctx.beginPath();
+  ctx.moveTo(el.x, el.y + el.height);
+  ctx.lineTo(el.x + el.width / 2, el.y + el.height - 20);
+  ctx.lineTo(el.x + el.width, el.y + el.height);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.3;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
 function drawImage(ctx, el) {
   if (!el.imageData) return;
   const img = getCachedImage(el.imageData);
   if (img.complete && img.naturalWidth > 0) {
-    // Shadow
     ctx.shadowColor = 'rgba(0,0,0,0.2)';
     ctx.shadowBlur = 8;
     ctx.shadowOffsetY = 2;
@@ -344,8 +466,9 @@ function hitTestElement(el, worldX, worldY, threshold) {
     case 'sticky':
     case 'image':
       return pointInRect(worldX, worldY, el.x, el.y, el.width, el.height);
+    case 'envelope':
+      return pointInRect(worldX, worldY, el.x, el.y, el.width, el.height);
     case 'frame': {
-      // Hit test the border area only (not the inside), or the title bar
       const titleH = (el.fontSize || 16) + 16;
       if (pointInRect(worldX, worldY, el.x, el.y - titleH, el.width, titleH)) return true;
       const borderThreshold = threshold;
@@ -376,6 +499,14 @@ function hitTestElement(el, worldX, worldY, threshold) {
     default:
       return false;
   }
+}
+
+// Check if element center is inside an envelope
+function isInsideEnvelope(el, envelope) {
+  const bounds = getElementBounds(el);
+  const cx = bounds.x + bounds.w / 2;
+  const cy = bounds.y + bounds.h / 2;
+  return pointInRect(cx, cy, envelope.x, envelope.y + 36, envelope.width, envelope.height - 36);
 }
 
 // Get resize handle at position

@@ -211,7 +211,15 @@ class InputHandler {
     }
 
     // Tool shortcuts
-    const toolMap = { v: 'select', h: 'hand', r: 'rect', c: 'circle', l: 'line', a: 'arrow', d: 'draw', s: 'sticky', t: 'text', e: 'eraser', f: 'frame' };
+    // Anchor navigation shortcut
+    if (e.key === 'n' || e.key === 'N') {
+      if (this.app.workshop) {
+        this.app.workshop.openAnchorSearch();
+      }
+      return;
+    }
+
+    const toolMap = { v: 'select', h: 'hand', r: 'rect', c: 'circle', l: 'line', a: 'arrow', d: 'draw', s: 'sticky', t: 'text', e: 'eraser', f: 'frame', g: 'envelope' };
     if (toolMap[e.key.toLowerCase()]) {
       this.app.setTool(toolMap[e.key.toLowerCase()]);
       return;

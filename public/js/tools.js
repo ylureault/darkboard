@@ -21,6 +21,9 @@ const Tools = {
         return;
       }
 
+      // Handle vote click during voting
+      if (app.handleVoteClick(worldX, worldY)) return;
+
       const hit = app.renderer.hitTest(worldX, worldY);
 
       if (hit) {
@@ -136,6 +139,17 @@ const Tools = {
           }
           app.history.push(ops, inverseOps);
           app.sync.sendOps(ops);
+
+          // Envelope: move children with envelope
+          for (const [id] of this.originalElements) {
+            const el = app.renderer.elements.get(id);
+            if (el && el.type === 'envelope') {
+              app.moveEnvelopeWithChildren(id, dx, dy);
+            }
+          }
+
+          // Envelope: check if moved elements landed in/out of envelopes
+          app.updateEnvelopeContainment(this.originalElements);
         }
       } else if (this.dragType === 'resize' && this.dragStart) {
         const { elementId } = this.resizeHandle;
@@ -213,7 +227,7 @@ const Tools = {
 
     onDoubleClick(app, worldX, worldY) {
       const hit = app.renderer.hitTest(worldX, worldY);
-      if (hit && (hit.type === 'sticky' || hit.type === 'text' || hit.type === 'rect' || hit.type === 'circle' || hit.type === 'frame')) {
+      if (hit && (hit.type === 'sticky' || hit.type === 'text' || hit.type === 'rect' || hit.type === 'circle' || hit.type === 'frame' || hit.type === 'envelope')) {
         app.startTextEdit(hit);
       } else if (!hit) {
         // Double-click on empty canvas creates a sticky
@@ -428,6 +442,52 @@ const Tools = {
 
     onPointerMove() {},
     onPointerUp() {},
+    onKeyDown() {},
+    onDoubleClick() {}
+  },
+
+  envelope: {
+    name: 'envelope',
+    cursor: 'crosshair',
+    startPoint: null,
+
+    onPointerDown(app, worldX, worldY) {
+      this.startPoint = { x: worldX, y: worldY };
+      app.renderer.previewElement = createEnvelope(worldX, worldY, 0, 0);
+    },
+
+    onPointerMove(app, worldX, worldY) {
+      if (!this.startPoint) return;
+      const w = worldX - this.startPoint.x;
+      const h = worldY - this.startPoint.y;
+      const norm = normalizeRect(this.startPoint.x, this.startPoint.y, w, h);
+      app.renderer.previewElement.x = norm.x;
+      app.renderer.previewElement.y = norm.y;
+      app.renderer.previewElement.width = norm.w;
+      app.renderer.previewElement.height = norm.h;
+      app.renderer.markDirty();
+    },
+
+    onPointerUp(app, worldX, worldY) {
+      if (!this.startPoint) return;
+      const w = worldX - this.startPoint.x;
+      const h = worldY - this.startPoint.y;
+      const norm = normalizeRect(this.startPoint.x, this.startPoint.y, w, h);
+
+      if (norm.w > 30 && norm.h > 30) {
+        const el = createEnvelope(norm.x, norm.y, norm.w, norm.h);
+        app.addElement(el);
+        app.renderer.selectedIds.clear();
+        app.renderer.selectedIds.add(el.id);
+        app.setTool('select');
+        setTimeout(() => app.startTextEdit(el), 50);
+      }
+
+      app.renderer.previewElement = null;
+      this.startPoint = null;
+      app.renderer.markDirty();
+    },
+
     onKeyDown() {},
     onDoubleClick() {}
   },

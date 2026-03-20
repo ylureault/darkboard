@@ -26,11 +26,12 @@ class SyncClient {
       this.reconnectDelay = 1000;
       console.log('Connected to DarkBoard server');
 
-      // Join board
+      // Join board with name
       this.ws.send(JSON.stringify({
         type: 'join',
         boardId: getBoardId(),
-        userId: getSessionId()
+        userId: getSessionId(),
+        name: this.app.userName
       }));
     };
 
@@ -50,7 +51,7 @@ class SyncClient {
       this.scheduleReconnect();
     };
 
-    this.ws.onerror = (e) => {
+    this.ws.onerror = () => {
       console.error('WebSocket error');
     };
   }
@@ -66,7 +67,6 @@ class SyncClient {
   handleMessage(msg) {
     switch (msg.type) {
       case 'init':
-        // Load initial board state
         this.app.renderer.elements.clear();
         if (msg.elements) {
           for (const el of msg.elements) {
@@ -79,12 +79,23 @@ class SyncClient {
           }
         }
         this.app.myColor = msg.color;
+        this.app.myUserId = msg.userId;
+        this.app.isFacilitator = msg.isFacilitator;
         this.app.updateUsersPanel();
         this.app.renderer.markDirty();
+
+        // Init workshop state
+        if (this.app.workshop) {
+          this.app.workshop.setFacilitator(msg.isFacilitator, msg.facilitatorId);
+          if (msg.anchors) this.app.workshop.loadAnchors(msg.anchors);
+          if (msg.timer) this.app.workshop.syncTimer(msg.timer);
+          if (msg.voting) this.app.workshop.syncVoting(msg.voting);
+          if (msg.isolation) this.app.workshop.syncIsolation(msg.isolation);
+          if (msg.followMode) this.app.workshop.syncFollowMode(msg.followMode, msg.facilitatorId);
+        }
         break;
 
       case 'op':
-        // Apply remote operations
         this.app.applyOps(msg.ops);
         break;
 
@@ -93,7 +104,8 @@ class SyncClient {
           x: msg.x,
           y: msg.y,
           name: msg.name,
-          color: msg.color
+          color: msg.color,
+          lastActivity: Date.now()
         });
         this.app.renderer.markDirty();
         break;
@@ -102,7 +114,9 @@ class SyncClient {
         this.app.renderer.remoteUsers.set(msg.userId, {
           x: 0, y: 0,
           name: msg.name,
-          color: msg.color
+          color: msg.color,
+          isFacilitator: msg.isFacilitator,
+          lastActivity: Date.now()
         });
         this.app.updateUsersPanel();
         this.app.showToast(`${msg.name} a rejoint le tableau`);
@@ -113,21 +127,104 @@ class SyncClient {
         this.app.updateUsersPanel();
         this.app.renderer.markDirty();
         break;
+
+      case 'user-rename': {
+        const user = this.app.renderer.remoteUsers.get(msg.userId);
+        if (user) user.name = msg.name;
+        this.app.updateUsersPanel();
+        break;
+      }
+
+      case 'facilitator-change':
+        this.app.isFacilitator = (msg.facilitatorId === this.app.myUserId);
+        if (this.app.workshop) {
+          this.app.workshop.setFacilitator(this.app.isFacilitator, msg.facilitatorId);
+        }
+        // Update remote users
+        this.app.renderer.remoteUsers.forEach((user, uid) => {
+          user.isFacilitator = (uid === msg.facilitatorId);
+        });
+        this.app.updateUsersPanel();
+        if (this.app.isFacilitator) {
+          this.app.showToast('Vous etes maintenant animateur');
+        }
+        break;
+
+      // Workshop messages
+      case 'timer-sync':
+        if (this.app.workshop) this.app.workshop.syncTimer(msg.timer);
+        break;
+
+      case 'vote-sync':
+        if (this.app.workshop) this.app.workshop.syncVoting(msg.voting);
+        break;
+
+      case 'vote-update':
+        if (this.app.workshop) this.app.workshop.handleVoteUpdate(msg);
+        break;
+
+      case 'vote-reveal':
+        if (this.app.workshop) this.app.workshop.handleVoteReveal(msg);
+        break;
+
+      case 'vote-end':
+        if (this.app.workshop) this.app.workshop.handleVoteEnd(msg);
+        break;
+
+      case 'vote-error':
+        this.app.showToast(msg.message);
+        break;
+
+      case 'isolation-sync':
+        if (this.app.workshop) this.app.workshop.syncIsolation(msg.isolation);
+        break;
+
+      case 'isolation-reveal':
+        if (this.app.workshop) this.app.workshop.handleIsolationReveal(msg);
+        break;
+
+      case 'follow-sync':
+        if (this.app.workshop) this.app.workshop.syncFollowMode(msg.active, msg.facilitatorId);
+        break;
+
+      case 'follow-view':
+        if (this.app.workshop) this.app.workshop.handleFollowView(msg);
+        break;
+
+      case 'goto-position':
+        this.app.animateToView(msg.x, msg.y);
+        break;
+
+      // Anchors
+      case 'anchor-add':
+        if (this.app.workshop) this.app.workshop.handleAnchorAdd(msg);
+        break;
+
+      case 'anchor-update':
+        if (this.app.workshop) this.app.workshop.handleAnchorUpdate(msg);
+        break;
+
+      case 'anchor-delete':
+        if (this.app.workshop) this.app.workshop.handleAnchorDelete(msg);
+        break;
     }
   }
 
-  sendOps(ops) {
+  send(msg) {
     if (!this.connected || !this.ws) return;
-    this.ws.send(JSON.stringify({
+    this.ws.send(JSON.stringify(msg));
+  }
+
+  sendOps(ops) {
+    this.send({
       type: 'op',
       boardId: getBoardId(),
       ops
-    }));
+    });
   }
 
   sendCursor(x, y) {
     if (!this.connected || !this.ws) return;
-    // Throttle cursor updates
     if (this.cursorThrottle) return;
     this.cursorThrottle = setTimeout(() => {
       this.cursorThrottle = null;
@@ -138,5 +235,9 @@ class SyncClient {
       boardId: getBoardId(),
       x, y
     }));
+  }
+
+  sendName(name) {
+    this.send({ type: 'set-name', name });
   }
 }

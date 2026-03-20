@@ -10,6 +10,16 @@
 <body>
   <canvas id="canvas"></canvas>
 
+  <!-- Name dialog on join -->
+  <div class="modal-overlay" id="nameDialog">
+    <div class="modal">
+      <h2>Bienvenue sur DarkBoard</h2>
+      <p>Choisissez un pseudonyme pour commencer</p>
+      <input type="text" id="nameInput" placeholder="Votre pseudo..." maxlength="20" autofocus />
+      <button class="modal-btn" id="nameSubmit">Rejoindre</button>
+    </div>
+  </div>
+
   <!-- Toolbar -->
   <div class="toolbar" id="toolbar">
     <button class="tool-btn active" data-tool="select" title="Selectionner (V)">
@@ -76,6 +86,13 @@
       </svg>
       <span class="shortcut">T</span>
     </button>
+    <button class="tool-btn" data-tool="envelope" title="Enveloppe (G)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="6" width="20" height="14" rx="2"/>
+        <path d="M2 8l10 6 10-6"/>
+      </svg>
+      <span class="shortcut">G</span>
+    </button>
     <button class="tool-btn" data-tool="frame" title="Cadre/Zone (F)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4 2"/>
@@ -107,6 +124,125 @@
   <div class="users-panel" id="usersPanel">
     <span class="users-count" id="usersCount">1 en ligne</span>
   </div>
+
+  <!-- Facilitator panel -->
+  <div class="facilitator-panel" id="facilitatorPanel" style="display:none;">
+    <div class="facilitator-label">Animateur</div>
+    <div class="facilitator-controls">
+      <button class="fctl-btn" id="btnTimer" title="Timer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3l2 2M19 3l-2 2"/>
+        </svg>
+        Timer
+      </button>
+      <button class="fctl-btn" id="btnVote" title="Vote">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <path d="M14 9V5a3 3 0 00-6 0v4"/><path d="M5 10h14l1 10H4L5 10z"/>
+        </svg>
+        Vote
+      </button>
+      <button class="fctl-btn" id="btnIsolation" title="Mode isoloir">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+          <line x1="2" y1="2" x2="22" y2="22"/>
+        </svg>
+        Isoloir
+      </button>
+      <button class="fctl-btn" id="btnFollow" title="Synchroniser les vues">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+        </svg>
+        Suivez-moi
+      </button>
+    </div>
+  </div>
+
+  <!-- Timer display -->
+  <div class="timer-display" id="timerDisplay" style="display:none;">
+    <div class="timer-time" id="timerTime">05:00</div>
+    <div class="timer-controls" id="timerControls" style="display:none;">
+      <button class="timer-ctrl-btn" id="timerToggle">Pause</button>
+      <button class="timer-ctrl-btn" id="timerReset">Relancer</button>
+      <button class="timer-ctrl-btn timer-ctrl-danger" id="timerClear">Fermer</button>
+    </div>
+  </div>
+
+  <!-- Timer setup modal -->
+  <div class="modal-overlay" id="timerModal" style="display:none;">
+    <div class="modal">
+      <h2>Lancer un timer</h2>
+      <div class="timer-setup">
+        <input type="number" id="timerMinutes" value="5" min="0" max="60" /> min
+        <input type="number" id="timerSeconds" value="0" min="0" max="59" /> sec
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn" id="timerStart">Demarrer</button>
+        <button class="modal-btn modal-btn-secondary" id="timerCancel">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vote setup modal -->
+  <div class="modal-overlay" id="voteModal" style="display:none;">
+    <div class="modal">
+      <h2>Session de vote</h2>
+      <label class="modal-label">Nombre de votes par participant</label>
+      <div class="vote-quota-options" id="voteQuotaOptions">
+        <button class="quota-btn" data-quota="1">1</button>
+        <button class="quota-btn active" data-quota="3">3</button>
+        <button class="quota-btn" data-quota="5">5</button>
+        <button class="quota-btn" data-quota="0">Illimite</button>
+      </div>
+      <label class="modal-label">
+        <input type="checkbox" id="voteHideResults" checked /> Masquer les resultats pendant le vote
+      </label>
+      <div class="modal-actions">
+        <button class="modal-btn" id="voteStart">Lancer le vote</button>
+        <button class="modal-btn modal-btn-secondary" id="voteCancel">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vote status bar -->
+  <div class="vote-bar" id="voteBar" style="display:none;">
+    <span class="vote-bar-label">Vote en cours</span>
+    <span class="vote-bar-remaining" id="voteRemaining">3 votes restants</span>
+    <button class="vote-bar-btn" id="voteReveal" style="display:none;">Reveler</button>
+    <button class="vote-bar-btn vote-bar-danger" id="voteEnd" style="display:none;">Terminer</button>
+  </div>
+
+  <!-- Isolation mode banner -->
+  <div class="isolation-banner" id="isolationBanner" style="display:none;">
+    <span>Mode isoloir actif — Vos contributions sont privees</span>
+    <button class="isolation-btn" id="isolationReveal" style="display:none;">Reveler tout</button>
+    <button class="isolation-btn isolation-btn-secondary" id="isolationCancel" style="display:none;">Annuler</button>
+  </div>
+
+  <!-- Follow mode banner -->
+  <div class="follow-banner" id="followBanner" style="display:none;">
+    <span id="followText">Vue synchronisee avec l'animateur</span>
+    <button class="follow-stop-btn" id="followStop" style="display:none;">Arreter</button>
+  </div>
+
+  <!-- Anchors panel (sidebar) -->
+  <div class="anchors-panel" id="anchorsPanel" style="display:none;">
+    <div class="anchors-header">
+      <span>Ancres</span>
+      <button class="anchors-close" id="anchorsClose">x</button>
+    </div>
+    <div class="anchors-list" id="anchorsList"></div>
+    <button class="anchors-add" id="anchorsAdd">+ Ajouter une ancre ici</button>
+  </div>
+
+  <!-- Anchors toggle button -->
+  <button class="anchor-toggle-btn" id="anchorToggle" title="Ancres / Navigation (N)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+      <circle cx="12" cy="5" r="3"/><line x1="12" y1="8" x2="12" y2="21"/>
+      <path d="M5 12h14"/>
+    </svg>
+    Ancres
+  </button>
 
   <!-- Zoom controls -->
   <div class="zoom-controls">
@@ -146,6 +282,7 @@
   <script src="/js/input.js"></script>
   <script src="/js/sync.js"></script>
   <script src="/js/ui.js"></script>
+  <script src="/js/workshop.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

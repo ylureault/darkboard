@@ -6,6 +6,9 @@ class DarkBoardApp {
     this.currentStroke = '#ffffff';
     this.currentStrokeWidth = 2;
     this.myColor = '#4a9eff';
+    this.myUserId = null;
+    this.isFacilitator = false;
+    this.userName = '';
     this.clipboard = [];
     this.textEditElement = null;
 
@@ -15,9 +18,8 @@ class DarkBoardApp {
     // Init history
     this.history = new History();
 
-    // Init sync
+    // Init sync (connect after name is set)
     this.sync = new SyncClient(this);
-    this.sync.connect();
 
     // Init input
     this.input = new InputHandler(this);
@@ -25,11 +27,55 @@ class DarkBoardApp {
     // Init UI
     this.ui = new UI(this);
 
+    // Init workshop features
+    this.workshop = new Workshop(this);
+
     // Update title
     document.title = `DarkBoard - ${getBoardId()}`;
 
     // Image drag-and-drop
     this.initDragDrop();
+
+    // Cursor timeout
+    this.initCursorTimeout();
+
+    // Render vote badges
+    this.initVoteRenderer();
+
+    // Show name dialog
+    this.showNameDialog();
+  }
+
+  showNameDialog() {
+    const dialog = document.getElementById('nameDialog');
+    const input = document.getElementById('nameInput');
+    const submit = document.getElementById('nameSubmit');
+
+    // Check if name already saved
+    const savedName = localStorage.getItem('darkboard-name');
+    if (savedName) {
+      this.userName = savedName;
+      dialog.style.display = 'none';
+      this.sync.connect();
+      return;
+    }
+
+    dialog.style.display = '';
+    input.focus();
+
+    const joinWithName = () => {
+      const name = input.value.trim() || `User ${getSessionId().slice(0, 4)}`;
+      this.userName = name;
+      localStorage.setItem('darkboard-name', name);
+      dialog.style.display = 'none';
+      this.sync.connect();
+    };
+
+    submit.addEventListener('click', joinWithName);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') joinWithName();
+      e.stopPropagation();
+    });
   }
 
   initDragDrop() {
@@ -45,14 +91,22 @@ class DarkBoardApp {
       const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
       if (files.length === 0) return;
 
+      // Check file size (max 5MB)
+      for (const file of files) {
+        if (file.size > 5 * 1024 * 1024) {
+          this.showToast('Image trop grande (max 5 Mo)');
+          continue;
+        }
+      }
+
       const world = this.renderer.screenToWorld(e.clientX, e.clientY);
 
       for (const file of files) {
+        if (file.size > 5 * 1024 * 1024) continue;
         const reader = new FileReader();
         reader.onload = (ev) => {
           const img = new Image();
           img.onload = () => {
-            // Scale down large images
             let w = img.width;
             let h = img.height;
             const maxSize = 600;
@@ -72,6 +126,77 @@ class DarkBoardApp {
         reader.readAsDataURL(file);
       }
     });
+  }
+
+  initCursorTimeout() {
+    // Hide cursors of inactive users (30 seconds)
+    setInterval(() => {
+      const now = Date.now();
+      let changed = false;
+      for (const [userId, user] of this.renderer.remoteUsers) {
+        if (user.lastActivity && (now - user.lastActivity) > 30000) {
+          if (!user.inactive) {
+            user.inactive = true;
+            changed = true;
+          }
+        } else {
+          if (user.inactive) {
+            user.inactive = false;
+            changed = true;
+          }
+        }
+      }
+      if (changed) this.renderer.markDirty();
+    }, 5000);
+  }
+
+  initVoteRenderer() {
+    // Override the render method to add vote badges
+    const origRender = this.renderer.render.bind(this.renderer);
+    this.renderer.render = () => {
+      origRender();
+
+      // Draw vote badges on top
+      if (this.workshop && this.workshop.isVotingActive()) {
+        const ctx = this.renderer.ctx;
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        ctx.save();
+        ctx.translate(w / 2, h / 2);
+        ctx.scale(this.renderer.camera.zoom, this.renderer.camera.zoom);
+        ctx.translate(-this.renderer.camera.x, -this.renderer.camera.y);
+
+        for (const [id, el] of this.renderer.elements) {
+          if (el.type === 'sticky' || el.type === 'rect' || el.type === 'text') {
+            const count = this.workshop.getVoteCount(id);
+            const voted = this.workshop.hasVoted(id);
+            if (count > 0 || voted) {
+              renderVoteBadge(ctx, el, count, voted);
+            }
+          }
+        }
+        ctx.restore();
+      }
+
+      // Show vote results after vote ends
+      if (this.workshop && !this.workshop.isVotingActive() && Object.keys(this.workshop.voteResults).length > 0) {
+        const ctx = this.renderer.ctx;
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        ctx.save();
+        ctx.translate(w / 2, h / 2);
+        ctx.scale(this.renderer.camera.zoom, this.renderer.camera.zoom);
+        ctx.translate(-this.renderer.camera.x, -this.renderer.camera.y);
+
+        for (const [elementId, count] of Object.entries(this.workshop.voteResults)) {
+          const el = this.renderer.elements.get(elementId);
+          if (el && count > 0) {
+            renderVoteBadge(ctx, el, count, false);
+          }
+        }
+        ctx.restore();
+      }
+    };
   }
 
   setTool(name) {
@@ -120,6 +245,11 @@ class DarkBoardApp {
       if (el) {
         ops.push({ type: 'delete', elementId: id });
         inverseOps.push({ type: 'add', elementId: id, element: deepClone(el) });
+
+        // If deleting an envelope, also remove children references
+        if (el.type === 'envelope' && el.children) {
+          // Children stay on canvas, just lose their parent
+        }
       }
     }
     this.applyOps(ops);
@@ -209,6 +339,84 @@ class DarkBoardApp {
     }
   }
 
+  // Envelope containment logic
+  updateEnvelopeContainment(movedElements) {
+    const envelopes = Array.from(this.renderer.elements.values()).filter(e => e.type === 'envelope');
+    if (envelopes.length === 0) return;
+
+    const ops = [];
+    const inverseOps = [];
+
+    for (const [id] of movedElements) {
+      const el = this.renderer.elements.get(id);
+      if (!el || el.type === 'envelope') continue;
+
+      // Remove from any previous envelope
+      for (const env of envelopes) {
+        if (env.children && env.children.includes(id)) {
+          const oldChildren = [...env.children];
+          env.children = env.children.filter(c => c !== id);
+          ops.push({ type: 'update', elementId: env.id, props: { children: [...env.children] } });
+          inverseOps.push({ type: 'update', elementId: env.id, props: { children: oldChildren } });
+        }
+      }
+
+      // Check if now inside an envelope
+      for (const env of envelopes) {
+        if (isInsideEnvelope(el, env)) {
+          if (!env.children) env.children = [];
+          if (!env.children.includes(id)) {
+            const oldChildren = [...env.children];
+            env.children.push(id);
+            ops.push({ type: 'update', elementId: env.id, props: { children: [...env.children] } });
+            inverseOps.push({ type: 'update', elementId: env.id, props: { children: oldChildren } });
+          }
+          break; // Only belong to one envelope
+        }
+      }
+    }
+
+    if (ops.length > 0) {
+      this.history.push(ops, inverseOps);
+      this.sync.sendOps(ops);
+      this.renderer.markDirty();
+    }
+  }
+
+  // Get children of an envelope
+  getEnvelopeChildren(envelopeId) {
+    const env = this.renderer.elements.get(envelopeId);
+    if (!env || !env.children) return [];
+    return env.children
+      .map(id => this.renderer.elements.get(id))
+      .filter(el => el != null);
+  }
+
+  // Move envelope with children
+  moveEnvelopeWithChildren(envelopeId, dx, dy) {
+    const children = this.getEnvelopeChildren(envelopeId);
+    const ops = [];
+    const inverseOps = [];
+    for (const child of children) {
+      const oldProps = { x: child.x, y: child.y };
+      child.x += dx;
+      child.y += dy;
+      if (child.x2 !== undefined) { child.x2 += dx; child.y2 += dy; }
+      if (child.points) {
+        child.points = child.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+      }
+      const newProps = { x: child.x, y: child.y };
+      if (child.x2 !== undefined) { newProps.x2 = child.x2; newProps.y2 = child.y2; }
+      if (child.points) { newProps.points = child.points; }
+      ops.push({ type: 'update', elementId: child.id, props: newProps });
+      inverseOps.push({ type: 'update', elementId: child.id, props: oldProps });
+    }
+    if (ops.length > 0) {
+      this.history.push(ops, inverseOps);
+      this.sync.sendOps(ops);
+    }
+  }
+
   startTextEdit(el) {
     this.textEditElement = el;
     const screen = this.renderer.worldToScreen(el.x, el.y);
@@ -239,11 +447,21 @@ class DarkBoardApp {
       textarea.style.color = 'white';
       textarea.style.fontWeight = 'bold';
       textarea.style.padding = (8 * zoom) + 'px';
+    } else if (el.type === 'envelope') {
+      // Edit envelope title in header bar
+      const headerH = 36 * zoom;
+      textarea.style.left = (screen.x + 30 * zoom) + 'px';
+      textarea.style.top = screen.y + 'px';
+      textarea.style.width = ((el.width - 60) * zoom) + 'px';
+      textarea.style.height = headerH + 'px';
+      textarea.style.background = el.stroke || '#4a9eff';
+      textarea.style.color = 'white';
+      textarea.style.fontWeight = 'bold';
+      textarea.style.padding = (8 * zoom) + 'px';
     } else if (el.type === 'rect' || el.type === 'circle') {
       textarea.style.background = 'rgba(30,30,30,0.9)';
       textarea.style.color = '#e0e0e0';
       textarea.style.textAlign = 'center';
-      // Init text prop if needed
       if (!el.text) el.text = '';
     } else {
       textarea.style.background = 'rgba(30,30,30,0.9)';
@@ -261,7 +479,6 @@ class DarkBoardApp {
         const inverseOps = [{ type: 'update', elementId: el.id, props: { text: el.text } }];
         el.text = newText;
 
-        // Auto-resize height for text elements
         if (el.type === 'text') {
           const lines = newText.split('\n').length;
           const newHeight = Math.max(40, lines * (el.fontSize || 20) * 1.4 + 10);
@@ -283,13 +500,51 @@ class DarkBoardApp {
       if (e.key === 'Escape') {
         textarea.blur();
       }
-      // Allow Enter in stickies (multiline), but finish on Enter for single-line text/frame/shapes
-      if (e.key === 'Enter' && (el.type === 'text' || el.type === 'frame' || el.type === 'rect' || el.type === 'circle') && !e.shiftKey) {
+      if (e.key === 'Enter' && (el.type === 'text' || el.type === 'frame' || el.type === 'rect' || el.type === 'circle' || el.type === 'envelope') && !e.shiftKey) {
         e.preventDefault();
         textarea.blur();
       }
       e.stopPropagation();
     });
+  }
+
+  // Animated view transition
+  animateToView(targetX, targetY, targetZoom) {
+    targetZoom = targetZoom || this.renderer.camera.zoom;
+    const startX = this.renderer.camera.x;
+    const startY = this.renderer.camera.y;
+    const startZoom = this.renderer.camera.zoom;
+    const startTime = Date.now();
+    const duration = 500; // ms
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const t = Math.min(1, elapsed / duration);
+      // Ease in-out
+      const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+      this.renderer.camera.x = lerp(startX, targetX, ease);
+      this.renderer.camera.y = lerp(startY, targetY, ease);
+      this.renderer.camera.zoom = lerp(startZoom, targetZoom, ease);
+      this.renderer.markDirty();
+      this.updateZoomDisplay();
+
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    requestAnimationFrame(animate);
+  }
+
+  // Handle click on element during voting
+  handleVoteClick(worldX, worldY) {
+    if (!this.workshop || !this.workshop.isVotingActive()) return false;
+
+    const hit = this.renderer.hitTest(worldX, worldY);
+    if (hit && (hit.type === 'sticky' || hit.type === 'rect' || hit.type === 'text')) {
+      return this.workshop.castVote(hit.id);
+    }
+    return false;
   }
 
   updateZoomDisplay() {
@@ -303,15 +558,75 @@ class DarkBoardApp {
     let html = '';
 
     // My avatar
-    html += `<div class="user-avatar" style="background:${this.myColor}">${getSessionId().slice(0, 2).toUpperCase()}</div>`;
+    const myFac = this.isFacilitator ? ' facilitator' : '';
+    html += `<div class="user-avatar${myFac}" style="background:${this.myColor}" title="${this.userName} (Vous)">${(this.userName || '').slice(0, 2).toUpperCase()}</div>`;
 
     // Remote users
     for (const [userId, user] of this.renderer.remoteUsers) {
-      html += `<div class="user-avatar" style="background:${user.color}" title="${user.name}">${(user.name || '').slice(0, 2).toUpperCase()}</div>`;
+      const fac = user.isFacilitator ? ' facilitator' : '';
+      html += `<div class="user-avatar${fac}" style="background:${user.color}" title="${user.name}">${(user.name || '').slice(0, 2).toUpperCase()}</div>`;
     }
 
     html += `<span class="users-count">${count} en ligne</span>`;
     panel.innerHTML = html;
+
+    // Click on users panel to show dropdown
+    panel.onclick = () => this.showUsersDropdown();
+  }
+
+  showUsersDropdown() {
+    // Remove existing
+    const existing = document.querySelector('.users-dropdown');
+    if (existing) { existing.remove(); return; }
+
+    const dropdown = document.createElement('div');
+    dropdown.className = 'users-dropdown';
+
+    // Me
+    const myItem = document.createElement('div');
+    myItem.className = 'users-dropdown-item';
+    myItem.innerHTML = `<span class="user-dot" style="background:${this.myColor}"></span>${this.userName} (Vous)${this.isFacilitator ? '<span class="user-role">Animateur</span>' : ''}`;
+    dropdown.appendChild(myItem);
+
+    // Remote users
+    for (const [userId, user] of this.renderer.remoteUsers) {
+      const item = document.createElement('div');
+      item.className = 'users-dropdown-item';
+      item.innerHTML = `<span class="user-dot" style="background:${user.color}"></span>${user.name || userId}${user.isFacilitator ? '<span class="user-role">Animateur</span>' : ''}`;
+      item.addEventListener('click', () => {
+        this.sync.send({ type: 'goto-user', targetUserId: userId });
+        dropdown.remove();
+      });
+      dropdown.appendChild(item);
+    }
+
+    // Claim facilitator option
+    if (!this.isFacilitator) {
+      const sep = document.createElement('div');
+      sep.style.cssText = 'height:1px;background:var(--panel-border);margin:4px 0;';
+      dropdown.appendChild(sep);
+
+      const claimBtn = document.createElement('div');
+      claimBtn.className = 'users-dropdown-item';
+      claimBtn.style.color = 'var(--warning)';
+      claimBtn.textContent = 'Devenir animateur';
+      claimBtn.addEventListener('click', () => {
+        this.sync.send({ type: 'claim-facilitator' });
+        dropdown.remove();
+      });
+      dropdown.appendChild(claimBtn);
+    }
+
+    document.body.appendChild(dropdown);
+
+    setTimeout(() => {
+      document.addEventListener('pointerdown', function handler(e) {
+        if (!dropdown.contains(e.target)) {
+          dropdown.remove();
+          document.removeEventListener('pointerdown', handler);
+        }
+      });
+    }, 0);
   }
 
   showToast(message) {
@@ -322,7 +637,6 @@ class DarkBoardApp {
   }
 
   showContextMenu(screenX, screenY, worldX, worldY) {
-    // Remove existing
     this.hideContextMenu();
 
     const hit = this.renderer.hitTest(worldX, worldY);
@@ -353,6 +667,8 @@ class DarkBoardApp {
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="selectAll">Tout selectionner <span class="shortcut-hint">Ctrl+A</span></div>
         <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="addAnchor">Ajouter une ancre ici</div>
+        <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="resetView">Reinitialiser la vue</div>
       `;
     }
@@ -360,7 +676,6 @@ class DarkBoardApp {
     document.body.appendChild(menu);
     this.contextMenu = menu;
 
-    // Keep menu in viewport
     const rect = menu.getBoundingClientRect();
     if (rect.right > window.innerWidth) {
       menu.style.left = (screenX - rect.width) + 'px';
@@ -380,6 +695,9 @@ class DarkBoardApp {
         case 'delete': this.deleteSelected(); break;
         case 'paste': this.paste(); break;
         case 'selectAll': this.selectAll(); break;
+        case 'addAnchor':
+          if (this.workshop) this.workshop.addAnchorHere();
+          break;
         case 'front':
           this.updateSelectedElements({ zIndex: Date.now() + 1000 });
           break;
@@ -395,7 +713,6 @@ class DarkBoardApp {
       this.hideContextMenu();
     });
 
-    // Close on click outside
     setTimeout(() => {
       document.addEventListener('pointerdown', this._closeMenu = () => {
         this.hideContextMenu();
