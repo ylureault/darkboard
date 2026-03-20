@@ -7,6 +7,7 @@ class InputHandler {
     this.lastPanX = 0;
     this.lastPanY = 0;
     this.pointerDown = false;
+    this.zoomMode = false; // Z key held
 
     this.bindEvents();
   }
@@ -21,7 +22,7 @@ class InputHandler {
     canvas.addEventListener('pointerleave', (e) => this.onPointerUp(e));
     canvas.addEventListener('dblclick', (e) => this.onDoubleClick(e));
 
-    // Wheel zoom
+    // Wheel zoom/pan
     canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
 
     // Keyboard
@@ -96,6 +97,15 @@ class InputHandler {
       return;
     }
 
+    // Z key zoom mode: click to zoom in, Alt+click to zoom out
+    if (this.zoomMode && e.button === 0) {
+      const factor = e.altKey ? 0.7 : 1.4;
+      const newZoom = this.app.renderer.camera.zoom * factor;
+      this.app.renderer.setZoom(newZoom, e.clientX, e.clientY);
+      this.app.updateZoomDisplay();
+      return;
+    }
+
     if (e.button !== 0) return;
     this.pointerDown = true;
 
@@ -154,16 +164,49 @@ class InputHandler {
 
   onWheel(e) {
     e.preventDefault();
-    const delta = -e.deltaY * 0.001;
-    const newZoom = this.app.renderer.camera.zoom * (1 + delta);
-    this.app.renderer.setZoom(newZoom, e.clientX, e.clientY);
-    this.app.updateZoomDisplay();
+
+    if (e.ctrlKey || e.metaKey) {
+      // Ctrl+scroll = zoom (pinch on trackpad also sends ctrl+wheel)
+      const delta = -e.deltaY * 0.005;
+      const newZoom = this.app.renderer.camera.zoom * (1 + delta);
+      this.app.renderer.setZoom(newZoom, e.clientX, e.clientY);
+      this.app.updateZoomDisplay();
+    } else if (e.shiftKey) {
+      // Shift+scroll = horizontal pan
+      this.app.renderer.pan(-e.deltaY, 0);
+      this.app.renderer.markDirty();
+    } else {
+      // Normal scroll = pan vertically (trackpad 2-finger sends deltaX & deltaY)
+      if (Math.abs(e.deltaX) > 0 || e.deltaMode === 0) {
+        // Trackpad: pan in both directions
+        this.app.renderer.pan(-e.deltaX, -e.deltaY);
+        this.app.renderer.markDirty();
+      } else {
+        // Mouse wheel: zoom
+        const delta = -e.deltaY * 0.001;
+        const newZoom = this.app.renderer.camera.zoom * (1 + delta);
+        this.app.renderer.setZoom(newZoom, e.clientX, e.clientY);
+        this.app.updateZoomDisplay();
+      }
+    }
   }
 
   onKeyDown(e) {
-    // Ignore if typing in input
-    if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+    // Ignore if typing in input/textarea/contenteditable
+    if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT' || e.target.isContentEditable) {
+      // Allow Ctrl shortcuts in contenteditable (formatting)
+      if (e.target.isContentEditable && (e.ctrlKey || e.metaKey)) {
+        // Let browser handle B/I/U in contenteditable; intercept Escape
+        if (e.key === 'Escape') {
+          e.target.blur();
+          e.preventDefault();
+        }
+        return;
+      }
+      return;
+    }
 
+    // Space bar = temporary pan (not in text editing)
     if (e.key === ' ') {
       e.preventDefault();
       this.spaceDown = true;
@@ -171,80 +214,104 @@ class InputHandler {
       return;
     }
 
+    // Z key = temporary zoom mode
+    if (e.key === 'z' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      this.zoomMode = true;
+      this.app.renderer.canvas.style.cursor = 'zoom-in';
+      return;
+    }
+
     // Ctrl/Cmd shortcuts
     if (e.ctrlKey || e.metaKey) {
       if (e.key === 'z') {
         e.preventDefault();
-        if (e.shiftKey) {
-          this.app.redo();
-        } else {
-          this.app.undo();
-        }
+        if (e.shiftKey) this.app.redo();
+        else this.app.undo();
         return;
       }
-      if (e.key === 'y') {
+      if (e.key === 'y') { e.preventDefault(); this.app.redo(); return; }
+      if (e.key === 'a') { e.preventDefault(); this.app.selectAll(); return; }
+      if (e.key === 'c' && !e.shiftKey) { e.preventDefault(); this.app.copySelected(); return; }
+      if (e.key === 'x') { e.preventDefault(); this.app.cutSelected(); return; }
+      if (e.key === 'v' && !e.shiftKey) { e.preventDefault(); this.app.paste(); return; }
+      if (e.key === 'g' && e.shiftKey) { e.preventDefault(); this.app.ungroupSelected(); return; }
+      if (e.key === 'g') { e.preventDefault(); this.app.groupSelected(); return; }
+      if (e.key === 'd') { e.preventDefault(); this.app.duplicateSelected(); return; }
+
+      // Ctrl+F: Search & replace
+      if (e.key === 'f') {
         e.preventDefault();
-        this.app.redo();
+        this.app.toggleSearchPanel();
         return;
       }
-      if (e.key === 'a') {
+
+      // Ctrl+0: Fit to screen
+      if (e.key === '0') {
         e.preventDefault();
-        this.app.selectAll();
+        this.app.ui.fitToScreen();
         return;
       }
-      if (e.key === 'c') {
+      // Ctrl+1: Zoom 100%
+      if (e.key === '1') {
         e.preventDefault();
-        this.app.copySelected();
+        this.app.renderer.camera.zoom = 1;
+        this.app.renderer.markDirty();
+        this.app.updateZoomDisplay();
         return;
       }
-      if (e.key === 'x') {
+      // Ctrl+= or Ctrl++: Zoom in
+      if (e.key === '=' || e.key === '+') {
         e.preventDefault();
-        this.app.cutSelected();
+        const z = this.app.renderer.camera.zoom * 1.2;
+        this.app.renderer.setZoom(z);
+        this.app.updateZoomDisplay();
         return;
       }
-      if (e.key === 'v') {
+      // Ctrl+-: Zoom out
+      if (e.key === '-') {
         e.preventDefault();
-        this.app.paste();
+        const z = this.app.renderer.camera.zoom / 1.2;
+        this.app.renderer.setZoom(z);
+        this.app.updateZoomDisplay();
         return;
       }
-      if (e.key === 'g' && e.shiftKey) {
+      // Ctrl+Shift+H: Center on selection
+      if (e.key === 'h' && e.shiftKey) {
         e.preventDefault();
-        this.app.ungroupSelected();
+        this.app.centerOnSelection();
         return;
       }
-      if (e.key === 'g') {
-        e.preventDefault();
-        this.app.groupSelected();
-        return;
-      }
-      if (e.key === 'd') {
-        e.preventDefault();
-        this.app.duplicateSelected();
-        return;
-      }
+
       return;
     }
 
     // Tool shortcuts
-    // Anchor navigation shortcut
-    if (e.key === 'n' || e.key === 'N') {
-      if (this.app.workshop) {
-        this.app.workshop.openAnchorSearch();
-      }
-      return;
-    }
+    // Remap: C=connector, O=circle (oval), N=sticky (new), S=sticky
+    const toolMap = {
+      v: 'select', h: 'hand', r: 'rect', o: 'circle', l: 'line',
+      a: 'arrow', d: 'draw', s: 'sticky', n: 'sticky', t: 'text',
+      e: 'eraser', f: 'frame', g: 'envelope', c: 'connector',
+      k: 'connector', m: 'card', i: 'list'
+    };
 
-    const toolMap = { v: 'select', h: 'hand', r: 'rect', c: 'circle', l: 'line', a: 'arrow', d: 'draw', s: 'sticky', t: 'text', e: 'eraser', f: 'frame', g: 'envelope', k: 'connector', m: 'card', i: 'list' };
-    if (toolMap[e.key.toLowerCase()]) {
-      this.app.setTool(toolMap[e.key.toLowerCase()]);
+    const lower = e.key.toLowerCase();
+    if (toolMap[lower]) {
+      this.app.setTool(toolMap[lower]);
       return;
     }
 
     // Arrow key movement of selected elements
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      // In presentation mode, navigate anchors
+      if (this.app.ui && this.app.ui.presentationActive) {
+        e.preventDefault();
+        if (e.key === 'ArrowRight') this.app.ui.presentationNavigate(1);
+        else if (e.key === 'ArrowLeft') this.app.ui.presentationNavigate(-1);
+        return;
+      }
       if (this.app.renderer.selectedIds.size > 0) {
         e.preventDefault();
-        const step = e.shiftKey ? 20 : 5;
+        const step = e.ctrlKey ? 100 : (e.shiftKey ? 10 : 1);
         let dx = 0, dy = 0;
         if (e.key === 'ArrowLeft') dx = -step;
         if (e.key === 'ArrowRight') dx = step;
@@ -255,6 +322,41 @@ class InputHandler {
       }
     }
 
+    // PageUp/PageDown for presentation mode
+    if (e.key === 'PageDown') {
+      if (this.app.ui && this.app.ui.presentationActive) {
+        e.preventDefault();
+        this.app.ui.presentationNavigate(1);
+        return;
+      }
+    }
+    if (e.key === 'PageUp') {
+      if (this.app.ui && this.app.ui.presentationActive) {
+        e.preventDefault();
+        this.app.ui.presentationNavigate(-1);
+        return;
+      }
+    }
+
+    // Number keys 1-9 for direct anchor navigation in presentation mode
+    if (this.app.ui && this.app.ui.presentationActive && e.key >= '1' && e.key <= '9') {
+      e.preventDefault();
+      this.app.ui.navigateToAnchor(parseInt(e.key) - 1);
+      return;
+    }
+
+    // F5 or F: toggle presentation fullscreen
+    if (e.key === 'F5') {
+      e.preventDefault();
+      if (this.app.ui && this.app.ui.presentationActive) {
+        if (document.fullscreenElement) document.exitFullscreen();
+        else document.documentElement.requestFullscreen();
+      } else {
+        this.app.ui.startPresentation();
+      }
+      return;
+    }
+
     // Delete
     const tool = Tools[this.app.currentTool];
     if (tool && tool.onKeyDown) {
@@ -263,6 +365,18 @@ class InputHandler {
 
     // Escape
     if (e.key === 'Escape') {
+      // Close search panel if open
+      if (this.app.searchPanel && this.app.searchPanel.style.display !== 'none') {
+        this.app.closeSearchPanel();
+        return;
+      }
+      // Exit presentation mode
+      if (this.app.ui && this.app.ui.presentationActive) {
+        this.app.ui.stopPresentation();
+        return;
+      }
+      // Return to select tool and clear selection
+      this.app.setTool('select');
       this.app.renderer.selectedIds.clear();
       this.app.renderer.previewElement = null;
       this.app.renderer.markDirty();
@@ -272,8 +386,17 @@ class InputHandler {
   onKeyUp(e) {
     if (e.key === ' ') {
       this.spaceDown = false;
-      const tool = Tools[this.app.currentTool];
-      this.app.renderer.canvas.style.cursor = tool ? tool.cursor : 'default';
+      if (!this.zoomMode) {
+        const tool = Tools[this.app.currentTool];
+        this.app.renderer.canvas.style.cursor = tool ? tool.cursor : 'default';
+      }
+    }
+    if (e.key === 'z' || e.key === 'Z') {
+      this.zoomMode = false;
+      if (!this.spaceDown) {
+        const tool = Tools[this.app.currentTool];
+        this.app.renderer.canvas.style.cursor = tool ? tool.cursor : 'default';
+      }
     }
   }
 

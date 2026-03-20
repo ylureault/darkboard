@@ -16,6 +16,7 @@ class CanvasRenderer {
     this.minimapEnabled = false;
     this.laserPointers = new Map(); // userId -> {x, y, color}
     this.comments = []; // anchored comments
+    this.alignmentGuides = []; // { type: 'h'|'v', x?, y? }
 
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -143,6 +144,29 @@ class CanvasRenderer {
     // Comments
     for (const comment of this.comments) {
       this.drawCommentBubble(ctx, comment);
+    }
+
+    // Alignment guides
+    if (this.alignmentGuides.length > 0) {
+      ctx.save();
+      ctx.strokeStyle = '#ff6b9d';
+      ctx.lineWidth = 1 / this.camera.zoom;
+      ctx.setLineDash([6 / this.camera.zoom, 4 / this.camera.zoom]);
+      const viewTL = this.screenToWorld(0, 0);
+      const viewBR = this.screenToWorld(w, h);
+      for (const guide of this.alignmentGuides) {
+        ctx.beginPath();
+        if (guide.type === 'h') {
+          ctx.moveTo(viewTL.x, guide.y);
+          ctx.lineTo(viewBR.x, guide.y);
+        } else {
+          ctx.moveTo(guide.x, viewTL.y);
+          ctx.lineTo(guide.x, viewBR.y);
+        }
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      ctx.restore();
     }
 
     // Remote cursors

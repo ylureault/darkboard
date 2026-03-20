@@ -605,114 +605,442 @@ class DarkBoardApp {
     }
   }
 
+  // Rich text types that support contenteditable
+  isRichTextType(type) {
+    return type === 'sticky' || type === 'text' || type === 'circle' || type === 'rect';
+  }
+
   startTextEdit(el) {
     this.textEditElement = el;
     const screen = this.renderer.worldToScreen(el.x, el.y);
     const zoom = this.renderer.camera.zoom;
 
-    const textarea = document.createElement('textarea');
-    textarea.className = 'text-edit-overlay';
-    textarea.value = el.text || '';
-    textarea.style.left = screen.x + 'px';
-    textarea.style.top = screen.y + 'px';
-    textarea.style.width = (el.width * zoom) + 'px';
-    textarea.style.height = (el.height * zoom) + 'px';
-    textarea.style.fontSize = ((el.fontSize || 16) * zoom) + 'px';
-    textarea.style.lineHeight = '1.4';
+    // Use contenteditable div for rich text types, textarea for simple types
+    const useRichText = this.isRichTextType(el.type);
+    const editor = document.createElement(useRichText ? 'div' : 'textarea');
+    editor.className = 'text-edit-overlay';
+
+    if (useRichText) {
+      editor.contentEditable = 'true';
+      editor.innerHTML = el.richText || (el.text ? el.text.replace(/\n/g, '<br>') : '');
+      editor.style.outline = 'none';
+      editor.style.whiteSpace = 'pre-wrap';
+      editor.style.wordWrap = 'break-word';
+      editor.style.overflowY = 'auto';
+    } else {
+      editor.value = el.text || '';
+    }
+
+    editor.style.left = screen.x + 'px';
+    editor.style.top = screen.y + 'px';
+    editor.style.width = (el.width * zoom) + 'px';
+    editor.style.height = (el.height * zoom) + 'px';
+    editor.style.fontSize = ((el.fontSize || 16) * zoom) + 'px';
+    editor.style.lineHeight = '1.4';
 
     if (el.type === 'sticky') {
-      textarea.style.background = el.fill || '#FFD966';
-      textarea.style.color = '#1a1a1a';
-      textarea.style.padding = (14 * zoom) + 'px';
-      textarea.style.borderColor = 'rgba(0,0,0,0.2)';
+      editor.style.background = el.fill || '#FFD966';
+      editor.style.color = '#1a1a1a';
+      editor.style.padding = (14 * zoom) + 'px';
+      editor.style.borderColor = 'rgba(0,0,0,0.2)';
+    } else if (el.type === 'text') {
+      editor.style.background = 'rgba(30,30,30,0.9)';
+      editor.style.color = '#e0e0e0';
     } else if (el.type === 'frame') {
       const titleH = ((el.fontSize || 16) + 16) * zoom;
-      textarea.style.left = screen.x + 'px';
-      textarea.style.top = (screen.y - titleH) + 'px';
-      textarea.style.width = (el.width * zoom) + 'px';
-      textarea.style.height = titleH + 'px';
-      textarea.style.background = el.stroke || '#4a9eff';
-      textarea.style.color = 'white';
-      textarea.style.fontWeight = 'bold';
-      textarea.style.padding = (8 * zoom) + 'px';
+      editor.style.left = screen.x + 'px';
+      editor.style.top = (screen.y - titleH) + 'px';
+      editor.style.width = (el.width * zoom) + 'px';
+      editor.style.height = titleH + 'px';
+      editor.style.background = el.stroke || '#4a9eff';
+      editor.style.color = 'white';
+      editor.style.fontWeight = 'bold';
+      editor.style.padding = (8 * zoom) + 'px';
     } else if (el.type === 'envelope') {
-      // Edit envelope title in header bar
       const headerH = 36 * zoom;
-      textarea.style.left = (screen.x + 30 * zoom) + 'px';
-      textarea.style.top = screen.y + 'px';
-      textarea.style.width = ((el.width - 60) * zoom) + 'px';
-      textarea.style.height = headerH + 'px';
-      textarea.style.background = el.stroke || '#4a9eff';
-      textarea.style.color = 'white';
-      textarea.style.fontWeight = 'bold';
-      textarea.style.padding = (8 * zoom) + 'px';
+      editor.style.left = (screen.x + 30 * zoom) + 'px';
+      editor.style.top = screen.y + 'px';
+      editor.style.width = ((el.width - 60) * zoom) + 'px';
+      editor.style.height = headerH + 'px';
+      editor.style.background = el.stroke || '#4a9eff';
+      editor.style.color = 'white';
+      editor.style.fontWeight = 'bold';
+      editor.style.padding = (8 * zoom) + 'px';
     } else if (el.type === 'card') {
-      // Show card edit panel instead of simple textarea
       this.showCardEditor(el);
       return;
     } else if (el.type === 'list') {
       this.showListEditor(el);
       return;
     } else if (el.type === 'connector') {
-      // Edit label on connector
       const mx = (el.x + el.x2) / 2;
       const my = (el.y + el.y2) / 2;
       const screen2 = this.renderer.worldToScreen(mx - 60, my - 15);
-      textarea.style.left = screen2.x + 'px';
-      textarea.style.top = screen2.y + 'px';
-      textarea.style.width = (120 * zoom) + 'px';
-      textarea.style.height = (30 * zoom) + 'px';
-      textarea.style.background = 'rgba(30,30,30,0.9)';
-      textarea.style.color = '#e0e0e0';
-      textarea.style.textAlign = 'center';
+      editor.style.left = screen2.x + 'px';
+      editor.style.top = screen2.y + 'px';
+      editor.style.width = (120 * zoom) + 'px';
+      editor.style.height = (30 * zoom) + 'px';
+      editor.style.background = 'rgba(30,30,30,0.9)';
+      editor.style.color = '#e0e0e0';
+      editor.style.textAlign = 'center';
     } else if (el.type === 'rect' || el.type === 'circle' || el.type === 'diamond' || el.type === 'triangle') {
-      textarea.style.background = 'rgba(30,30,30,0.9)';
-      textarea.style.color = '#e0e0e0';
-      textarea.style.textAlign = 'center';
+      editor.style.background = 'rgba(30,30,30,0.9)';
+      editor.style.color = '#e0e0e0';
+      editor.style.textAlign = 'center';
       if (!el.text) el.text = '';
     } else {
-      textarea.style.background = 'rgba(30,30,30,0.9)';
-      textarea.style.color = '#e0e0e0';
+      editor.style.background = 'rgba(30,30,30,0.9)';
+      editor.style.color = '#e0e0e0';
     }
 
-    document.body.appendChild(textarea);
-    textarea.focus();
-    textarea.select();
+    document.body.appendChild(editor);
+    editor.focus();
+
+    // Show formatting toolbar for rich text types
+    if (useRichText) {
+      this.showFormattingToolbar(editor, el);
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } else {
+      editor.select();
+    }
 
     const finishEdit = () => {
-      const newText = textarea.value;
-      if (newText !== el.text) {
-        const ops = [{ type: 'update', elementId: el.id, props: { text: newText } }];
-        const inverseOps = [{ type: 'update', elementId: el.id, props: { text: el.text } }];
-        el.text = newText;
-
-        if (el.type === 'text') {
-          const lines = newText.split('\n').length;
-          const newHeight = Math.max(40, lines * (el.fontSize || 20) * 1.4 + 10);
-          ops[0].props.height = newHeight;
-          inverseOps[0].props.height = el.height;
-          el.height = newHeight;
+      if (useRichText) {
+        const newHtml = editor.innerHTML;
+        const newPlain = editor.textContent || editor.innerText || '';
+        const props = { richText: newHtml, text: newPlain };
+        const oldProps = { richText: el.richText || null, text: el.text || '' };
+        if (newHtml !== (el.richText || '') || newPlain !== el.text) {
+          Object.assign(el, props);
+          if (el.type === 'text') {
+            const lines = newPlain.split('\n').length;
+            const newHeight = Math.max(40, lines * (el.fontSize || 20) * 1.4 + 10);
+            props.height = newHeight;
+            oldProps.height = el.height;
+            el.height = newHeight;
+          }
+          if (el.type === 'sticky') {
+            const lines = newPlain.split('\n').length;
+            const minH = Math.max(200, lines * (el.fontSize || 16) * 1.4 + 28);
+            if (minH > el.height) {
+              props.height = minH;
+              oldProps.height = el.height;
+              el.height = minH;
+            }
+          }
+          const ops = [{ type: 'update', elementId: el.id, props }];
+          const inverseOps = [{ type: 'update', elementId: el.id, props: oldProps }];
+          this.history.push(ops, inverseOps);
+          this.sync.sendOps(ops);
         }
-
-        this.history.push(ops, inverseOps);
-        this.sync.sendOps(ops);
+      } else {
+        const newText = editor.value;
+        if (newText !== el.text) {
+          const ops = [{ type: 'update', elementId: el.id, props: { text: newText } }];
+          const inverseOps = [{ type: 'update', elementId: el.id, props: { text: el.text } }];
+          el.text = newText;
+          if (el.type === 'text') {
+            const lines = newText.split('\n').length;
+            const newHeight = Math.max(40, lines * (el.fontSize || 20) * 1.4 + 10);
+            ops[0].props.height = newHeight;
+            inverseOps[0].props.height = el.height;
+            el.height = newHeight;
+          }
+          this.history.push(ops, inverseOps);
+          this.sync.sendOps(ops);
+        }
       }
-      textarea.remove();
+      this.hideFormattingToolbar();
+      editor.remove();
       this.textEditElement = null;
       this.renderer.markDirty();
     };
 
-    textarea.addEventListener('blur', finishEdit);
-    textarea.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        textarea.blur();
+    editor.addEventListener('blur', (e) => {
+      if (e.relatedTarget && (e.relatedTarget.closest('.formatting-toolbar') || e.relatedTarget.closest('.fmt-color-picker'))) {
+        setTimeout(() => editor.focus(), 10);
+        return;
       }
-      if (e.key === 'Enter' && (el.type === 'text' || el.type === 'frame' || el.type === 'rect' || el.type === 'circle' || el.type === 'envelope' || el.type === 'diamond' || el.type === 'triangle' || el.type === 'connector') && !e.shiftKey) {
+      finishEdit();
+    });
+    editor.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        editor.blur();
+      }
+      if (!useRichText && e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        textarea.blur();
+        editor.blur();
       }
       e.stopPropagation();
     });
+  }
+
+  showFormattingToolbar(editor, el) {
+    this.hideFormattingToolbar();
+    const toolbar = document.createElement('div');
+    toolbar.className = 'formatting-toolbar';
+    toolbar.tabIndex = -1;
+    toolbar.innerHTML = `
+      <button class="fmt-btn" data-cmd="bold" title="Gras (Ctrl+B)"><b>B</b></button>
+      <button class="fmt-btn" data-cmd="italic" title="Italique (Ctrl+I)"><i>I</i></button>
+      <button class="fmt-btn" data-cmd="underline" title="Souligne (Ctrl+U)"><u>U</u></button>
+      <button class="fmt-btn" data-cmd="strikeThrough" title="Barre"><s>S</s></button>
+      <span class="fmt-sep"></span>
+      <select class="fmt-select" data-cmd="fontSize" title="Taille">
+        <option value="">Taille</option>
+        <option value="1">9px</option>
+        <option value="2">11px</option>
+        <option value="3">14px</option>
+        <option value="4">18px</option>
+        <option value="5">22px</option>
+        <option value="6">28px</option>
+        <option value="7">36px</option>
+      </select>
+      <span class="fmt-sep"></span>
+      <button class="fmt-btn" data-action="textColor" title="Couleur du texte"><span style="color:#e94560">A</span></button>
+      <button class="fmt-btn" data-action="highlight" title="Surlignage"><span style="background:#ffd966;padding:0 3px">H</span></button>
+      <span class="fmt-sep"></span>
+      <button class="fmt-btn" data-cmd="justifyLeft" title="Gauche">≡</button>
+      <button class="fmt-btn" data-cmd="justifyCenter" title="Centre">≡</button>
+      <button class="fmt-btn" data-cmd="justifyRight" title="Droite">≡</button>
+      <span class="fmt-sep"></span>
+      <button class="fmt-btn" data-cmd="removeFormat" title="Effacer">✕</button>
+    `;
+
+    const editorRect = editor.getBoundingClientRect();
+    toolbar.style.left = editorRect.left + 'px';
+    toolbar.style.top = Math.max(0, editorRect.top - 44) + 'px';
+    if (editorRect.top < 50) {
+      toolbar.style.top = (editorRect.bottom + 4) + 'px';
+    }
+
+    document.body.appendChild(toolbar);
+    this.formattingToolbar = toolbar;
+
+    toolbar.addEventListener('mousedown', (e) => e.preventDefault());
+
+    toolbar.addEventListener('click', (e) => {
+      const btn = e.target.closest('.fmt-btn');
+      const select = e.target.closest('.fmt-select');
+      if (btn) {
+        const cmd = btn.dataset.cmd;
+        const action = btn.dataset.action;
+        if (cmd) {
+          document.execCommand(cmd, false, null);
+          editor.focus();
+        } else if (action === 'textColor') {
+          this.showColorPicker(toolbar, (color) => {
+            document.execCommand('foreColor', false, color);
+            editor.focus();
+          });
+        } else if (action === 'highlight') {
+          this.showColorPicker(toolbar, (color) => {
+            document.execCommand('hiliteColor', false, color);
+            editor.focus();
+          });
+        }
+      }
+      if (select && select.dataset.cmd === 'fontSize') {
+        document.execCommand('fontSize', false, select.value);
+        editor.focus();
+      }
+    });
+  }
+
+  hideFormattingToolbar() {
+    if (this.formattingToolbar) { this.formattingToolbar.remove(); this.formattingToolbar = null; }
+    const picker = document.querySelector('.fmt-color-picker');
+    if (picker) picker.remove();
+  }
+
+  showColorPicker(toolbar, callback) {
+    const existing = document.querySelector('.fmt-color-picker');
+    if (existing) { existing.remove(); return; }
+    const picker = document.createElement('div');
+    picker.className = 'fmt-color-picker';
+    picker.tabIndex = -1;
+    const colors = ['#000000', '#e94560', '#ff6b6b', '#ffd966', '#4ecdc4', '#4a9eff', '#96ceb4', '#dda0dd', '#ffffff', '#888888', '#0f3460', '#45b7d1'];
+    for (const c of colors) {
+      const swatch = document.createElement('div');
+      swatch.className = 'fmt-swatch';
+      swatch.style.background = c;
+      swatch.addEventListener('mousedown', (e) => e.preventDefault());
+      swatch.addEventListener('click', () => { callback(c); picker.remove(); });
+      picker.appendChild(swatch);
+    }
+    const tbRect = toolbar.getBoundingClientRect();
+    picker.style.left = tbRect.left + 'px';
+    picker.style.top = (tbRect.bottom + 4) + 'px';
+    document.body.appendChild(picker);
+    setTimeout(() => {
+      document.addEventListener('pointerdown', function handler(e) {
+        if (!picker.contains(e.target)) { picker.remove(); document.removeEventListener('pointerdown', handler); }
+      });
+    }, 0);
+  }
+
+  centerOnSelection() {
+    if (this.renderer.selectedIds.size === 0) return;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const id of this.renderer.selectedIds) {
+      const el = this.renderer.elements.get(id);
+      if (!el) continue;
+      const b = getElementBounds(el);
+      if (b.x < minX) minX = b.x;
+      if (b.y < minY) minY = b.y;
+      if (b.x + b.w > maxX) maxX = b.x + b.w;
+      if (b.y + b.h > maxY) maxY = b.y + b.h;
+    }
+    if (!isFinite(minX)) return;
+    const cx = minX + (maxX - minX) / 2;
+    const cy = minY + (maxY - minY) / 2;
+    const cw = maxX - minX;
+    const ch = maxY - minY;
+    const zoom = Math.min((window.innerWidth * 0.7) / (cw || 1), (window.innerHeight * 0.7) / (ch || 1), 2);
+    this.animateToView(cx, cy, Math.max(0.3, zoom));
+  }
+
+  // Search and replace
+  toggleSearchPanel() {
+    if (!this.searchPanel) this.createSearchPanel();
+    const visible = this.searchPanel.style.display !== 'none';
+    this.searchPanel.style.display = visible ? 'none' : 'flex';
+    if (!visible) this.searchPanel.querySelector('.search-input').focus();
+  }
+
+  closeSearchPanel() {
+    if (this.searchPanel) { this.searchPanel.style.display = 'none'; this.clearSearchHighlights(); }
+  }
+
+  createSearchPanel() {
+    const panel = document.createElement('div');
+    panel.className = 'search-panel';
+    panel.style.display = 'none';
+    panel.innerHTML = `
+      <input type="text" class="search-input" placeholder="Rechercher..." />
+      <span class="search-count">0/0</span>
+      <button class="search-btn" id="searchNext" title="Suivant">▼</button>
+      <button class="search-btn" id="searchPrev" title="Precedent">▲</button>
+      <span class="search-sep"></span>
+      <input type="text" class="replace-input" placeholder="Remplacer par..." />
+      <button class="search-btn replace-btn">Remplacer</button>
+      <button class="search-btn replace-all-btn">Tout</button>
+      <button class="search-btn search-close-btn">✕</button>
+    `;
+    document.body.appendChild(panel);
+    this.searchPanel = panel;
+    this.searchResults = [];
+    this.searchIndex = 0;
+
+    const searchInput = panel.querySelector('.search-input');
+    const replaceInput = panel.querySelector('.replace-input');
+    const countEl = panel.querySelector('.search-count');
+
+    searchInput.addEventListener('input', () => {
+      this.performSearch(searchInput.value);
+      countEl.textContent = this.searchResults.length > 0 ? `${this.searchIndex + 1}/${this.searchResults.length}` : '0/0';
+    });
+    searchInput.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') this.searchNavigate(1);
+      if (e.key === 'Escape') this.closeSearchPanel();
+    });
+    replaceInput.addEventListener('keydown', (e) => e.stopPropagation());
+
+    panel.querySelector('#searchNext').addEventListener('click', () => this.searchNavigate(1));
+    panel.querySelector('#searchPrev').addEventListener('click', () => this.searchNavigate(-1));
+    panel.querySelector('.replace-btn').addEventListener('click', () => this.replaceOne(searchInput.value, replaceInput.value));
+    panel.querySelector('.replace-all-btn').addEventListener('click', () => this.replaceAll(searchInput.value, replaceInput.value));
+    panel.querySelector('.search-close-btn').addEventListener('click', () => this.closeSearchPanel());
+  }
+
+  performSearch(query) {
+    this.clearSearchHighlights();
+    this.searchResults = [];
+    this.searchIndex = 0;
+    if (!query) return;
+    const lower = query.toLowerCase();
+    for (const [id, el] of this.renderer.elements) {
+      const text = (el.text || '') + (el.richText ? richTextToPlain(el.richText) : '');
+      if (text.toLowerCase().includes(lower)) {
+        this.searchResults.push(id);
+        el._searchHighlight = true;
+      }
+    }
+    if (this.searchResults.length > 0) this.focusSearchResult();
+    this.renderer.markDirty();
+  }
+
+  searchNavigate(dir) {
+    if (this.searchResults.length === 0) return;
+    this.searchIndex = (this.searchIndex + dir + this.searchResults.length) % this.searchResults.length;
+    this.focusSearchResult();
+    this.searchPanel.querySelector('.search-count').textContent = `${this.searchIndex + 1}/${this.searchResults.length}`;
+  }
+
+  focusSearchResult() {
+    const id = this.searchResults[this.searchIndex];
+    if (!id) return;
+    const el = this.renderer.elements.get(id);
+    if (!el) return;
+    const b = getElementBounds(el);
+    this.renderer.selectedIds.clear();
+    this.renderer.selectedIds.add(id);
+    this.animateToView(b.x + b.w / 2, b.y + b.h / 2);
+  }
+
+  replaceOne(search, replace) {
+    if (this.searchResults.length === 0 || !search) return;
+    const id = this.searchResults[this.searchIndex];
+    const el = this.renderer.elements.get(id);
+    if (!el) return;
+    const re = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    const oldText = el.text;
+    const newText = (el.text || '').replace(re, replace);
+    if (newText !== oldText) {
+      const props = { text: newText };
+      const oldProps = { text: oldText };
+      if (el.richText) { oldProps.richText = el.richText; el.richText = el.richText.replace(re, replace); props.richText = el.richText; }
+      el.text = newText;
+      this.history.push([{ type: 'update', elementId: id, props }], [{ type: 'update', elementId: id, props: oldProps }]);
+      this.sync.sendOps([{ type: 'update', elementId: id, props }]);
+    }
+    this.performSearch(search);
+    this.searchPanel.querySelector('.search-count').textContent = this.searchResults.length > 0 ? `${this.searchIndex + 1}/${this.searchResults.length}` : '0/0';
+    this.renderer.markDirty();
+  }
+
+  replaceAll(search, replace) {
+    if (!search) return;
+    const re = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    let count = 0;
+    const ops = [], inverseOps = [];
+    for (const [id, el] of this.renderer.elements) {
+      const oldText = el.text || '';
+      const newText = oldText.replace(re, replace);
+      if (newText !== oldText) {
+        count++;
+        const p = { text: newText }, op = { text: oldText };
+        if (el.richText) { op.richText = el.richText; el.richText = el.richText.replace(re, replace); p.richText = el.richText; }
+        el.text = newText;
+        ops.push({ type: 'update', elementId: id, props: p });
+        inverseOps.push({ type: 'update', elementId: id, props: op });
+      }
+    }
+    if (ops.length > 0) { this.history.push(ops, inverseOps); this.sync.sendOps(ops); }
+    this.showToast(`${count} remplacement(s) effectue(s)`);
+    this.performSearch(search);
+    this.searchPanel.querySelector('.search-count').textContent = '0/0';
+    this.renderer.markDirty();
+  }
+
+  clearSearchHighlights() {
+    for (const [id, el] of this.renderer.elements) delete el._searchHighlight;
+    this.renderer.markDirty();
   }
 
   // Group/Ungroup

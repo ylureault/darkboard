@@ -202,6 +202,187 @@ function getCachedImage(dataUrl) {
   return img;
 }
 
+// ========================
+// Rich Text Rendering
+// ========================
+
+// Parse HTML string to array of text segments with formatting
+function parseRichText(html) {
+  if (!html || typeof html !== 'string') return [{ text: html || '', bold: false, italic: false, underline: false, strikethrough: false, fontSize: null, color: null, highlight: null }];
+
+  // If no HTML tags, treat as plain text
+  if (!/<[^>]+>/.test(html)) {
+    return [{ text: html, bold: false, italic: false, underline: false, strikethrough: false, fontSize: null, color: null, highlight: null }];
+  }
+
+  const segments = [];
+  // Use a temporary div to parse HTML
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = html;
+
+  function walkNode(node, styles) {
+    if (node.nodeType === 3) { // Text node
+      const text = node.textContent;
+      if (text) {
+        segments.push({ text, ...styles });
+      }
+      return;
+    }
+    if (node.nodeType !== 1) return;
+
+    const tag = node.tagName.toLowerCase();
+    const newStyles = { ...styles };
+
+    if (tag === 'b' || tag === 'strong') newStyles.bold = true;
+    if (tag === 'i' || tag === 'em') newStyles.italic = true;
+    if (tag === 'u') newStyles.underline = true;
+    if (tag === 's' || tag === 'strike' || tag === 'del') newStyles.strikethrough = true;
+    if (tag === 'br') { segments.push({ text: '\n', ...styles }); return; }
+
+    // Check inline styles
+    const style = node.style;
+    if (style) {
+      if (style.color) newStyles.color = style.color;
+      if (style.backgroundColor) newStyles.highlight = style.backgroundColor;
+      if (style.fontSize) newStyles.fontSize = parseInt(style.fontSize) || null;
+      if (style.fontWeight === 'bold' || parseInt(style.fontWeight) >= 700) newStyles.bold = true;
+      if (style.fontStyle === 'italic') newStyles.italic = true;
+      if (style.textDecoration && style.textDecoration.includes('underline')) newStyles.underline = true;
+      if (style.textDecoration && style.textDecoration.includes('line-through')) newStyles.strikethrough = true;
+    }
+
+    for (const child of node.childNodes) {
+      walkNode(child, newStyles);
+    }
+
+    // Add newline after block elements
+    if (['div', 'p', 'h1', 'h2', 'h3', 'h4'].includes(tag) && segments.length > 0) {
+      const last = segments[segments.length - 1];
+      if (last.text && !last.text.endsWith('\n')) {
+        segments.push({ text: '\n', ...styles });
+      }
+    }
+  }
+
+  walkNode(tempDiv, { bold: false, italic: false, underline: false, strikethrough: false, fontSize: null, color: null, highlight: null });
+  return segments.length > 0 ? segments : [{ text: '', bold: false, italic: false, underline: false, strikethrough: false, fontSize: null, color: null, highlight: null }];
+}
+
+// Render rich text segments on canvas with word wrapping
+function renderRichText(ctx, segments, x, y, maxWidth, defaultFontSize, defaultColor, textAlign) {
+  const lineHeight = defaultFontSize * 1.4;
+  const fontFamily = '-apple-system, BlinkMacSystemFont, sans-serif';
+  let curX = x;
+  let curY = y;
+  const lines = []; // array of arrays of { segment, width }
+  let currentLine = [];
+  let currentLineWidth = 0;
+
+  // First pass: compute lines for word wrapping
+  for (const seg of segments) {
+    if (!seg.text) continue;
+
+    const fontSize = seg.fontSize || defaultFontSize;
+    let fontStr = '';
+    if (seg.italic) fontStr += 'italic ';
+    if (seg.bold) fontStr += 'bold ';
+    fontStr += `${fontSize}px ${fontFamily}`;
+    ctx.font = fontStr;
+
+    const words = seg.text.split(/(\s+)/);
+    for (const word of words) {
+      if (word === '\n') {
+        lines.push([...currentLine]);
+        currentLine = [];
+        currentLineWidth = 0;
+        continue;
+      }
+      if (!word) continue;
+
+      const wordWidth = ctx.measureText(word).width;
+      if (currentLineWidth + wordWidth > maxWidth && currentLine.length > 0 && word.trim()) {
+        lines.push([...currentLine]);
+        currentLine = [];
+        currentLineWidth = 0;
+      }
+      currentLine.push({ segment: { ...seg, fontSize }, text: word, width: wordWidth });
+      currentLineWidth += wordWidth;
+    }
+  }
+  if (currentLine.length > 0) {
+    lines.push(currentLine);
+  }
+
+  // Second pass: render
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
+    let lineW = line.reduce((s, item) => s + item.width, 0);
+    let startX = x;
+    if (textAlign === 'center') startX = x + (maxWidth - lineW) / 2;
+    else if (textAlign === 'right') startX = x + maxWidth - lineW;
+
+    curX = startX;
+    const curLineY = y + li * lineHeight;
+
+    for (const item of line) {
+      const seg = item.segment;
+      const fontSize = seg.fontSize || defaultFontSize;
+      let fontStr = '';
+      if (seg.italic) fontStr += 'italic ';
+      if (seg.bold) fontStr += 'bold ';
+      fontStr += `${fontSize}px ${fontFamily}`;
+      ctx.font = fontStr;
+
+      // Highlight background
+      if (seg.highlight) {
+        ctx.save();
+        ctx.fillStyle = seg.highlight;
+        ctx.globalAlpha = 0.5;
+        ctx.fillRect(curX, curLineY, item.width, lineHeight);
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+
+      // Text
+      ctx.fillStyle = seg.color || defaultColor || '#e0e0e0';
+      ctx.textBaseline = 'top';
+      ctx.fillText(item.text, curX, curLineY);
+
+      // Underline
+      if (seg.underline) {
+        ctx.beginPath();
+        ctx.moveTo(curX, curLineY + fontSize + 2);
+        ctx.lineTo(curX + item.width, curLineY + fontSize + 2);
+        ctx.strokeStyle = seg.color || defaultColor || '#e0e0e0';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      // Strikethrough
+      if (seg.strikethrough) {
+        ctx.beginPath();
+        ctx.moveTo(curX, curLineY + fontSize / 2);
+        ctx.lineTo(curX + item.width, curLineY + fontSize / 2);
+        ctx.strokeStyle = seg.color || defaultColor || '#e0e0e0';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      curX += item.width;
+    }
+  }
+
+  return lines.length * lineHeight;
+}
+
+// Get plain text from rich text HTML
+function richTextToPlain(html) {
+  if (!html || !/<[^>]+>/.test(html)) return html || '';
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return div.textContent || div.innerText || '';
+}
+
 // Render an element to canvas
 function renderElement(ctx, el, selected, camera) {
   ctx.save();
@@ -329,13 +510,21 @@ function drawRect(ctx, el) {
     ctx.lineWidth = el.strokeWidth;
     ctx.stroke();
   }
-  if (el.text) {
-    ctx.fillStyle = '#e0e0e0';
-    ctx.font = `${el.fontSize || 16}px -apple-system, BlinkMacSystemFont, sans-serif`;
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'center';
-    ctx.fillText(el.text, el.x + el.width / 2, el.y + el.height / 2, el.width - 16);
-    ctx.textAlign = 'left';
+  const textContent = el.richText || el.text;
+  if (textContent) {
+    if (el.richText) {
+      const segments = parseRichText(el.richText);
+      const fs = el.fontSize || 16;
+      const textH = segments.length * fs * 1.4;
+      renderRichText(ctx, segments, el.x + 8, el.y + (el.height - textH) / 2, el.width - 16, fs, '#e0e0e0', 'center');
+    } else {
+      ctx.fillStyle = '#e0e0e0';
+      ctx.font = `${el.fontSize || 16}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center';
+      ctx.fillText(el.text, el.x + el.width / 2, el.y + el.height / 2, el.width - 16);
+      ctx.textAlign = 'left';
+    }
   }
 }
 
@@ -353,13 +542,20 @@ function drawCircle(ctx, el) {
     ctx.lineWidth = el.strokeWidth;
     ctx.stroke();
   }
-  if (el.text) {
-    ctx.fillStyle = '#e0e0e0';
-    ctx.font = `${el.fontSize || 16}px -apple-system, BlinkMacSystemFont, sans-serif`;
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'center';
-    ctx.fillText(el.text, el.x + el.width / 2, el.y + el.height / 2, el.width - 16);
-    ctx.textAlign = 'left';
+  const textContent = el.richText || el.text;
+  if (textContent) {
+    if (el.richText) {
+      const segments = parseRichText(el.richText);
+      const fs = el.fontSize || 16;
+      renderRichText(ctx, segments, el.x + 16, el.y + 16, el.width - 32, fs, '#e0e0e0', 'center');
+    } else {
+      ctx.fillStyle = '#e0e0e0';
+      ctx.font = `${el.fontSize || 16}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center';
+      ctx.fillText(el.text, el.x + el.width / 2, el.y + el.height / 2, el.width - 16);
+      ctx.textAlign = 'left';
+    }
   }
 }
 
@@ -417,20 +613,32 @@ function drawSticky(ctx, el) {
   ctx.fillStyle = 'rgba(0,0,0,0.1)';
   ctx.fill();
 
-  if (el.text) {
-    ctx.fillStyle = '#1a1a1a';
-    ctx.font = `${el.fontSize || 16}px -apple-system, BlinkMacSystemFont, sans-serif`;
-    ctx.textBaseline = 'top';
-    wrapText(ctx, el.text, el.x + 14, el.y + 14, el.width - 28, (el.fontSize || 16) * 1.4);
+  const textContent = el.richText || el.text;
+  if (textContent) {
+    if (el.richText) {
+      const segments = parseRichText(el.richText);
+      renderRichText(ctx, segments, el.x + 14, el.y + 14, el.width - 28, el.fontSize || 16, '#1a1a1a', el.textAlign || 'left');
+    } else {
+      ctx.fillStyle = '#1a1a1a';
+      ctx.font = `${el.fontSize || 16}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.textBaseline = 'top';
+      wrapText(ctx, el.text, el.x + 14, el.y + 14, el.width - 28, (el.fontSize || 16) * 1.4);
+    }
   }
 }
 
 function drawText(ctx, el) {
-  if (!el.text) return;
-  ctx.fillStyle = el.fill && el.fill !== 'transparent' ? el.fill : '#e0e0e0';
-  ctx.font = `${el.fontSize || 20}px -apple-system, BlinkMacSystemFont, sans-serif`;
-  ctx.textBaseline = 'top';
-  wrapText(ctx, el.text, el.x, el.y, el.width || 400, (el.fontSize || 20) * 1.4);
+  const textContent = el.richText || el.text;
+  if (!textContent) return;
+  if (el.richText) {
+    const segments = parseRichText(el.richText);
+    renderRichText(ctx, segments, el.x, el.y, el.width || 400, el.fontSize || 20, '#e0e0e0', el.textAlign || 'left');
+  } else {
+    ctx.fillStyle = el.fill && el.fill !== 'transparent' ? el.fill : '#e0e0e0';
+    ctx.font = `${el.fontSize || 20}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    ctx.textBaseline = 'top';
+    wrapText(ctx, el.text, el.x, el.y, el.width || 400, (el.fontSize || 20) * 1.4);
+  }
 }
 
 function drawFreehand(ctx, el) {

@@ -4,10 +4,30 @@ const Tools = {
     name: 'select',
     cursor: 'default',
     dragStart: null,
-    dragType: null, // 'move' | 'resize' | 'marquee' | 'rotate'
+    dragType: null, // 'move' | 'resize' | 'marquee' | 'rotate' | 'alt-duplicate'
     resizeHandle: null,
     originalElements: null,
     rotationCenter: null,
+    altDuplicated: false, // track if alt+drag already created duplicates
+    autoScrollTimer: null,
+
+    // Auto-scroll when dragging near edges
+    startAutoScroll(app, screenX, screenY) {
+      const margin = 50;
+      const maxSpeed = 15;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      let dx = 0, dy = 0;
+      if (screenX < margin) dx = maxSpeed * ((margin - screenX) / margin);
+      if (screenX > w - margin) dx = -maxSpeed * ((screenX - (w - margin)) / margin);
+      if (screenY < margin + 60) dy = maxSpeed * ((margin + 60 - screenY) / margin); // offset for toolbar
+      if (screenY > h - margin) dy = -maxSpeed * ((screenY - (h - margin)) / margin);
+
+      if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+        app.renderer.pan(dx, dy);
+        app.renderer.markDirty();
+      }
+    },
 
     onPointerDown(app, worldX, worldY, e) {
       // Check minimap click
@@ -108,20 +128,28 @@ const Tools = {
 
     onPointerMove(app, worldX, worldY, e) {
       if (!this.dragStart) {
-        // Hover cursor
+        // Hover cursor: contextual based on what's under the pointer
         const handleHit = app.renderer.hitTestHandle(worldX, worldY);
         if (handleHit) {
-          const cursors = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', rotate: 'crosshair' };
+          const cursors = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', rotate: 'grab' };
           app.renderer.canvas.style.cursor = cursors[handleHit.handle] || 'default';
         } else {
           const hit = app.renderer.hitTest(worldX, worldY);
-          app.renderer.canvas.style.cursor = hit ? (hit.locked ? 'not-allowed' : 'move') : 'default';
+          if (hit) {
+            app.renderer.canvas.style.cursor = hit.locked ? 'not-allowed' : 'move';
+          } else {
+            app.renderer.canvas.style.cursor = 'default';
+          }
         }
         return;
       }
 
       const dx = worldX - this.dragStart.x;
       const dy = worldY - this.dragStart.y;
+
+      // Auto-scroll at screen edges
+      const screen = app.renderer.worldToScreen(worldX, worldY);
+      this.startAutoScroll(app, screen.x, screen.y);
 
       if (this.dragType === 'rotate') {
         if (this.rotationCenter) {
@@ -137,6 +165,32 @@ const Tools = {
           }
         }
       } else if (this.dragType === 'move') {
+        // Alt+drag = duplicate (create copies on first move)
+        if (e.altKey && !this.altDuplicated && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+          this.altDuplicated = true;
+          // Create duplicates, keep originals in place
+          const newSelected = new Set();
+          const newOriginals = new Map();
+          for (const [id, orig] of this.originalElements) {
+            const clone = deepClone(orig);
+            clone.id = generateId();
+            clone.zIndex = Date.now();
+            app.addElement(clone);
+            newSelected.add(clone.id);
+            newOriginals.set(clone.id, deepClone(clone));
+            // Restore original element to its position
+            const origEl = app.renderer.elements.get(id);
+            if (origEl) {
+              origEl.x = orig.x;
+              origEl.y = orig.y;
+              if (origEl.x2 !== undefined) { origEl.x2 = orig.x2; origEl.y2 = orig.y2; }
+              if (origEl.points) origEl.points = orig.points.map(p => ({ ...p }));
+            }
+          }
+          app.renderer.selectedIds = newSelected;
+          this.originalElements = newOriginals;
+        }
+
         // Snap to grid if enabled
         let snapDx = dx, snapDy = dy;
         if (app.renderer.snapToGrid && !e.altKey) {
@@ -147,6 +201,56 @@ const Tools = {
             snapDy = snapped.y - firstOrig.y;
           }
         }
+
+        // Compute alignment guides
+        app.renderer.alignmentGuides = [];
+        if (this.originalElements.size === 1 && !app.renderer.snapToGrid) {
+          const firstOrig = this.originalElements.values().next().value;
+          if (firstOrig) {
+            const movedBounds = {
+              x: firstOrig.x + snapDx,
+              y: firstOrig.y + snapDy,
+              w: firstOrig.width || 0,
+              h: firstOrig.height || 0
+            };
+            const movedCX = movedBounds.x + movedBounds.w / 2;
+            const movedCY = movedBounds.y + movedBounds.h / 2;
+            const threshold = 6 / app.renderer.camera.zoom;
+            const movingId = this.originalElements.keys().next().value;
+
+            for (const [id, el] of app.renderer.elements) {
+              if (id === movingId || el.hidden) continue;
+              const b = getElementBounds(el);
+              const cx = b.x + b.w / 2;
+              const cy = b.y + b.h / 2;
+
+              // Horizontal alignment guides
+              if (Math.abs(movedBounds.y - b.y) < threshold) {
+                app.renderer.alignmentGuides.push({ type: 'h', y: b.y });
+                snapDy = b.y - firstOrig.y;
+              } else if (Math.abs((movedBounds.y + movedBounds.h) - (b.y + b.h)) < threshold) {
+                app.renderer.alignmentGuides.push({ type: 'h', y: b.y + b.h });
+                snapDy = (b.y + b.h - movedBounds.h) - firstOrig.y;
+              } else if (Math.abs(movedCY - cy) < threshold) {
+                app.renderer.alignmentGuides.push({ type: 'h', y: cy });
+                snapDy = (cy - movedBounds.h / 2) - firstOrig.y;
+              }
+
+              // Vertical alignment guides
+              if (Math.abs(movedBounds.x - b.x) < threshold) {
+                app.renderer.alignmentGuides.push({ type: 'v', x: b.x });
+                snapDx = b.x - firstOrig.x;
+              } else if (Math.abs((movedBounds.x + movedBounds.w) - (b.x + b.w)) < threshold) {
+                app.renderer.alignmentGuides.push({ type: 'v', x: b.x + b.w });
+                snapDx = (b.x + b.w - movedBounds.w) - firstOrig.x;
+              } else if (Math.abs(movedCX - cx) < threshold) {
+                app.renderer.alignmentGuides.push({ type: 'v', x: cx });
+                snapDx = (cx - movedBounds.w / 2) - firstOrig.x;
+              }
+            }
+          }
+        }
+
         for (const [id, orig] of this.originalElements) {
           const el = app.renderer.elements.get(id);
           if (!el) continue;
@@ -183,6 +287,9 @@ const Tools = {
     },
 
     onPointerUp(app, worldX, worldY, e) {
+      // Clear alignment guides
+      app.renderer.alignmentGuides = [];
+
       if (this.dragType === 'rotate' && this.dragStart) {
         for (const [id, orig] of this.originalElements) {
           const el = app.renderer.elements.get(id);
@@ -197,6 +304,7 @@ const Tools = {
         this.dragType = null;
         this.rotationCenter = null;
         this.originalElements = null;
+        this.altDuplicated = false;
         app.renderer.markDirty();
         return;
       }
@@ -277,6 +385,7 @@ const Tools = {
       this.dragType = null;
       this.resizeHandle = null;
       this.originalElements = null;
+      this.altDuplicated = false;
       app.renderer.markDirty();
     },
 
