@@ -197,6 +197,11 @@ class InputHandler {
         this.app.copySelected();
         return;
       }
+      if (e.key === 'x') {
+        e.preventDefault();
+        this.app.cutSelected();
+        return;
+      }
       if (e.key === 'v') {
         e.preventDefault();
         this.app.paste();
@@ -219,10 +224,25 @@ class InputHandler {
       return;
     }
 
-    const toolMap = { v: 'select', h: 'hand', r: 'rect', c: 'circle', l: 'line', a: 'arrow', d: 'draw', s: 'sticky', t: 'text', e: 'eraser', f: 'frame', g: 'envelope' };
+    const toolMap = { v: 'select', h: 'hand', r: 'rect', c: 'circle', l: 'line', a: 'arrow', d: 'draw', s: 'sticky', t: 'text', e: 'eraser', f: 'frame', g: 'envelope', k: 'connector', m: 'card', i: 'list' };
     if (toolMap[e.key.toLowerCase()]) {
       this.app.setTool(toolMap[e.key.toLowerCase()]);
       return;
+    }
+
+    // Arrow key movement of selected elements
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      if (this.app.renderer.selectedIds.size > 0) {
+        e.preventDefault();
+        const step = e.shiftKey ? 20 : 5;
+        let dx = 0, dy = 0;
+        if (e.key === 'ArrowLeft') dx = -step;
+        if (e.key === 'ArrowRight') dx = step;
+        if (e.key === 'ArrowUp') dy = -step;
+        if (e.key === 'ArrowDown') dy = step;
+        this.app.moveSelectedBy(dx, dy);
+        return;
+      }
     }
 
     // Delete

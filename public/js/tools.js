@@ -148,6 +148,9 @@ const Tools = {
             }
           }
 
+          // Update connectors attached to moved elements
+          app.updateConnectors(this.originalElements);
+
           // Envelope: check if moved elements landed in/out of envelopes
           app.updateEnvelopeContainment(this.originalElements);
         }
@@ -227,7 +230,7 @@ const Tools = {
 
     onDoubleClick(app, worldX, worldY) {
       const hit = app.renderer.hitTest(worldX, worldY);
-      if (hit && (hit.type === 'sticky' || hit.type === 'text' || hit.type === 'rect' || hit.type === 'circle' || hit.type === 'frame' || hit.type === 'envelope')) {
+      if (hit && (hit.type === 'sticky' || hit.type === 'text' || hit.type === 'rect' || hit.type === 'circle' || hit.type === 'frame' || hit.type === 'envelope' || hit.type === 'diamond' || hit.type === 'triangle' || hit.type === 'card' || hit.type === 'connector')) {
         app.startTextEdit(hit);
       } else if (!hit) {
         // Double-click on empty canvas creates a sticky
@@ -289,6 +292,16 @@ const Tools = {
     cursor: 'crosshair',
     startPoint: null,
 
+    constrainAngle(sx, sy, ex, ey, constrain) {
+      if (!constrain) return { x: ex, y: ey };
+      const dx = ex - sx;
+      const dy = ey - sy;
+      const len = Math.hypot(dx, dy);
+      const angle = Math.atan2(dy, dx);
+      const snap = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+      return { x: sx + len * Math.cos(snap), y: sy + len * Math.sin(snap) };
+    },
+
     onPointerDown(app, worldX, worldY) {
       this.startPoint = { x: worldX, y: worldY };
       app.renderer.previewElement = createElement('line', {
@@ -297,18 +310,20 @@ const Tools = {
       });
     },
 
-    onPointerMove(app, worldX, worldY) {
+    onPointerMove(app, worldX, worldY, e) {
       if (!this.startPoint) return;
-      app.renderer.previewElement.x2 = worldX;
-      app.renderer.previewElement.y2 = worldY;
+      const end = this.constrainAngle(this.startPoint.x, this.startPoint.y, worldX, worldY, e.shiftKey);
+      app.renderer.previewElement.x2 = end.x;
+      app.renderer.previewElement.y2 = end.y;
       app.renderer.markDirty();
     },
 
-    onPointerUp(app, worldX, worldY) {
+    onPointerUp(app, worldX, worldY, e) {
       if (!this.startPoint) return;
+      const end = this.constrainAngle(this.startPoint.x, this.startPoint.y, worldX, worldY, e.shiftKey);
       const el = createElement('line', {
         x: this.startPoint.x, y: this.startPoint.y,
-        x2: worldX, y2: worldY,
+        x2: end.x, y2: end.y,
         stroke: app.currentStroke, strokeWidth: app.currentStrokeWidth
       });
       app.addElement(el);
@@ -334,18 +349,20 @@ const Tools = {
       });
     },
 
-    onPointerMove(app, worldX, worldY) {
+    onPointerMove(app, worldX, worldY, e) {
       if (!this.startPoint) return;
-      app.renderer.previewElement.x2 = worldX;
-      app.renderer.previewElement.y2 = worldY;
+      const end = Tools.line.constrainAngle(this.startPoint.x, this.startPoint.y, worldX, worldY, e.shiftKey);
+      app.renderer.previewElement.x2 = end.x;
+      app.renderer.previewElement.y2 = end.y;
       app.renderer.markDirty();
     },
 
-    onPointerUp(app, worldX, worldY) {
+    onPointerUp(app, worldX, worldY, e) {
       if (!this.startPoint) return;
+      const end = Tools.line.constrainAngle(this.startPoint.x, this.startPoint.y, worldX, worldY, e.shiftKey);
       const el = createElement('arrow', {
         x: this.startPoint.x, y: this.startPoint.y,
-        x2: worldX, y2: worldY,
+        x2: end.x, y2: end.y,
         stroke: app.currentStroke, strokeWidth: app.currentStrokeWidth
       });
       app.addElement(el);
@@ -411,17 +428,25 @@ const Tools = {
 
     onPointerDown(app, worldX, worldY) {
       const el = createSticky(worldX - 100, worldY - 100);
+      // Use remembered color if set
+      if (app.lastStickyColor) {
+        el.fill = app.lastStickyColor;
+      }
+      app.lastStickyColor = el.fill;
       app.addElement(el);
       app.renderer.selectedIds.clear();
       app.renderer.selectedIds.add(el.id);
       app.renderer.markDirty();
-      // Switch to select tool
-      app.setTool('select');
+      // Tool stays active - don't switch to select
     },
 
     onPointerMove() {},
     onPointerUp() {},
-    onKeyDown() {},
+    onKeyDown(app, e) {
+      if (e.key === 'Escape') {
+        app.setTool('select');
+      }
+    },
     onDoubleClick() {}
   },
 
@@ -549,6 +574,135 @@ const Tools = {
       app.renderer.markDirty();
     },
 
+    onKeyDown() {},
+    onDoubleClick() {}
+  },
+
+  connector: {
+    name: 'connector',
+    cursor: 'crosshair',
+    sourceId: null,
+    hoveredAnchor: null,
+
+    onPointerDown(app, worldX, worldY) {
+      // Find element under cursor to start connector from
+      const hit = app.renderer.hitTest(worldX, worldY);
+      if (hit && hit.type !== 'connector') {
+        this.sourceId = hit.id;
+        const anchors = getAnchorPoints(hit);
+        // Find closest anchor
+        let best = anchors[0];
+        let bestDist = Infinity;
+        for (const a of anchors) {
+          const d = Math.hypot(a.x - worldX, a.y - worldY);
+          if (d < bestDist) { bestDist = d; best = a; }
+        }
+        app.renderer.previewElement = createElement('connector', {
+          x: best.x, y: best.y, x2: worldX, y2: worldY,
+          stroke: app.currentStroke, strokeWidth: app.currentStrokeWidth,
+          connectorStyle: 'arrow'
+        });
+      } else {
+        // Free connector
+        this.sourceId = null;
+        app.renderer.previewElement = createElement('connector', {
+          x: worldX, y: worldY, x2: worldX, y2: worldY,
+          stroke: app.currentStroke, strokeWidth: app.currentStrokeWidth,
+          connectorStyle: 'arrow'
+        });
+      }
+    },
+
+    onPointerMove(app, worldX, worldY) {
+      if (!app.renderer.previewElement) return;
+      app.renderer.previewElement.x2 = worldX;
+      app.renderer.previewElement.y2 = worldY;
+      app.renderer.markDirty();
+    },
+
+    onPointerUp(app, worldX, worldY) {
+      if (!app.renderer.previewElement) return;
+
+      const targetHit = app.renderer.hitTest(worldX, worldY);
+      const targetId = (targetHit && targetHit.type !== 'connector' && targetHit.id !== this.sourceId) ? targetHit.id : null;
+
+      // Create connector
+      const el = createConnector(this.sourceId, targetId, 'arrow');
+      el.stroke = app.currentStroke;
+      el.strokeWidth = app.currentStrokeWidth;
+
+      // Set initial positions
+      if (this.sourceId && targetId) {
+        const srcEl = app.renderer.elements.get(this.sourceId);
+        const tgtEl = app.renderer.elements.get(targetId);
+        if (srcEl && tgtEl) {
+          const best = getBestAnchors(srcEl, tgtEl);
+          el.x = best.src.x;
+          el.y = best.src.y;
+          el.x2 = best.tgt.x;
+          el.y2 = best.tgt.y;
+        }
+      } else {
+        el.x = app.renderer.previewElement.x;
+        el.y = app.renderer.previewElement.y;
+        el.x2 = worldX;
+        el.y2 = worldY;
+      }
+
+      app.addElement(el);
+      app.renderer.previewElement = null;
+      this.sourceId = null;
+      app.renderer.markDirty();
+    },
+
+    onKeyDown() {},
+    onDoubleClick(app, worldX, worldY) {
+      const hit = app.renderer.hitTest(worldX, worldY);
+      if (hit && hit.type === 'connector') {
+        app.startTextEdit(hit);
+      }
+    }
+  },
+
+  diamond: createShapeTool('diamond'),
+  triangle: createShapeTool('triangle'),
+
+  card: {
+    name: 'card',
+    cursor: 'crosshair',
+
+    onPointerDown(app, worldX, worldY) {
+      const el = createCard(worldX - 130, worldY - 80);
+      app.addElement(el);
+      app.renderer.selectedIds.clear();
+      app.renderer.selectedIds.add(el.id);
+      app.renderer.markDirty();
+      app.setTool('select');
+      setTimeout(() => app.startTextEdit(el), 50);
+    },
+
+    onPointerMove() {},
+    onPointerUp() {},
+    onKeyDown() {},
+    onDoubleClick() {}
+  },
+
+  list: {
+    name: 'list',
+    cursor: 'crosshair',
+
+    onPointerDown(app, worldX, worldY) {
+      const el = createList(worldX - 125, worldY - 30);
+      app.addElement(el);
+      app.renderer.selectedIds.clear();
+      app.renderer.selectedIds.add(el.id);
+      app.renderer.markDirty();
+      app.setTool('select');
+      setTimeout(() => app.startTextEdit(el), 50);
+    },
+
+    onPointerMove() {},
+    onPointerUp() {},
     onKeyDown() {},
     onDoubleClick() {}
   },

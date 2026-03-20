@@ -1206,6 +1206,129 @@ html, body {
   opacity: 0.6;
 }
 
+/* =========================
+   CARD EDITOR PANEL
+   ========================= */
+.card-editor-panel {
+  position: fixed;
+  top: 80px;
+  right: 16px;
+  width: 320px;
+  max-height: calc(100vh - 100px);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  z-index: 300;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+.card-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.card-editor-header h3 {
+  font-size: 16px;
+  color: var(--text);
+}
+
+.card-editor-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.card-editor-body {
+  padding: 16px;
+}
+
+.card-editor-body label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 10px;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.card-editor-body label:first-child {
+  margin-top: 0;
+}
+
+.card-field {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--btn);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.card-field:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.card-desc {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.list-item-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.list-item-input {
+  flex: 1;
+  padding: 6px 8px;
+  background: var(--btn);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.list-item-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.list-item-del {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 6px;
+}
+
+.list-add-btn {
+  width: 100%;
+  padding: 8px;
+  margin-top: 8px;
+  background: var(--btn);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.list-add-btn:hover {
+  background: var(--btn-hover);
+}
+
 /* Fit to screen button */
 #zoomFit {
   font-size: 14px;

@@ -60,11 +60,16 @@ function getElementBounds(el) {
     case 'frame':
     case 'image':
     case 'envelope':
+    case 'diamond':
+    case 'triangle':
+    case 'card':
+    case 'list':
       return { x: el.x, y: el.y, w: el.width, h: el.height };
     case 'circle':
       return { x: el.x - el.width / 2, y: el.y - el.height / 2, w: el.width, h: el.height };
     case 'line':
-    case 'arrow': {
+    case 'arrow':
+    case 'connector': {
       const minX = Math.min(el.x, el.x2);
       const minY = Math.min(el.y, el.y2);
       const maxX = Math.max(el.x, el.x2);

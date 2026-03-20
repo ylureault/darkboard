@@ -79,6 +79,105 @@ function createEnvelope(x, y, w, h) {
   });
 }
 
+// Connector factory - connected arrow between two elements
+function createConnector(sourceId, targetId, style) {
+  return createElement('connector', {
+    sourceId: sourceId,
+    targetId: targetId,
+    x: 0, y: 0, x2: 0, y2: 0,
+    width: 0, height: 0,
+    stroke: '#ffffff',
+    strokeWidth: 2,
+    fill: 'transparent',
+    connectorStyle: style || 'arrow', // 'arrow', 'double-arrow', 'line', 'dashed'
+    lineType: 'straight', // 'straight', 'curve', 'orthogonal'
+    text: '', // label
+    zIndex: Date.now() - 1000 // slightly below other elements
+  });
+}
+
+// Get anchor points for an element (top, bottom, left, right centers)
+function getAnchorPoints(el) {
+  const bounds = getElementBounds(el);
+  return [
+    { x: bounds.x + bounds.w / 2, y: bounds.y, side: 'top' },
+    { x: bounds.x + bounds.w / 2, y: bounds.y + bounds.h, side: 'bottom' },
+    { x: bounds.x, y: bounds.y + bounds.h / 2, side: 'left' },
+    { x: bounds.x + bounds.w, y: bounds.y + bounds.h / 2, side: 'right' },
+  ];
+}
+
+// Find the closest pair of anchor points between two elements
+function getBestAnchors(sourceEl, targetEl) {
+  const srcAnchors = getAnchorPoints(sourceEl);
+  const tgtAnchors = getAnchorPoints(targetEl);
+  let best = null;
+  let bestDist = Infinity;
+  for (const sa of srcAnchors) {
+    for (const ta of tgtAnchors) {
+      const d = Math.hypot(sa.x - ta.x, sa.y - ta.y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = { src: sa, tgt: ta };
+      }
+    }
+  }
+  return best;
+}
+
+// Diamond shape factory
+function createDiamond(x, y, w, h) {
+  return createElement('diamond', {
+    x, y, width: w || 100, height: h || 100,
+    fill: 'transparent', stroke: '#ffffff', strokeWidth: 2
+  });
+}
+
+// Triangle shape factory
+function createTriangle(x, y, w, h) {
+  return createElement('triangle', {
+    x, y, width: w || 100, height: h || 100,
+    fill: 'transparent', stroke: '#ffffff', strokeWidth: 2
+  });
+}
+
+// Card factory (management visual card)
+function createCard(x, y) {
+  return createElement('card', {
+    x, y,
+    width: 260,
+    height: 160,
+    fill: '#1e1e1e',
+    stroke: '#333',
+    strokeWidth: 1,
+    text: '',
+    fontSize: 14,
+    cardStatus: '', // 'todo', 'in-progress', 'review', 'done'
+    cardTags: [],
+    cardPriority: '', // 'high', 'medium', 'low'
+    cardPoints: '',
+    cardAssignee: '',
+    cardDescription: '',
+    cardDueDate: '',
+    cardColor: ''
+  });
+}
+
+// List factory
+function createList(x, y) {
+  return createElement('list', {
+    x, y,
+    width: 250,
+    height: 60,
+    fill: '#1e1e1e',
+    stroke: '#333',
+    strokeWidth: 1,
+    text: 'Liste',
+    fontSize: 14,
+    listItems: [] // array of { id, text }
+  });
+}
+
 function createImageElement(x, y, w, h, dataUrl) {
   return createElement('image', {
     x, y,
@@ -134,6 +233,21 @@ function renderElement(ctx, el, selected, camera) {
       break;
     case 'envelope':
       drawEnvelope(ctx, el);
+      break;
+    case 'connector':
+      drawConnector(ctx, el);
+      break;
+    case 'diamond':
+      drawDiamond(ctx, el);
+      break;
+    case 'triangle':
+      drawTriangle(ctx, el);
+      break;
+    case 'card':
+      drawCard(ctx, el);
+      break;
+    case 'list':
+      drawList(ctx, el);
       break;
   }
 
@@ -424,6 +538,352 @@ function drawEnvelope(ctx, el) {
   ctx.globalAlpha = 1;
 }
 
+function drawConnector(ctx, el) {
+  if (!el.x || !el.y || !el.x2 || !el.y2) return;
+  const style = el.connectorStyle || 'arrow';
+
+  ctx.strokeStyle = el.stroke || '#ffffff';
+  ctx.lineWidth = el.strokeWidth || 2;
+  ctx.lineCap = 'round';
+
+  if (style === 'dashed') {
+    ctx.setLineDash([8, 4]);
+  }
+
+  if (el.lineType === 'curve') {
+    // Bezier curve
+    const mx = (el.x + el.x2) / 2;
+    const my = (el.y + el.y2) / 2;
+    const dx = el.x2 - el.x;
+    const dy = el.y2 - el.y;
+    const cx1 = el.x + dx * 0.5;
+    const cy1 = el.y;
+    const cx2 = el.x2 - dx * 0.5;
+    const cy2 = el.y2;
+    ctx.beginPath();
+    ctx.moveTo(el.x, el.y);
+    ctx.bezierCurveTo(cx1, cy1, cx2, cy2, el.x2, el.y2);
+    ctx.stroke();
+  } else if (el.lineType === 'orthogonal') {
+    // Right angle path
+    const mx = (el.x + el.x2) / 2;
+    ctx.beginPath();
+    ctx.moveTo(el.x, el.y);
+    ctx.lineTo(mx, el.y);
+    ctx.lineTo(mx, el.y2);
+    ctx.lineTo(el.x2, el.y2);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(el.x, el.y);
+    ctx.lineTo(el.x2, el.y2);
+    ctx.stroke();
+  }
+
+  ctx.setLineDash([]);
+
+  // Arrow heads
+  const headLen = 12;
+  if (style === 'arrow' || style === 'double-arrow') {
+    const dx = el.x2 - el.x;
+    const dy = el.y2 - el.y;
+    const angle = Math.atan2(dy, dx);
+    ctx.beginPath();
+    ctx.moveTo(el.x2, el.y2);
+    ctx.lineTo(el.x2 - headLen * Math.cos(angle - Math.PI / 6), el.y2 - headLen * Math.sin(angle - Math.PI / 6));
+    ctx.moveTo(el.x2, el.y2);
+    ctx.lineTo(el.x2 - headLen * Math.cos(angle + Math.PI / 6), el.y2 - headLen * Math.sin(angle + Math.PI / 6));
+    ctx.stroke();
+  }
+  if (style === 'double-arrow') {
+    const dx = el.x - el.x2;
+    const dy = el.y - el.y2;
+    const angle = Math.atan2(dy, dx);
+    ctx.beginPath();
+    ctx.moveTo(el.x, el.y);
+    ctx.lineTo(el.x - headLen * Math.cos(angle - Math.PI / 6), el.y - headLen * Math.sin(angle - Math.PI / 6));
+    ctx.moveTo(el.x, el.y);
+    ctx.lineTo(el.x - headLen * Math.cos(angle + Math.PI / 6), el.y - headLen * Math.sin(angle + Math.PI / 6));
+    ctx.stroke();
+  }
+
+  // Label
+  if (el.text) {
+    const mx = (el.x + el.x2) / 2;
+    const my = (el.y + el.y2) / 2;
+    const fontSize = el.fontSize || 12;
+    ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    const tw = ctx.measureText(el.text).width;
+    ctx.fillStyle = 'rgba(30,30,30,0.8)';
+    ctx.fillRect(mx - tw / 2 - 4, my - fontSize / 2 - 4, tw + 8, fontSize + 8);
+    ctx.fillStyle = '#e0e0e0';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    ctx.fillText(el.text, mx, my);
+    ctx.textAlign = 'left';
+  }
+}
+
+function drawDiamond(ctx, el) {
+  const cx = el.x + el.width / 2;
+  const cy = el.y + el.height / 2;
+  ctx.beginPath();
+  ctx.moveTo(cx, el.y);
+  ctx.lineTo(el.x + el.width, cy);
+  ctx.lineTo(cx, el.y + el.height);
+  ctx.lineTo(el.x, cy);
+  ctx.closePath();
+  if (el.fill && el.fill !== 'transparent') {
+    ctx.fillStyle = el.fill;
+    ctx.fill();
+  }
+  if (el.stroke && el.stroke !== 'transparent' && el.strokeWidth > 0) {
+    ctx.strokeStyle = el.stroke;
+    ctx.lineWidth = el.strokeWidth;
+    if (el.dashStyle) ctx.setLineDash([8, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  if (el.text) {
+    ctx.fillStyle = '#e0e0e0';
+    ctx.font = `${el.fontSize || 16}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    ctx.fillText(el.text, cx, cy, el.width - 20);
+    ctx.textAlign = 'left';
+  }
+}
+
+function drawTriangle(ctx, el) {
+  const cx = el.x + el.width / 2;
+  ctx.beginPath();
+  ctx.moveTo(cx, el.y);
+  ctx.lineTo(el.x + el.width, el.y + el.height);
+  ctx.lineTo(el.x, el.y + el.height);
+  ctx.closePath();
+  if (el.fill && el.fill !== 'transparent') {
+    ctx.fillStyle = el.fill;
+    ctx.fill();
+  }
+  if (el.stroke && el.stroke !== 'transparent' && el.strokeWidth > 0) {
+    ctx.strokeStyle = el.stroke;
+    ctx.lineWidth = el.strokeWidth;
+    if (el.dashStyle) ctx.setLineDash([8, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  if (el.text) {
+    ctx.fillStyle = '#e0e0e0';
+    ctx.font = `${el.fontSize || 16}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    ctx.fillText(el.text, cx, el.y + el.height * 0.6, el.width - 20);
+    ctx.textAlign = 'left';
+  }
+}
+
+const CARD_STATUS_COLORS = {
+  'todo': '#888', 'in-progress': '#4a9eff', 'review': '#ffd966', 'done': '#4ecdc4'
+};
+const CARD_STATUS_LABELS = {
+  'todo': 'A faire', 'in-progress': 'En cours', 'review': 'En review', 'done': 'Termine'
+};
+const CARD_PRIORITY_COLORS = { 'high': '#e94560', 'medium': '#ffd966', 'low': '#4ecdc4' };
+
+function drawCard(ctx, el) {
+  const r = 8;
+  const w = el.width;
+  const h = el.height;
+
+  // Shadow
+  ctx.shadowColor = 'rgba(0,0,0,0.3)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 3;
+
+  // Background
+  ctx.beginPath();
+  ctx.roundRect(el.x, el.y, w, h, r);
+  ctx.fillStyle = el.cardColor || el.fill || '#1e1e1e';
+  ctx.fill();
+
+  ctx.shadowColor = 'transparent';
+
+  // Border
+  ctx.strokeStyle = el.stroke || '#333';
+  ctx.lineWidth = el.strokeWidth || 1;
+  ctx.stroke();
+
+  // Priority strip (left edge)
+  if (el.cardPriority && CARD_PRIORITY_COLORS[el.cardPriority]) {
+    ctx.fillStyle = CARD_PRIORITY_COLORS[el.cardPriority];
+    ctx.beginPath();
+    ctx.roundRect(el.x, el.y, 5, h, [r, 0, 0, r]);
+    ctx.fill();
+  }
+
+  let yOff = el.y + 14;
+  const xPad = el.x + 16;
+
+  // Status badge
+  if (el.cardStatus && CARD_STATUS_LABELS[el.cardStatus]) {
+    const label = CARD_STATUS_LABELS[el.cardStatus];
+    const color = CARD_STATUS_COLORS[el.cardStatus];
+    ctx.font = 'bold 10px sans-serif';
+    const tw = ctx.measureText(label).width;
+    ctx.fillStyle = color + '30';
+    ctx.beginPath();
+    ctx.roundRect(xPad, yOff - 2, tw + 12, 18, 4);
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'top';
+    ctx.fillText(label, xPad + 6, yOff + 1);
+    yOff += 24;
+  } else {
+    yOff += 4;
+  }
+
+  // Title
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = `bold ${el.fontSize || 14}px -apple-system, BlinkMacSystemFont, sans-serif`;
+  ctx.textBaseline = 'top';
+  const title = el.text || 'Sans titre';
+  wrapText(ctx, title, xPad, yOff, w - 32, (el.fontSize || 14) * 1.3);
+  const titleLines = Math.max(1, Math.ceil(ctx.measureText(title).width / (w - 32)));
+  yOff += titleLines * (el.fontSize || 14) * 1.3 + 8;
+
+  // Tags
+  if (el.cardTags && el.cardTags.length > 0) {
+    let tx = xPad;
+    ctx.font = '10px sans-serif';
+    for (const tag of el.cardTags.slice(0, 3)) {
+      const tw = ctx.measureText(tag).width;
+      ctx.fillStyle = '#4a9eff20';
+      ctx.beginPath();
+      ctx.roundRect(tx, yOff, tw + 10, 16, 3);
+      ctx.fill();
+      ctx.fillStyle = '#4a9eff';
+      ctx.textBaseline = 'top';
+      ctx.fillText(tag, tx + 5, yOff + 2);
+      tx += tw + 16;
+    }
+    yOff += 22;
+  }
+
+  // Bottom row: points + assignee + due date
+  const bY = el.y + h - 24;
+  ctx.font = '11px sans-serif';
+  ctx.textBaseline = 'top';
+
+  if (el.cardPoints) {
+    ctx.fillStyle = '#888';
+    ctx.fillText('⚡ ' + el.cardPoints + ' pts', xPad, bY);
+  }
+
+  if (el.cardDueDate) {
+    ctx.fillStyle = '#888';
+    const dueText = el.cardDueDate;
+    ctx.textAlign = 'right';
+    ctx.fillText('📅 ' + dueText, el.x + w - 12, bY);
+    ctx.textAlign = 'left';
+  }
+
+  if (el.cardAssignee) {
+    const initials = el.cardAssignee.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    const aX = el.x + w - 34;
+    const aY = el.y + 10;
+    ctx.beginPath();
+    ctx.arc(aX, aY + 10, 12, 0, Math.PI * 2);
+    ctx.fillStyle = '#4a9eff';
+    ctx.fill();
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(initials, aX, aY + 10);
+    ctx.textAlign = 'left';
+  }
+
+  // Description indicator
+  if (el.cardDescription) {
+    ctx.fillStyle = '#666';
+    ctx.font = '11px sans-serif';
+    ctx.textBaseline = 'top';
+    ctx.fillText('📝', el.x + w - 55, bY);
+  }
+}
+
+function drawList(ctx, el) {
+  const r = 8;
+  const headerH = 36;
+  const itemH = 30;
+  const items = el.listItems || [];
+  const totalH = headerH + items.length * itemH + 36;
+
+  // Update logical height
+  el.height = Math.max(60, totalH);
+
+  // Shadow
+  ctx.shadowColor = 'rgba(0,0,0,0.2)';
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 2;
+
+  // Background
+  ctx.beginPath();
+  ctx.roundRect(el.x, el.y, el.width, el.height, r);
+  ctx.fillStyle = el.fill || '#1e1e1e';
+  ctx.fill();
+
+  ctx.shadowColor = 'transparent';
+
+  // Border
+  ctx.strokeStyle = el.stroke || '#333';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Header
+  ctx.fillStyle = '#2a2a2a';
+  ctx.beginPath();
+  ctx.roundRect(el.x, el.y, el.width, headerH, [r, r, 0, 0]);
+  ctx.fill();
+
+  // Title
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = `bold ${el.fontSize || 14}px -apple-system, BlinkMacSystemFont, sans-serif`;
+  ctx.textBaseline = 'middle';
+  ctx.fillText(el.text || 'Liste', el.x + 12, el.y + headerH / 2, el.width - 24);
+
+  // Items
+  for (let i = 0; i < items.length; i++) {
+    const iy = el.y + headerH + i * itemH;
+    // Separator
+    if (i > 0) {
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(el.x + 12, iy);
+      ctx.lineTo(el.x + el.width - 12, iy);
+      ctx.stroke();
+    }
+    // Bullet
+    ctx.fillStyle = '#4a9eff';
+    ctx.beginPath();
+    ctx.arc(el.x + 20, iy + itemH / 2, 3, 0, Math.PI * 2);
+    ctx.fill();
+    // Text
+    ctx.fillStyle = '#ccc';
+    ctx.font = '13px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(items[i].text || '', el.x + 32, iy + itemH / 2, el.width - 48);
+  }
+
+  // Add button
+  const addY = el.y + headerH + items.length * itemH + 4;
+  ctx.fillStyle = '#555';
+  ctx.font = '13px sans-serif';
+  ctx.textBaseline = 'top';
+  ctx.fillText('+ Ajouter...', el.x + 12, addY + 4);
+}
+
 function drawImage(ctx, el) {
   if (!el.imageData) return;
   const img = getCachedImage(el.imageData);
@@ -468,6 +928,38 @@ function hitTestElement(el, worldX, worldY, threshold) {
       return pointInRect(worldX, worldY, el.x, el.y, el.width, el.height);
     case 'envelope':
       return pointInRect(worldX, worldY, el.x, el.y, el.width, el.height);
+    case 'diamond': {
+      const cx = el.x + el.width / 2;
+      const cy = el.y + el.height / 2;
+      const dx = Math.abs(worldX - cx) / (el.width / 2);
+      const dy = Math.abs(worldY - cy) / (el.height / 2);
+      return dx + dy <= 1;
+    }
+    case 'triangle': {
+      // Point-in-triangle test
+      const ax = el.x + el.width / 2, ay = el.y;
+      const bx = el.x + el.width, by = el.y + el.height;
+      const cx2 = el.x, cy2 = el.y + el.height;
+      const d1 = (worldX - bx) * (ay - by) - (ax - bx) * (worldY - by);
+      const d2 = (worldX - cx2) * (by - cy2) - (bx - cx2) * (worldY - cy2);
+      const d3 = (worldX - ax) * (cy2 - ay) - (cx2 - ax) * (worldY - ay);
+      const hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+      const hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+      return !(hasNeg && hasPos);
+    }
+    case 'card':
+    case 'list':
+      return pointInRect(worldX, worldY, el.x, el.y, el.width, el.height);
+    case 'connector': {
+      if (el.lineType === 'orthogonal') {
+        const mx = (el.x + el.x2) / 2;
+        const d1 = distanceToSegment(worldX, worldY, el.x, el.y, mx, el.y);
+        const d2 = distanceToSegment(worldX, worldY, mx, el.y, mx, el.y2);
+        const d3 = distanceToSegment(worldX, worldY, mx, el.y2, el.x2, el.y2);
+        return Math.min(d1, d2, d3) < threshold;
+      }
+      return distanceToSegment(worldX, worldY, el.x, el.y, el.x2, el.y2) < threshold;
+    }
     case 'frame': {
       const titleH = (el.fontSize || 16) + 16;
       if (pointInRect(worldX, worldY, el.x, el.y - titleH, el.width, titleH)) return true;

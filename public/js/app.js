@@ -33,8 +33,14 @@ class DarkBoardApp {
     // Update title
     document.title = `DarkBoard - ${getBoardId()}`;
 
+    // Sticky color memory
+    this.lastStickyColor = null;
+
     // Image drag-and-drop
     this.initDragDrop();
+
+    // Clipboard image paste
+    this.initClipboardPaste();
 
     // Cursor timeout
     this.initCursorTimeout();
@@ -124,6 +130,65 @@ class DarkBoardApp {
           img.src = ev.target.result;
         };
         reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  initClipboardPaste() {
+    document.addEventListener('paste', (e) => {
+      // Don't intercept if typing in a text field
+      if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          const blob = item.getAsFile();
+          if (!blob) continue;
+          if (blob.size > 5 * 1024 * 1024) {
+            this.showToast('Image trop grande (max 5 Mo)');
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const img = new Image();
+            img.onload = () => {
+              let w = img.width, h = img.height;
+              const maxSize = 600;
+              if (w > maxSize || h > maxSize) {
+                const scale = maxSize / Math.max(w, h);
+                w *= scale;
+                h *= scale;
+              }
+              const cx = this.renderer.camera.x;
+              const cy = this.renderer.camera.y;
+              const el = createImageElement(cx - w / 2, cy - h / 2, w, h, ev.target.result);
+              this.addElement(el);
+              this.renderer.selectedIds.clear();
+              this.renderer.selectedIds.add(el.id);
+              this.renderer.markDirty();
+            };
+            img.src = ev.target.result;
+          };
+          reader.readAsDataURL(blob);
+          return;
+        }
+      }
+
+      // If text pasted on canvas, create a sticky with that text
+      const text = e.clipboardData.getData('text/plain');
+      if (text && this.clipboard.length === 0) {
+        e.preventDefault();
+        const cx = this.renderer.camera.x;
+        const cy = this.renderer.camera.y;
+        const el = createSticky(cx - 100, cy - 100);
+        el.text = text;
+        this.addElement(el);
+        this.renderer.selectedIds.clear();
+        this.renderer.selectedIds.add(el.id);
+        this.renderer.markDirty();
       }
     });
   }
@@ -238,6 +303,12 @@ class DarkBoardApp {
 
   deleteSelected() {
     if (this.renderer.selectedIds.size === 0) return;
+
+    // Delete connectors attached to selected elements first
+    for (const id of this.renderer.selectedIds) {
+      this.deleteConnectorsFor(id);
+    }
+
     const ops = [];
     const inverseOps = [];
     for (const id of this.renderer.selectedIds) {
@@ -245,11 +316,6 @@ class DarkBoardApp {
       if (el) {
         ops.push({ type: 'delete', elementId: id });
         inverseOps.push({ type: 'add', elementId: id, element: deepClone(el) });
-
-        // If deleting an envelope, also remove children references
-        if (el.type === 'envelope' && el.children) {
-          // Children stay on canvas, just lose their parent
-        }
       }
     }
     this.applyOps(ops);
@@ -311,9 +377,52 @@ class DarkBoardApp {
     this.renderer.markDirty();
   }
 
+  cutSelected() {
+    this.copySelected();
+    this.deleteSelected();
+  }
+
   duplicateSelected() {
     this.copySelected();
     this.paste();
+  }
+
+  // Move selected elements by dx, dy (arrow keys)
+  moveSelectedBy(dx, dy) {
+    if (this.renderer.selectedIds.size === 0) return;
+    const ops = [];
+    const inverseOps = [];
+    const moved = new Map();
+    for (const id of this.renderer.selectedIds) {
+      const el = this.renderer.elements.get(id);
+      if (!el) continue;
+      moved.set(id, deepClone(el));
+      const oldProps = { x: el.x, y: el.y };
+      el.x += dx;
+      el.y += dy;
+      const newProps = { x: el.x, y: el.y };
+      if (el.x2 !== undefined) {
+        oldProps.x2 = el.x2 - dx;
+        oldProps.y2 = el.y2 - dy;
+        el.x2 += dx;
+        el.y2 += dy;
+        newProps.x2 = el.x2;
+        newProps.y2 = el.y2;
+      }
+      if (el.points) {
+        oldProps.points = el.points.map(p => ({ x: p.x - dx, y: p.y - dy }));
+        el.points = el.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+        newProps.points = el.points;
+      }
+      ops.push({ type: 'update', elementId: id, props: newProps });
+      inverseOps.push({ type: 'update', elementId: id, props: oldProps });
+    }
+    if (ops.length > 0) {
+      this.history.push(ops, inverseOps);
+      this.sync.sendOps(ops);
+      this.updateConnectors(moved);
+      this.renderer.markDirty();
+    }
   }
 
   updateSelectedElements(props) {
@@ -336,6 +445,81 @@ class DarkBoardApp {
       this.history.push(ops, inverseOps);
       this.sync.sendOps(ops);
       this.renderer.markDirty();
+    }
+  }
+
+  // Update connectors when source/target elements are moved
+  updateConnectors(movedElements) {
+    const connectors = Array.from(this.renderer.elements.values()).filter(e => e.type === 'connector');
+    if (connectors.length === 0) return;
+
+    const ops = [];
+    const inverseOps = [];
+    const movedIds = new Set(movedElements.keys());
+
+    for (const conn of connectors) {
+      if (!conn.sourceId && !conn.targetId) continue;
+      const srcMoved = conn.sourceId && movedIds.has(conn.sourceId);
+      const tgtMoved = conn.targetId && movedIds.has(conn.targetId);
+      if (!srcMoved && !tgtMoved) continue;
+
+      const srcEl = conn.sourceId ? this.renderer.elements.get(conn.sourceId) : null;
+      const tgtEl = conn.targetId ? this.renderer.elements.get(conn.targetId) : null;
+
+      const oldProps = { x: conn.x, y: conn.y, x2: conn.x2, y2: conn.y2 };
+
+      if (srcEl && tgtEl) {
+        const best = getBestAnchors(srcEl, tgtEl);
+        conn.x = best.src.x;
+        conn.y = best.src.y;
+        conn.x2 = best.tgt.x;
+        conn.y2 = best.tgt.y;
+      } else if (srcEl) {
+        const anchors = getAnchorPoints(srcEl);
+        let best = anchors[0], bestDist = Infinity;
+        for (const a of anchors) {
+          const d = Math.hypot(a.x - conn.x2, a.y - conn.y2);
+          if (d < bestDist) { bestDist = d; best = a; }
+        }
+        conn.x = best.x;
+        conn.y = best.y;
+      } else if (tgtEl) {
+        const anchors = getAnchorPoints(tgtEl);
+        let best = anchors[0], bestDist = Infinity;
+        for (const a of anchors) {
+          const d = Math.hypot(a.x - conn.x, a.y - conn.y);
+          if (d < bestDist) { bestDist = d; best = a; }
+        }
+        conn.x2 = best.x;
+        conn.y2 = best.y;
+      }
+
+      const newProps = { x: conn.x, y: conn.y, x2: conn.x2, y2: conn.y2 };
+      ops.push({ type: 'update', elementId: conn.id, props: newProps });
+      inverseOps.push({ type: 'update', elementId: conn.id, props: oldProps });
+    }
+
+    if (ops.length > 0) {
+      this.history.push(ops, inverseOps);
+      this.sync.sendOps(ops);
+      this.renderer.markDirty();
+    }
+  }
+
+  // Delete element and its connectors
+  deleteConnectorsFor(elementId) {
+    const connectors = Array.from(this.renderer.elements.values())
+      .filter(e => e.type === 'connector' && (e.sourceId === elementId || e.targetId === elementId));
+    const ops = [];
+    const inverseOps = [];
+    for (const conn of connectors) {
+      ops.push({ type: 'delete', elementId: conn.id });
+      inverseOps.push({ type: 'add', elementId: conn.id, element: deepClone(conn) });
+    }
+    if (ops.length > 0) {
+      this.applyOps(ops);
+      this.history.push(ops, inverseOps);
+      this.sync.sendOps(ops);
     }
   }
 
@@ -458,7 +642,26 @@ class DarkBoardApp {
       textarea.style.color = 'white';
       textarea.style.fontWeight = 'bold';
       textarea.style.padding = (8 * zoom) + 'px';
-    } else if (el.type === 'rect' || el.type === 'circle') {
+    } else if (el.type === 'card') {
+      // Show card edit panel instead of simple textarea
+      this.showCardEditor(el);
+      return;
+    } else if (el.type === 'list') {
+      this.showListEditor(el);
+      return;
+    } else if (el.type === 'connector') {
+      // Edit label on connector
+      const mx = (el.x + el.x2) / 2;
+      const my = (el.y + el.y2) / 2;
+      const screen2 = this.renderer.worldToScreen(mx - 60, my - 15);
+      textarea.style.left = screen2.x + 'px';
+      textarea.style.top = screen2.y + 'px';
+      textarea.style.width = (120 * zoom) + 'px';
+      textarea.style.height = (30 * zoom) + 'px';
+      textarea.style.background = 'rgba(30,30,30,0.9)';
+      textarea.style.color = '#e0e0e0';
+      textarea.style.textAlign = 'center';
+    } else if (el.type === 'rect' || el.type === 'circle' || el.type === 'diamond' || el.type === 'triangle') {
       textarea.style.background = 'rgba(30,30,30,0.9)';
       textarea.style.color = '#e0e0e0';
       textarea.style.textAlign = 'center';
@@ -500,12 +703,188 @@ class DarkBoardApp {
       if (e.key === 'Escape') {
         textarea.blur();
       }
-      if (e.key === 'Enter' && (el.type === 'text' || el.type === 'frame' || el.type === 'rect' || el.type === 'circle' || el.type === 'envelope') && !e.shiftKey) {
+      if (e.key === 'Enter' && (el.type === 'text' || el.type === 'frame' || el.type === 'rect' || el.type === 'circle' || el.type === 'envelope' || el.type === 'diamond' || el.type === 'triangle' || el.type === 'connector') && !e.shiftKey) {
         e.preventDefault();
         textarea.blur();
       }
       e.stopPropagation();
     });
+  }
+
+  // Card editor panel
+  showCardEditor(el) {
+    const existing = document.querySelector('.card-editor-panel');
+    if (existing) existing.remove();
+
+    const panel = document.createElement('div');
+    panel.className = 'card-editor-panel';
+    panel.innerHTML = `
+      <div class="card-editor-header">
+        <h3>Carte</h3>
+        <button class="card-editor-close">&times;</button>
+      </div>
+      <div class="card-editor-body">
+        <label>Titre</label>
+        <input type="text" class="card-field" data-field="text" value="${(el.text || '').replace(/"/g, '&quot;')}" placeholder="Titre de la carte..." />
+        <label>Statut</label>
+        <select class="card-field" data-field="cardStatus">
+          <option value="">-- Aucun --</option>
+          <option value="todo" ${el.cardStatus === 'todo' ? 'selected' : ''}>A faire</option>
+          <option value="in-progress" ${el.cardStatus === 'in-progress' ? 'selected' : ''}>En cours</option>
+          <option value="review" ${el.cardStatus === 'review' ? 'selected' : ''}>En review</option>
+          <option value="done" ${el.cardStatus === 'done' ? 'selected' : ''}>Termine</option>
+        </select>
+        <label>Priorite</label>
+        <select class="card-field" data-field="cardPriority">
+          <option value="">-- Aucune --</option>
+          <option value="high" ${el.cardPriority === 'high' ? 'selected' : ''}>Haute</option>
+          <option value="medium" ${el.cardPriority === 'medium' ? 'selected' : ''}>Moyenne</option>
+          <option value="low" ${el.cardPriority === 'low' ? 'selected' : ''}>Basse</option>
+        </select>
+        <label>Tags (separes par virgule)</label>
+        <input type="text" class="card-field" data-field="cardTags" value="${(el.cardTags || []).join(', ')}" placeholder="Frontend, Sprint 4..." />
+        <label>Story Points</label>
+        <input type="number" class="card-field" data-field="cardPoints" value="${el.cardPoints || ''}" min="0" placeholder="0" />
+        <label>Assigne a</label>
+        <input type="text" class="card-field" data-field="cardAssignee" value="${el.cardAssignee || ''}" placeholder="Nom..." />
+        <label>Date echeance</label>
+        <input type="date" class="card-field" data-field="cardDueDate" value="${el.cardDueDate || ''}" />
+        <label>Description</label>
+        <textarea class="card-field card-desc" data-field="cardDescription" placeholder="Description detaillee...">${el.cardDescription || ''}</textarea>
+      </div>
+    `;
+
+    document.body.appendChild(panel);
+
+    panel.querySelector('.card-editor-close').addEventListener('click', () => {
+      panel.remove();
+    });
+
+    // Save changes on input
+    panel.querySelectorAll('.card-field').forEach(field => {
+      const saveField = () => {
+        const key = field.dataset.field;
+        let value = field.value;
+        if (key === 'cardTags') {
+          value = value.split(',').map(t => t.trim()).filter(t => t);
+        }
+        const ops = [{ type: 'update', elementId: el.id, props: { [key]: value } }];
+        const inverseOps = [{ type: 'update', elementId: el.id, props: { [key]: el[key] } }];
+        el[key] = value;
+        this.history.push(ops, inverseOps);
+        this.sync.sendOps(ops);
+        this.renderer.markDirty();
+      };
+      field.addEventListener('change', saveField);
+      field.addEventListener('input', saveField);
+      field.addEventListener('keydown', (e) => e.stopPropagation());
+    });
+  }
+
+  // List editor
+  showListEditor(el) {
+    const existing = document.querySelector('.card-editor-panel');
+    if (existing) existing.remove();
+
+    if (!el.listItems) el.listItems = [];
+
+    const panel = document.createElement('div');
+    panel.className = 'card-editor-panel';
+
+    const renderList = () => {
+      panel.innerHTML = `
+        <div class="card-editor-header">
+          <h3>Liste</h3>
+          <button class="card-editor-close">&times;</button>
+        </div>
+        <div class="card-editor-body">
+          <label>Titre</label>
+          <input type="text" class="list-title" value="${(el.text || '').replace(/"/g, '&quot;')}" placeholder="Titre..." />
+          <label>Elements</label>
+          <div class="list-items-editor">
+            ${el.listItems.map((item, i) => `
+              <div class="list-item-row">
+                <input type="text" class="list-item-input" data-idx="${i}" value="${(item.text || '').replace(/"/g, '&quot;')}" placeholder="Element..." />
+                <button class="list-item-del" data-idx="${i}">&times;</button>
+              </div>
+            `).join('')}
+          </div>
+          <button class="list-add-btn">+ Ajouter un element</button>
+        </div>
+      `;
+
+      panel.querySelector('.card-editor-close').addEventListener('click', () => panel.remove());
+
+      panel.querySelector('.list-title').addEventListener('input', (e) => {
+        e.target.addEventListener('keydown', (ev) => ev.stopPropagation());
+        const ops = [{ type: 'update', elementId: el.id, props: { text: e.target.value } }];
+        const inverseOps = [{ type: 'update', elementId: el.id, props: { text: el.text } }];
+        el.text = e.target.value;
+        this.history.push(ops, inverseOps);
+        this.sync.sendOps(ops);
+        this.renderer.markDirty();
+      });
+      panel.querySelector('.list-title').addEventListener('keydown', (e) => e.stopPropagation());
+
+      panel.querySelectorAll('.list-item-input').forEach(input => {
+        input.addEventListener('input', () => {
+          const idx = parseInt(input.dataset.idx);
+          const old = deepClone(el.listItems);
+          el.listItems[idx].text = input.value;
+          const ops = [{ type: 'update', elementId: el.id, props: { listItems: deepClone(el.listItems) } }];
+          const inverseOps = [{ type: 'update', elementId: el.id, props: { listItems: old } }];
+          this.history.push(ops, inverseOps);
+          this.sync.sendOps(ops);
+          this.renderer.markDirty();
+        });
+        input.addEventListener('keydown', (e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') {
+            const idx = parseInt(input.dataset.idx);
+            const old = deepClone(el.listItems);
+            el.listItems.splice(idx + 1, 0, { id: generateId(), text: '' });
+            const ops = [{ type: 'update', elementId: el.id, props: { listItems: deepClone(el.listItems) } }];
+            const inverseOps = [{ type: 'update', elementId: el.id, props: { listItems: old } }];
+            this.history.push(ops, inverseOps);
+            this.sync.sendOps(ops);
+            this.renderer.markDirty();
+            renderList();
+            const newInput = panel.querySelector(`[data-idx="${idx + 1}"]`);
+            if (newInput) newInput.focus();
+          }
+        });
+      });
+
+      panel.querySelectorAll('.list-item-del').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.dataset.idx);
+          const old = deepClone(el.listItems);
+          el.listItems.splice(idx, 1);
+          const ops = [{ type: 'update', elementId: el.id, props: { listItems: deepClone(el.listItems) } }];
+          const inverseOps = [{ type: 'update', elementId: el.id, props: { listItems: old } }];
+          this.history.push(ops, inverseOps);
+          this.sync.sendOps(ops);
+          this.renderer.markDirty();
+          renderList();
+        });
+      });
+
+      panel.querySelector('.list-add-btn').addEventListener('click', () => {
+        const old = deepClone(el.listItems);
+        el.listItems.push({ id: generateId(), text: '' });
+        const ops = [{ type: 'update', elementId: el.id, props: { listItems: deepClone(el.listItems) } }];
+        const inverseOps = [{ type: 'update', elementId: el.id, props: { listItems: old } }];
+        this.history.push(ops, inverseOps);
+        this.sync.sendOps(ops);
+        this.renderer.markDirty();
+        renderList();
+        const inputs = panel.querySelectorAll('.list-item-input');
+        if (inputs.length > 0) inputs[inputs.length - 1].focus();
+      });
+    };
+
+    renderList();
+    document.body.appendChild(panel);
   }
 
   // Animated view transition
