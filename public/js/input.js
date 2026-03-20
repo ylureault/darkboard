@@ -207,6 +207,16 @@ class InputHandler {
         this.app.paste();
         return;
       }
+      if (e.key === 'g' && e.shiftKey) {
+        e.preventDefault();
+        this.app.ungroupSelected();
+        return;
+      }
+      if (e.key === 'g') {
+        e.preventDefault();
+        this.app.groupSelected();
+        return;
+      }
       if (e.key === 'd') {
         e.preventDefault();
         this.app.duplicateSelected();

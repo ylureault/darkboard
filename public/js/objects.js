@@ -13,6 +13,9 @@ function createElement(type, props) {
     text: '',
     fontSize: 16,
     zIndex: Date.now(),
+    rotation: 0, // degrees
+    locked: false,
+    groupId: null, // group membership
     ...props
   };
   return base;
@@ -202,6 +205,31 @@ function getCachedImage(dataUrl) {
 // Render an element to canvas
 function renderElement(ctx, el, selected, camera) {
   ctx.save();
+
+  // Apply rotation if set
+  if (el.rotation && el.type !== 'line' && el.type !== 'arrow' && el.type !== 'connector' && el.type !== 'freehand') {
+    const bounds = getElementBounds(el);
+    const cx = bounds.x + bounds.w / 2;
+    const cy = bounds.y + bounds.h / 2;
+    ctx.translate(cx, cy);
+    ctx.rotate(el.rotation * Math.PI / 180);
+    ctx.translate(-cx, -cy);
+  }
+
+  // Lock indicator
+  if (el.locked) {
+    const bounds = getElementBounds(el);
+    if (bounds) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '12px sans-serif';
+      ctx.textBaseline = 'top';
+      ctx.textAlign = 'right';
+      ctx.fillText('🔒', bounds.x + bounds.w - 2, bounds.y + 2);
+      ctx.textAlign = 'left';
+      ctx.restore();
+    }
+  }
 
   switch (el.type) {
     case 'rect':
@@ -463,6 +491,8 @@ function drawEnvelope(ctx, el) {
   const headerH = 36;
   const color = el.stroke || '#4a9eff';
   const childCount = (el.children && el.children.length) || 0;
+  const collapsed = el.collapsed || false;
+  const drawH = collapsed ? headerH : el.height;
 
   // Shadow
   ctx.shadowColor = 'rgba(0,0,0,0.2)';
@@ -471,8 +501,8 @@ function drawEnvelope(ctx, el) {
 
   // Body
   ctx.beginPath();
-  ctx.roundRect(el.x, el.y, el.width, el.height, r);
-  ctx.fillStyle = el.fill || (color + '15');
+  ctx.roundRect(el.x, el.y, el.width, drawH, r);
+  ctx.fillStyle = collapsed ? (color + '30') : (el.fill || (color + '15'));
   ctx.fill();
 
   ctx.shadowColor = 'transparent';
@@ -510,32 +540,40 @@ function drawEnvelope(ctx, el) {
   ctx.textBaseline = 'middle';
   ctx.fillText(el.text || 'Enveloppe', el.x + 30, el.y + headerH / 2, el.width - 70);
 
-  // Count badge
-  if (childCount > 0) {
-    const badgeX = el.x + el.width - 30;
-    const badgeY = el.y + headerH / 2;
-    ctx.beginPath();
-    ctx.arc(badgeX, badgeY, 12, 0, Math.PI * 2);
-    ctx.fillStyle = 'white';
-    ctx.fill();
+  // Collapse/expand indicator
+  const chevX = el.x + el.width - 54;
+  const chevY = el.y + headerH / 2;
+  ctx.fillStyle = 'white';
+  ctx.font = '12px sans-serif';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(collapsed ? '▶' : '▼', chevX, chevY);
 
-    ctx.fillStyle = color;
-    ctx.font = 'bold 11px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(String(childCount), badgeX, badgeY);
-    ctx.textAlign = 'left';
-  }
-
-  // Flap pattern (envelope flap aesthetic at bottom)
+  // Count badge (always visible)
+  const badgeX = el.x + el.width - 30;
+  const badgeY = el.y + headerH / 2;
   ctx.beginPath();
-  ctx.moveTo(el.x, el.y + el.height);
-  ctx.lineTo(el.x + el.width / 2, el.y + el.height - 20);
-  ctx.lineTo(el.x + el.width, el.y + el.height);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1;
-  ctx.globalAlpha = 0.3;
-  ctx.stroke();
-  ctx.globalAlpha = 1;
+  ctx.arc(badgeX, badgeY, 12, 0, Math.PI * 2);
+  ctx.fillStyle = 'white';
+  ctx.fill();
+
+  ctx.fillStyle = color;
+  ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(String(childCount), badgeX, badgeY);
+  ctx.textAlign = 'left';
+
+  // Flap pattern (only when expanded)
+  if (!collapsed) {
+    ctx.beginPath();
+    ctx.moveTo(el.x, el.y + el.height);
+    ctx.lineTo(el.x + el.width / 2, el.y + el.height - 20);
+    ctx.lineTo(el.x + el.width, el.y + el.height);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.3;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
 }
 
 function drawConnector(ctx, el) {
@@ -810,6 +848,29 @@ function drawCard(ctx, el) {
     ctx.textBaseline = 'top';
     ctx.fillText('📝', el.x + w - 55, bY);
   }
+
+  // Checklist progress bar
+  if (el.cardChecklist && el.cardChecklist.length > 0) {
+    const done = el.cardChecklist.filter(c => c.checked).length;
+    const total = el.cardChecklist.length;
+    const barW = w - 32;
+    const barH = 4;
+    const barY2 = bY - 12;
+    ctx.fillStyle = '#333';
+    ctx.beginPath();
+    ctx.roundRect(xPad, barY2, barW, barH, 2);
+    ctx.fill();
+    if (done > 0) {
+      ctx.fillStyle = done === total ? '#4ecdc4' : '#4a9eff';
+      ctx.beginPath();
+      ctx.roundRect(xPad, barY2, barW * (done / total), barH, 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#888';
+    ctx.font = '9px sans-serif';
+    ctx.textBaseline = 'top';
+    ctx.fillText(done + '/' + total, xPad + barW + 4, barY2 - 2);
+  }
 }
 
 function drawList(ctx, el) {
@@ -852,6 +913,17 @@ function drawList(ctx, el) {
   ctx.textBaseline = 'middle';
   ctx.fillText(el.text || 'Liste', el.x + 12, el.y + headerH / 2, el.width - 24);
 
+  // Checklist progress (if checkbox mode)
+  if (el.checkboxMode && items.length > 0) {
+    const done = items.filter(it => it.checked).length;
+    ctx.fillStyle = '#888';
+    ctx.font = '11px sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'right';
+    ctx.fillText(done + '/' + items.length, el.x + el.width - 12, el.y + headerH / 2);
+    ctx.textAlign = 'left';
+  }
+
   // Items
   for (let i = 0; i < items.length; i++) {
     const iy = el.y + headerH + i * itemH;
@@ -864,16 +936,54 @@ function drawList(ctx, el) {
       ctx.lineTo(el.x + el.width - 12, iy);
       ctx.stroke();
     }
-    // Bullet
-    ctx.fillStyle = '#4a9eff';
-    ctx.beginPath();
-    ctx.arc(el.x + 20, iy + itemH / 2, 3, 0, Math.PI * 2);
-    ctx.fill();
-    // Text
-    ctx.fillStyle = '#ccc';
-    ctx.font = '13px -apple-system, BlinkMacSystemFont, sans-serif';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(items[i].text || '', el.x + 32, iy + itemH / 2, el.width - 48);
+
+    if (el.checkboxMode) {
+      // Checkbox
+      const cbX = el.x + 14;
+      const cbY = iy + itemH / 2 - 6;
+      ctx.strokeStyle = items[i].checked ? '#4ecdc4' : '#666';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(cbX, cbY, 12, 12, 2);
+      ctx.stroke();
+      if (items[i].checked) {
+        ctx.fillStyle = '#4ecdc4';
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cbX + 3, cbY + 6);
+        ctx.lineTo(cbX + 5, cbY + 9);
+        ctx.lineTo(cbX + 9, cbY + 3);
+        ctx.stroke();
+      }
+      // Text (strikethrough if checked)
+      ctx.fillStyle = items[i].checked ? '#666' : '#ccc';
+      ctx.font = items[i].checked ? 'italic 13px sans-serif' : '13px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(items[i].text || '', el.x + 34, iy + itemH / 2, el.width - 50);
+      if (items[i].checked) {
+        // Strikethrough line
+        const tw = ctx.measureText(items[i].text || '').width;
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(el.x + 34, iy + itemH / 2);
+        ctx.lineTo(el.x + 34 + Math.min(tw, el.width - 50), iy + itemH / 2);
+        ctx.stroke();
+      }
+    } else {
+      // Bullet
+      ctx.fillStyle = '#4a9eff';
+      ctx.beginPath();
+      ctx.arc(el.x + 20, iy + itemH / 2, 3, 0, Math.PI * 2);
+      ctx.fill();
+      // Text
+      ctx.fillStyle = '#ccc';
+      ctx.font = '13px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(items[i].text || '', el.x + 32, iy + itemH / 2, el.width - 48);
+    }
   }
 
   // Add button

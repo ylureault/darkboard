@@ -4,18 +4,41 @@ const Tools = {
     name: 'select',
     cursor: 'default',
     dragStart: null,
-    dragType: null, // 'move' | 'resize' | 'marquee'
+    dragType: null, // 'move' | 'resize' | 'marquee' | 'rotate'
     resizeHandle: null,
     originalElements: null,
+    rotationCenter: null,
 
     onPointerDown(app, worldX, worldY, e) {
-      // Check resize handles first
+      // Check minimap click
+      const mmHit = app.renderer.hitTestMinimap(e.clientX, e.clientY);
+      if (mmHit) {
+        app.renderer.camera.x = mmHit.worldX;
+        app.renderer.camera.y = mmHit.worldY;
+        app.renderer.markDirty();
+        app.updateZoomDisplay();
+        return;
+      }
+
+      // Check resize/rotation handles first
       const handleHit = app.renderer.hitTestHandle(worldX, worldY);
       if (handleHit) {
+        const el = app.renderer.elements.get(handleHit.elementId);
+        if (el && el.locked) return; // Don't resize/rotate locked elements
+
+        if (handleHit.handle === 'rotate') {
+          this.dragType = 'rotate';
+          const bounds = getElementBounds(el);
+          this.rotationCenter = { x: bounds.x + bounds.w / 2, y: bounds.y + bounds.h / 2 };
+          this.dragStart = { x: worldX, y: worldY };
+          this.originalElements = new Map();
+          this.originalElements.set(el.id, deepClone(el));
+          return;
+        }
+
         this.dragType = 'resize';
         this.resizeHandle = handleHit;
         this.dragStart = { x: worldX, y: worldY };
-        const el = app.renderer.elements.get(handleHit.elementId);
         this.originalElements = new Map();
         this.originalElements.set(el.id, deepClone(el));
         return;
@@ -27,6 +50,14 @@ const Tools = {
       const hit = app.renderer.hitTest(worldX, worldY);
 
       if (hit) {
+        // Check if locked
+        if (hit.locked && !e.shiftKey) {
+          app.renderer.selectedIds.clear();
+          app.renderer.selectedIds.add(hit.id);
+          app.renderer.markDirty();
+          return; // Don't start move on locked elements
+        }
+
         if (e.shiftKey) {
           // Toggle selection
           if (app.renderer.selectedIds.has(hit.id)) {
@@ -39,14 +70,30 @@ const Tools = {
           app.renderer.selectedIds.add(hit.id);
         }
 
+        // Check if ALL selected elements are locked
+        let allLocked = true;
+        for (const id of app.renderer.selectedIds) {
+          const el2 = app.renderer.elements.get(id);
+          if (el2 && !el2.locked) { allLocked = false; break; }
+        }
+        if (allLocked) {
+          app.renderer.markDirty();
+          return;
+        }
+
+        // Auto-select group members
+        if (hit.groupId && !e.shiftKey) {
+          app.selectGroup(hit.id);
+        }
+
         this.dragType = 'move';
         this.dragStart = { x: worldX, y: worldY };
 
-        // Store original positions
+        // Store original positions (exclude locked)
         this.originalElements = new Map();
         for (const id of app.renderer.selectedIds) {
           const el = app.renderer.elements.get(id);
-          if (el) this.originalElements.set(id, deepClone(el));
+          if (el && !el.locked) this.originalElements.set(id, deepClone(el));
         }
       } else {
         // Start marquee selection
@@ -64,11 +111,11 @@ const Tools = {
         // Hover cursor
         const handleHit = app.renderer.hitTestHandle(worldX, worldY);
         if (handleHit) {
-          const cursors = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' };
+          const cursors = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', rotate: 'crosshair' };
           app.renderer.canvas.style.cursor = cursors[handleHit.handle] || 'default';
         } else {
           const hit = app.renderer.hitTest(worldX, worldY);
-          app.renderer.canvas.style.cursor = hit ? 'move' : 'default';
+          app.renderer.canvas.style.cursor = hit ? (hit.locked ? 'not-allowed' : 'move') : 'default';
         }
         return;
       }
@@ -76,18 +123,41 @@ const Tools = {
       const dx = worldX - this.dragStart.x;
       const dy = worldY - this.dragStart.y;
 
-      if (this.dragType === 'move') {
+      if (this.dragType === 'rotate') {
+        if (this.rotationCenter) {
+          const startAngle = Math.atan2(this.dragStart.y - this.rotationCenter.y, this.dragStart.x - this.rotationCenter.x);
+          const currentAngle = Math.atan2(worldY - this.rotationCenter.y, worldX - this.rotationCenter.x);
+          let delta = (currentAngle - startAngle) * 180 / Math.PI;
+          if (e.shiftKey) {
+            delta = Math.round(delta / 45) * 45;
+          }
+          for (const [id, orig] of this.originalElements) {
+            const el = app.renderer.elements.get(id);
+            if (el) el.rotation = (orig.rotation || 0) + delta;
+          }
+        }
+      } else if (this.dragType === 'move') {
+        // Snap to grid if enabled
+        let snapDx = dx, snapDy = dy;
+        if (app.renderer.snapToGrid && !e.altKey) {
+          const firstOrig = this.originalElements.values().next().value;
+          if (firstOrig) {
+            const snapped = app.renderer.snapPosition(firstOrig.x + dx, firstOrig.y + dy);
+            snapDx = snapped.x - firstOrig.x;
+            snapDy = snapped.y - firstOrig.y;
+          }
+        }
         for (const [id, orig] of this.originalElements) {
           const el = app.renderer.elements.get(id);
           if (!el) continue;
-          el.x = orig.x + dx;
-          el.y = orig.y + dy;
+          el.x = orig.x + snapDx;
+          el.y = orig.y + snapDy;
           if (el.x2 !== undefined) {
-            el.x2 = orig.x2 + dx;
-            el.y2 = orig.y2 + dy;
+            el.x2 = orig.x2 + snapDx;
+            el.y2 = orig.y2 + snapDy;
           }
           if (el.points) {
-            el.points = orig.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+            el.points = orig.points.map(p => ({ x: p.x + snapDx, y: p.y + snapDy }));
           }
         }
       } else if (this.dragType === 'resize') {
@@ -113,6 +183,24 @@ const Tools = {
     },
 
     onPointerUp(app, worldX, worldY, e) {
+      if (this.dragType === 'rotate' && this.dragStart) {
+        for (const [id, orig] of this.originalElements) {
+          const el = app.renderer.elements.get(id);
+          if (el) {
+            const ops = [{ type: 'update', elementId: id, props: { rotation: el.rotation } }];
+            const inverseOps = [{ type: 'update', elementId: id, props: { rotation: orig.rotation || 0 } }];
+            app.history.push(ops, inverseOps);
+            app.sync.sendOps(ops);
+          }
+        }
+        this.dragStart = null;
+        this.dragType = null;
+        this.rotationCenter = null;
+        this.originalElements = null;
+        app.renderer.markDirty();
+        return;
+      }
+
       if (this.dragType === 'move' && this.dragStart) {
         const dx = worldX - this.dragStart.x;
         const dy = worldY - this.dragStart.y;

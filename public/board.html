@@ -284,6 +284,33 @@
     <span class="zoom-level" id="zoomLevel" title="Reinitialiser le zoom">100%</span>
     <button class="zoom-btn" id="zoomIn" title="Zoomer">+</button>
     <button class="zoom-btn" id="zoomFit" title="Adapter a l'ecran">⊞</button>
+    <div class="divider" style="height:20px;width:1px;background:var(--panel-border);margin:0 4px"></div>
+    <button class="zoom-btn" id="toggleMinimap" title="Minimap">🗺</button>
+    <button class="zoom-btn" id="toggleSnap" title="Grille magnetique">⊹</button>
+  </div>
+
+  <!-- Laser pointer button -->
+  <button class="share-btn" id="laserBtn" title="Pointeur laser" style="bottom: 176px;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7" stroke-dasharray="3 3"/><circle cx="12" cy="12" r="10" stroke-dasharray="2 4"/>
+    </svg>
+    Laser
+  </button>
+
+  <!-- Presentation mode button -->
+  <button class="share-btn" id="presentBtn" title="Mode presentation" style="bottom: 216px;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+    </svg>
+    Present.
+  </button>
+
+  <!-- Presentation controls (hidden by default) -->
+  <div class="presentation-controls" id="presentationControls" style="display:none">
+    <button class="pres-btn" id="presPrev" title="Ancre precedente">◀</button>
+    <span class="pres-indicator" id="presIndicator">1/1</span>
+    <button class="pres-btn" id="presNext" title="Ancre suivante">▶</button>
+    <button class="pres-btn" id="presExit" title="Quitter">✕</button>
   </div>
 
   <!-- Action buttons -->

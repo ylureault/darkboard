@@ -11,6 +11,11 @@ class CanvasRenderer {
     this.previewElement = null;
     this.selectionBox = null; // { x, y, w, h } for marquee selection
     this.gridEnabled = true;
+    this.snapToGrid = false;
+    this.snapGridSize = 20;
+    this.minimapEnabled = false;
+    this.laserPointers = new Map(); // userId -> {x, y, color}
+    this.comments = []; // anchored comments
 
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -102,6 +107,7 @@ class CanvasRenderer {
       .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
 
     for (const el of sorted) {
+      if (el.hidden) continue; // skip hidden elements (collapsed envelope children)
       renderElement(ctx, el, this.selectedIds.has(el.id), this.camera);
     }
 
@@ -129,12 +135,27 @@ class CanvasRenderer {
       ctx.setLineDash([]);
     }
 
+    // Laser pointers
+    for (const [userId, laser] of this.laserPointers) {
+      this.drawLaserPointer(ctx, laser);
+    }
+
+    // Comments
+    for (const comment of this.comments) {
+      this.drawCommentBubble(ctx, comment);
+    }
+
     // Remote cursors
     for (const [userId, user] of this.remoteUsers) {
       this.drawRemoteCursor(ctx, user);
     }
 
     ctx.restore();
+
+    // Minimap (rendered in screen space, after ctx.restore)
+    if (this.minimapEnabled) {
+      this.drawMinimap();
+    }
   }
 
   drawGrid(ctx, w, h) {
@@ -202,6 +223,35 @@ class CanvasRenderer {
       ctx.fill();
       ctx.stroke();
     }
+
+    // Rotation handle (top center, above element)
+    if (el.type !== 'line' && el.type !== 'arrow' && el.type !== 'connector' && el.type !== 'freehand') {
+      const rotX = bounds.x + bounds.w / 2;
+      const rotY = bounds.y - pad - 30 / this.camera.zoom;
+      const lineY = bounds.y - pad;
+      // Line from top to rotation handle
+      ctx.beginPath();
+      ctx.moveTo(rotX, lineY);
+      ctx.lineTo(rotX, rotY);
+      ctx.strokeStyle = '#4a9eff';
+      ctx.lineWidth = 1.5 / this.camera.zoom;
+      ctx.stroke();
+      // Rotation circle
+      ctx.beginPath();
+      ctx.arc(rotX, rotY, handleSize * 0.7, 0, Math.PI * 2);
+      ctx.fillStyle = '#4a9eff';
+      ctx.fill();
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 1.5 / this.camera.zoom;
+      ctx.stroke();
+      // Rotation arrow icon
+      ctx.beginPath();
+      const rs = handleSize * 0.35;
+      ctx.arc(rotX, rotY, rs, -Math.PI * 0.7, Math.PI * 0.3);
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 1.5 / this.camera.zoom;
+      ctx.stroke();
+    }
   }
 
   drawRemoteCursor(ctx, user) {
@@ -245,6 +295,133 @@ class CanvasRenderer {
     ctx.restore();
   }
 
+  drawLaserPointer(ctx, laser) {
+    const x = laser.x;
+    const y = laser.y;
+    // Glowing dot
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, 8, 0, Math.PI * 2);
+    ctx.fillStyle = laser.color || '#ff0000';
+    ctx.shadowColor = laser.color || '#ff0000';
+    ctx.shadowBlur = 20;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = 'white';
+    ctx.fill();
+    ctx.restore();
+  }
+
+  drawCommentBubble(ctx, comment) {
+    const x = comment.x;
+    const y = comment.y;
+    const sz = 24;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, sz / 2, 0, Math.PI * 2);
+    ctx.fillStyle = comment.resolved ? '#666' : '#4a9eff';
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = 6;
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    ctx.fillText('💬', x, y);
+    ctx.textAlign = 'left';
+    // Count
+    if (comment.replies && comment.replies.length > 0) {
+      ctx.beginPath();
+      ctx.arc(x + sz / 2 - 2, y - sz / 2 + 2, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#e94560';
+      ctx.fill();
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(String(comment.replies.length + 1), x + sz / 2 - 2, y - sz / 2 + 2);
+      ctx.textAlign = 'left';
+    }
+    ctx.restore();
+  }
+
+  drawMinimap() {
+    const ctx = this.ctx;
+    const mmW = 180;
+    const mmH = 120;
+    const mmX = window.innerWidth - mmW - 16;
+    const mmY = window.innerHeight - mmH - 60;
+
+    // Compute world bounds of all elements
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const el of this.elements.values()) {
+      const b = getElementBounds(el);
+      if (b.x < minX) minX = b.x;
+      if (b.y < minY) minY = b.y;
+      if (b.x + b.w > maxX) maxX = b.x + b.w;
+      if (b.y + b.h > maxY) maxY = b.y + b.h;
+    }
+    if (!isFinite(minX)) return;
+
+    const pad = 100;
+    minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+    const worldW = maxX - minX || 1;
+    const worldH = maxY - minY || 1;
+    const scale = Math.min(mmW / worldW, mmH / worldH);
+
+    // Background
+    ctx.save();
+    ctx.fillStyle = 'rgba(30,30,30,0.85)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(mmX, mmY, mmW, mmH, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    // Clip to minimap
+    ctx.beginPath();
+    ctx.roundRect(mmX, mmY, mmW, mmH, 8);
+    ctx.clip();
+
+    // Draw elements as dots
+    for (const el of this.elements.values()) {
+      const b = getElementBounds(el);
+      const x = mmX + (b.x - minX) * scale;
+      const y = mmY + (b.y - minY) * scale;
+      const w = Math.max(2, b.w * scale);
+      const h = Math.max(2, b.h * scale);
+      ctx.fillStyle = el.fill && el.fill !== 'transparent' ? el.fill : (el.stroke || '#888');
+      ctx.globalAlpha = 0.6;
+      ctx.fillRect(x, y, w, h);
+    }
+    ctx.globalAlpha = 1;
+
+    // Viewport rectangle
+    const tlWorld = this.screenToWorld(0, 0);
+    const brWorld = this.screenToWorld(window.innerWidth, window.innerHeight);
+    const vpX = mmX + (tlWorld.x - minX) * scale;
+    const vpY = mmY + (tlWorld.y - minY) * scale;
+    const vpW = (brWorld.x - tlWorld.x) * scale;
+    const vpH = (brWorld.y - tlWorld.y) * scale;
+    ctx.strokeStyle = '#4a9eff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(vpX, vpY, vpW, vpH);
+
+    ctx.restore();
+  }
+
+  // Snap a position to grid if enabled
+  snapPosition(x, y) {
+    if (!this.snapToGrid) return { x, y };
+    const gs = this.snapGridSize;
+    return {
+      x: Math.round(x / gs) * gs,
+      y: Math.round(y / gs) * gs
+    };
+  }
+
   // Hit test: find element under point
   hitTest(worldX, worldY) {
     const sorted = Array.from(this.elements.values())
@@ -264,9 +441,50 @@ class CanvasRenderer {
     for (const id of this.selectedIds) {
       const el = this.elements.get(id);
       if (el) {
+        // Check rotation handle first
+        if (el.type !== 'line' && el.type !== 'arrow' && el.type !== 'connector' && el.type !== 'freehand') {
+          const bounds = getElementBounds(el);
+          const pad = 6 / this.camera.zoom;
+          const rotX = bounds.x + bounds.w / 2;
+          const rotY = bounds.y - pad - 30 / this.camera.zoom;
+          const rotR = 8 / this.camera.zoom;
+          if (Math.hypot(worldX - rotX, worldY - rotY) < rotR) {
+            return { elementId: id, handle: 'rotate' };
+          }
+        }
         const handle = getResizeHandle(el, worldX, worldY, handleSize);
         if (handle) return { elementId: id, handle };
       }
+    }
+    return null;
+  }
+
+  // Hit test minimap for navigation
+  hitTestMinimap(screenX, screenY) {
+    if (!this.minimapEnabled) return null;
+    const mmW = 180, mmH = 120;
+    const mmX = window.innerWidth - mmW - 16;
+    const mmY = window.innerHeight - mmH - 60;
+    if (screenX >= mmX && screenX <= mmX + mmW && screenY >= mmY && screenY <= mmY + mmH) {
+      // Compute world position from minimap click
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const el of this.elements.values()) {
+        const b = getElementBounds(el);
+        if (b.x < minX) minX = b.x;
+        if (b.y < minY) minY = b.y;
+        if (b.x + b.w > maxX) maxX = b.x + b.w;
+        if (b.y + b.h > maxY) maxY = b.y + b.h;
+      }
+      if (!isFinite(minX)) return null;
+      const pad = 100;
+      minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+      const worldW = maxX - minX || 1;
+      const worldH = maxY - minY || 1;
+      const scale = Math.min(mmW / worldW, mmH / worldH);
+      return {
+        worldX: minX + (screenX - mmX) / scale,
+        worldY: minY + (screenY - mmY) / scale
+      };
     }
     return null;
   }

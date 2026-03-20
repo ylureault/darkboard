@@ -313,10 +313,14 @@ class DarkBoardApp {
     const inverseOps = [];
     for (const id of this.renderer.selectedIds) {
       const el = this.renderer.elements.get(id);
-      if (el) {
+      if (el && !el.locked) {
         ops.push({ type: 'delete', elementId: id });
         inverseOps.push({ type: 'add', elementId: id, element: deepClone(el) });
       }
+    }
+    if (ops.length === 0) {
+      this.showToast('Objets verrouilles');
+      return;
     }
     this.applyOps(ops);
     this.history.push(ops, inverseOps);
@@ -711,6 +715,235 @@ class DarkBoardApp {
     });
   }
 
+  // Group/Ungroup
+  groupSelected() {
+    if (this.renderer.selectedIds.size < 2) return;
+    const groupId = generateId();
+    const ops = [];
+    const inverseOps = [];
+    for (const id of this.renderer.selectedIds) {
+      const el = this.renderer.elements.get(id);
+      if (el) {
+        inverseOps.push({ type: 'update', elementId: id, props: { groupId: el.groupId || null } });
+        el.groupId = groupId;
+        ops.push({ type: 'update', elementId: id, props: { groupId } });
+      }
+    }
+    this.history.push(ops, inverseOps);
+    this.sync.sendOps(ops);
+    this.renderer.markDirty();
+    this.showToast('Objets groupes');
+  }
+
+  ungroupSelected() {
+    const ops = [];
+    const inverseOps = [];
+    const groupIds = new Set();
+    for (const id of this.renderer.selectedIds) {
+      const el = this.renderer.elements.get(id);
+      if (el && el.groupId) groupIds.add(el.groupId);
+    }
+    // Ungroup all elements in those groups
+    for (const [id, el] of this.renderer.elements) {
+      if (el.groupId && groupIds.has(el.groupId)) {
+        inverseOps.push({ type: 'update', elementId: id, props: { groupId: el.groupId } });
+        el.groupId = null;
+        ops.push({ type: 'update', elementId: id, props: { groupId: null } });
+      }
+    }
+    this.history.push(ops, inverseOps);
+    this.sync.sendOps(ops);
+    this.renderer.markDirty();
+    this.showToast('Objets degroupes');
+  }
+
+  // Select entire group when one element is clicked
+  selectGroup(elementId) {
+    const el = this.renderer.elements.get(elementId);
+    if (!el || !el.groupId) return;
+    for (const [id, other] of this.renderer.elements) {
+      if (other.groupId === el.groupId) {
+        this.renderer.selectedIds.add(id);
+      }
+    }
+  }
+
+  // Alignment tools
+  alignSelected(mode) {
+    if (this.renderer.selectedIds.size < 2) return;
+    const elements = [];
+    for (const id of this.renderer.selectedIds) {
+      const el = this.renderer.elements.get(id);
+      if (el && !el.locked) elements.push(el);
+    }
+    if (elements.length < 2) return;
+
+    const ops = [];
+    const inverseOps = [];
+
+    if (mode === 'top') {
+      const minY = Math.min(...elements.map(el => el.y));
+      for (const el of elements) {
+        if (el.y !== minY) {
+          inverseOps.push({ type: 'update', elementId: el.id, props: { y: el.y } });
+          el.y = minY;
+          ops.push({ type: 'update', elementId: el.id, props: { y: minY } });
+        }
+      }
+    } else if (mode === 'left') {
+      const minX = Math.min(...elements.map(el => el.x));
+      for (const el of elements) {
+        if (el.x !== minX) {
+          inverseOps.push({ type: 'update', elementId: el.id, props: { x: el.x } });
+          el.x = minX;
+          ops.push({ type: 'update', elementId: el.id, props: { x: minX } });
+        }
+      }
+    } else if (mode === 'centerH') {
+      const bounds = elements.map(el => getElementBounds(el));
+      const centerY = bounds.reduce((s, b) => s + b.y + b.h / 2, 0) / bounds.length;
+      for (let i = 0; i < elements.length; i++) {
+        const el = elements[i];
+        const newY = centerY - bounds[i].h / 2;
+        if (el.y !== newY) {
+          inverseOps.push({ type: 'update', elementId: el.id, props: { y: el.y } });
+          el.y = newY;
+          ops.push({ type: 'update', elementId: el.id, props: { y: newY } });
+        }
+      }
+    }
+
+    if (ops.length > 0) {
+      this.history.push(ops, inverseOps);
+      this.sync.sendOps(ops);
+      this.renderer.markDirty();
+    }
+  }
+
+  distributeSelected(direction) {
+    const elements = [];
+    for (const id of this.renderer.selectedIds) {
+      const el = this.renderer.elements.get(id);
+      if (el && !el.locked) elements.push(el);
+    }
+    if (elements.length < 3) return;
+
+    const ops = [];
+    const inverseOps = [];
+
+    if (direction === 'horizontal') {
+      elements.sort((a, b) => a.x - b.x);
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      const totalSpan = (last.x + last.width) - first.x;
+      const totalWidths = elements.reduce((s, el) => s + el.width, 0);
+      const gap = (totalSpan - totalWidths) / (elements.length - 1);
+      let currentX = first.x + first.width + gap;
+      for (let i = 1; i < elements.length - 1; i++) {
+        const el = elements[i];
+        if (el.x !== currentX) {
+          inverseOps.push({ type: 'update', elementId: el.id, props: { x: el.x } });
+          el.x = currentX;
+          ops.push({ type: 'update', elementId: el.id, props: { x: currentX } });
+        }
+        currentX += el.width + gap;
+      }
+    }
+
+    if (ops.length > 0) {
+      this.history.push(ops, inverseOps);
+      this.sync.sendOps(ops);
+      this.renderer.markDirty();
+    }
+  }
+
+  // Envelope collapse/expand
+  toggleEnvelopeCollapse(envelope) {
+    const collapsed = !envelope.collapsed;
+    const ops = [{ type: 'update', elementId: envelope.id, props: { collapsed } }];
+    const inverseOps = [{ type: 'update', elementId: envelope.id, props: { collapsed: !collapsed } }];
+    envelope.collapsed = collapsed;
+
+    // Hide/show children
+    if (envelope.children) {
+      for (const childId of envelope.children) {
+        const child = this.renderer.elements.get(childId);
+        if (child) {
+          ops.push({ type: 'update', elementId: childId, props: { hidden: collapsed } });
+          inverseOps.push({ type: 'update', elementId: childId, props: { hidden: !collapsed } });
+          child.hidden = collapsed;
+        }
+      }
+    }
+
+    this.history.push(ops, inverseOps);
+    this.sync.sendOps(ops);
+    this.renderer.markDirty();
+  }
+
+  // Delete envelope with all its content
+  deleteEnvelopeWithContent(envelope) {
+    const ops = [];
+    const inverseOps = [];
+    if (envelope.children) {
+      for (const childId of envelope.children) {
+        const child = this.renderer.elements.get(childId);
+        if (child) {
+          ops.push({ type: 'delete', elementId: childId });
+          inverseOps.push({ type: 'add', elementId: childId, element: deepClone(child) });
+        }
+      }
+    }
+    ops.push({ type: 'delete', elementId: envelope.id });
+    inverseOps.push({ type: 'add', elementId: envelope.id, element: deepClone(envelope) });
+    this.applyOps(ops);
+    this.history.push(ops, inverseOps);
+    this.sync.sendOps(ops);
+    this.renderer.selectedIds.clear();
+    this.renderer.markDirty();
+  }
+
+  // Comments
+  addComment(el) {
+    const text = prompt('Commentaire:');
+    if (!text) return;
+    const bounds = getElementBounds(el);
+    const comment = {
+      id: generateId(),
+      x: bounds.x + bounds.w,
+      y: bounds.y,
+      elementId: el.id,
+      text: text,
+      author: this.userName || 'Anonyme',
+      timestamp: Date.now(),
+      replies: [],
+      resolved: false
+    };
+    this.renderer.comments.push(comment);
+    this.renderer.markDirty();
+    this.showToast('Commentaire ajoute');
+  }
+
+  // Canvas comment (not attached to object)
+  addCanvasComment(x, y) {
+    const text = prompt('Commentaire:');
+    if (!text) return;
+    const comment = {
+      id: generateId(),
+      x: x,
+      y: y,
+      elementId: null,
+      text: text,
+      author: this.userName || 'Anonyme',
+      timestamp: Date.now(),
+      replies: [],
+      resolved: false
+    };
+    this.renderer.comments.push(comment);
+    this.renderer.markDirty();
+    this.showToast('Commentaire ajoute');
+  }
+
   // Card editor panel
   showCardEditor(el) {
     const existing = document.querySelector('.card-editor-panel');
@@ -751,8 +984,73 @@ class DarkBoardApp {
         <input type="date" class="card-field" data-field="cardDueDate" value="${el.cardDueDate || ''}" />
         <label>Description</label>
         <textarea class="card-field card-desc" data-field="cardDescription" placeholder="Description detaillee...">${el.cardDescription || ''}</textarea>
+        <label>Checklist</label>
+        <div class="card-checklist-editor"></div>
+        <button class="list-add-btn card-add-check">+ Ajouter un element</button>
       </div>
     `;
+
+    // Render checklist
+    const renderChecklist = () => {
+      if (!el.cardChecklist) el.cardChecklist = [];
+      const container = panel.querySelector('.card-checklist-editor');
+      container.innerHTML = el.cardChecklist.map((item, i) => `
+        <div class="list-item-row">
+          <input type="checkbox" ${item.checked ? 'checked' : ''} data-chk-idx="${i}" />
+          <input type="text" class="list-item-input" data-chk-text-idx="${i}" value="${(item.text || '').replace(/"/g, '&quot;')}" placeholder="Sous-tache..." />
+          <button class="list-item-del" data-chk-del="${i}">&times;</button>
+        </div>
+      `).join('');
+
+      container.querySelectorAll('[data-chk-idx]').forEach(cb => {
+        cb.addEventListener('change', () => {
+          const idx = parseInt(cb.dataset.chkIdx);
+          const old = deepClone(el.cardChecklist);
+          el.cardChecklist[idx].checked = cb.checked;
+          const ops = [{ type: 'update', elementId: el.id, props: { cardChecklist: deepClone(el.cardChecklist) } }];
+          const inverseOps = [{ type: 'update', elementId: el.id, props: { cardChecklist: old } }];
+          this.history.push(ops, inverseOps);
+          this.sync.sendOps(ops);
+          this.renderer.markDirty();
+        });
+      });
+
+      container.querySelectorAll('[data-chk-text-idx]').forEach(input => {
+        input.addEventListener('input', () => {
+          const idx = parseInt(input.dataset.chkTextIdx);
+          el.cardChecklist[idx].text = input.value;
+          const ops = [{ type: 'update', elementId: el.id, props: { cardChecklist: deepClone(el.cardChecklist) } }];
+          this.sync.sendOps(ops);
+          this.renderer.markDirty();
+        });
+        input.addEventListener('keydown', (e) => e.stopPropagation());
+      });
+
+      container.querySelectorAll('[data-chk-del]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.dataset.chkDel);
+          const old = deepClone(el.cardChecklist);
+          el.cardChecklist.splice(idx, 1);
+          const ops = [{ type: 'update', elementId: el.id, props: { cardChecklist: deepClone(el.cardChecklist) } }];
+          const inverseOps = [{ type: 'update', elementId: el.id, props: { cardChecklist: old } }];
+          this.history.push(ops, inverseOps);
+          this.sync.sendOps(ops);
+          this.renderer.markDirty();
+          renderChecklist();
+        });
+      });
+    };
+
+    panel.querySelector('.card-add-check').addEventListener('click', () => {
+      if (!el.cardChecklist) el.cardChecklist = [];
+      el.cardChecklist.push({ text: '', checked: false });
+      const ops = [{ type: 'update', elementId: el.id, props: { cardChecklist: deepClone(el.cardChecklist) } }];
+      this.sync.sendOps(ops);
+      this.renderer.markDirty();
+      renderChecklist();
+    });
+
+    renderChecklist();
 
     document.body.appendChild(panel);
 
@@ -800,6 +1098,10 @@ class DarkBoardApp {
         <div class="card-editor-body">
           <label>Titre</label>
           <input type="text" class="list-title" value="${(el.text || '').replace(/"/g, '&quot;')}" placeholder="Titre..." />
+          <div style="display:flex;align-items:center;gap:8px;margin:8px 0">
+            <input type="checkbox" id="chkMode" ${el.checkboxMode ? 'checked' : ''} />
+            <label for="chkMode" style="margin:0;text-transform:none;font-size:13px">Mode checklist</label>
+          </div>
           <label>Elements</label>
           <div class="list-items-editor">
             ${el.listItems.map((item, i) => `
@@ -825,6 +1127,19 @@ class DarkBoardApp {
         this.renderer.markDirty();
       });
       panel.querySelector('.list-title').addEventListener('keydown', (e) => e.stopPropagation());
+
+      // Checkbox mode toggle
+      const chkModeEl = panel.querySelector('#chkMode');
+      if (chkModeEl) {
+        chkModeEl.addEventListener('change', () => {
+          const ops = [{ type: 'update', elementId: el.id, props: { checkboxMode: chkModeEl.checked } }];
+          const inverseOps = [{ type: 'update', elementId: el.id, props: { checkboxMode: el.checkboxMode } }];
+          el.checkboxMode = chkModeEl.checked;
+          this.history.push(ops, inverseOps);
+          this.sync.sendOps(ops);
+          this.renderer.markDirty();
+        });
+      }
 
       panel.querySelectorAll('.list-item-input').forEach(input => {
         input.addEventListener('input', () => {
@@ -1031,12 +1346,37 @@ class DarkBoardApp {
         this.renderer.markDirty();
       }
 
+      const isLocked = hit.locked;
+      const multiSel = this.renderer.selectedIds.size > 1;
+      const isGrouped = hit.groupId;
+
       menu.innerHTML = `
         <div class="context-menu-item" data-action="copy">Copier <span class="shortcut-hint">Ctrl+C</span></div>
         <div class="context-menu-item" data-action="duplicate">Dupliquer <span class="shortcut-hint">Ctrl+D</span></div>
         <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="${isLocked ? 'unlock' : 'lock'}">${isLocked ? '🔓 Deverrouiller' : '🔒 Verrouiller'}</div>
+        ${multiSel ? `<div class="context-menu-item" data-action="group">📦 Grouper <span class="shortcut-hint">Ctrl+G</span></div>` : ''}
+        ${isGrouped ? `<div class="context-menu-item" data-action="ungroup">📤 Degrouper <span class="shortcut-hint">Ctrl+Shift+G</span></div>` : ''}
+        ${hit.rotation ? `<div class="context-menu-item" data-action="resetRotation">↺ Remettre a 0°</div>` : ''}
+        <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="front">Mettre devant</div>
         <div class="context-menu-item" data-action="back">Mettre derriere</div>
+        ${multiSel ? `
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="alignTop">↑ Aligner en haut</div>
+        <div class="context-menu-item" data-action="alignLeft">← Aligner a gauche</div>
+        <div class="context-menu-item" data-action="alignCenterH">↔ Centrer horizontalement</div>
+        <div class="context-menu-item" data-action="distributeH">⇔ Distribuer horizontalement</div>
+        ` : ''}
+        ${hit.type === 'envelope' ? `
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="toggleCollapse">${hit.collapsed ? '▼ Etendre' : '▶ Reduire'}</div>
+        <div class="context-menu-item" data-action="deleteWithContent" style="color:var(--danger)">Supprimer avec le contenu</div>
+        ` : ''}
+        ${hit.type === 'card' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editCard">✏️ Modifier la carte</div>` : ''}
+        ${hit.type === 'list' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editList">✏️ Modifier la liste</div>` : ''}
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="comment">💬 Commenter</div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="delete" style="color:var(--danger)">Supprimer <span class="shortcut-hint">Suppr</span></div>
       `;
@@ -1046,7 +1386,8 @@ class DarkBoardApp {
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="selectAll">Tout selectionner <span class="shortcut-hint">Ctrl+A</span></div>
         <div class="context-menu-separator"></div>
-        <div class="context-menu-item" data-action="addAnchor">Ajouter une ancre ici</div>
+        <div class="context-menu-item" data-action="addAnchor">📌 Ajouter une ancre ici</div>
+        <div class="context-menu-item" data-action="addCanvasComment">💬 Ajouter un commentaire</div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="resetView">Reinitialiser la vue</div>
       `;
@@ -1087,6 +1428,53 @@ class DarkBoardApp {
           this.renderer.camera = { x: 0, y: 0, zoom: 1 };
           this.renderer.markDirty();
           this.updateZoomDisplay();
+          break;
+        case 'lock':
+          this.updateSelectedElements({ locked: true });
+          this.showToast('Objet verrouille');
+          break;
+        case 'unlock':
+          this.updateSelectedElements({ locked: false });
+          this.showToast('Objet deverrouille');
+          break;
+        case 'group':
+          this.groupSelected();
+          break;
+        case 'ungroup':
+          this.ungroupSelected();
+          break;
+        case 'resetRotation':
+          this.updateSelectedElements({ rotation: 0 });
+          break;
+        case 'alignTop':
+          this.alignSelected('top');
+          break;
+        case 'alignLeft':
+          this.alignSelected('left');
+          break;
+        case 'alignCenterH':
+          this.alignSelected('centerH');
+          break;
+        case 'distributeH':
+          this.distributeSelected('horizontal');
+          break;
+        case 'toggleCollapse':
+          this.toggleEnvelopeCollapse(hit);
+          break;
+        case 'deleteWithContent':
+          this.deleteEnvelopeWithContent(hit);
+          break;
+        case 'editCard':
+          this.showCardEditor(hit);
+          break;
+        case 'editList':
+          this.showListEditor(hit);
+          break;
+        case 'comment':
+          this.addComment(hit);
+          break;
+        case 'addCanvasComment':
+          this.addCanvasComment(worldX, worldY);
           break;
       }
       this.hideContextMenu();

@@ -1334,3 +1334,52 @@ html, body {
   font-size: 14px;
   padding: 0 6px;
 }
+
+/* Minimap and snap toggle active states */
+#toggleMinimap.active, #toggleSnap.active {
+  background: var(--accent);
+  color: white;
+}
+
+/* Presentation controls */
+.presentation-controls {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 8px 16px;
+  z-index: 200;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+.pres-btn {
+  background: var(--btn);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.pres-btn:hover { background: var(--btn-hover); }
+
+.pres-indicator {
+  color: var(--text);
+  font-size: 14px;
+  min-width: 40px;
+  text-align: center;
+}
+
+/* Laser btn active */
+#laserBtn.active {
+  background: #e94560;
+  color: white;
+  border-color: #e94560;
+}

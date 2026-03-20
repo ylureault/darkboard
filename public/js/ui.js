@@ -11,6 +11,10 @@ class UI {
     this.initCSVExport();
     this.initThemeToggle();
     this.initTemplates();
+    this.initMinimap();
+    this.initSnapToGrid();
+    this.initLaserPointer();
+    this.initPresentationMode();
   }
 
   initToolbar() {
@@ -563,5 +567,138 @@ class UI {
         this.app.showToast('Lien copie !');
       }
     });
+  }
+
+  // Minimap toggle
+  initMinimap() {
+    const btn = document.getElementById('toggleMinimap');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      this.app.renderer.minimapEnabled = !this.app.renderer.minimapEnabled;
+      btn.classList.toggle('active', this.app.renderer.minimapEnabled);
+      this.app.renderer.markDirty();
+    });
+  }
+
+  // Snap to grid toggle
+  initSnapToGrid() {
+    const btn = document.getElementById('toggleSnap');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      this.app.renderer.snapToGrid = !this.app.renderer.snapToGrid;
+      btn.classList.toggle('active', this.app.renderer.snapToGrid);
+      this.app.showToast(this.app.renderer.snapToGrid ? 'Grille magnetique activee' : 'Grille magnetique desactivee');
+    });
+  }
+
+  // Laser pointer mode
+  initLaserPointer() {
+    const btn = document.getElementById('laserBtn');
+    if (!btn) return;
+    this.laserActive = false;
+
+    btn.addEventListener('click', () => {
+      this.laserActive = !this.laserActive;
+      btn.classList.toggle('active', this.laserActive);
+      if (this.laserActive) {
+        this.app.setTool('select');
+        this.app.renderer.canvas.style.cursor = 'crosshair';
+        // Override pointer move to show laser
+        this._originalOnPointerMove = this.app.input.onPointerMove.bind(this.app.input);
+        const renderer = this.app.renderer;
+        const sync = this.app.sync;
+        const userId = this.app.userId;
+        const userName = this.app.userName;
+        document.addEventListener('mousemove', this._laserMove = (e) => {
+          if (!this.laserActive) return;
+          const world = renderer.screenToWorld(e.clientX, e.clientY);
+          renderer.laserPointers.set('local', { x: world.x, y: world.y, color: '#ff0000' });
+          renderer.markDirty();
+          // Send laser position to peers via cursor channel
+          sync.sendLaser && sync.sendLaser(world.x, world.y);
+        });
+      } else {
+        this.app.renderer.canvas.style.cursor = 'default';
+        this.app.renderer.laserPointers.delete('local');
+        this.app.renderer.markDirty();
+        if (this._laserMove) {
+          document.removeEventListener('mousemove', this._laserMove);
+          this._laserMove = null;
+        }
+      }
+    });
+  }
+
+  // Presentation mode using anchors
+  initPresentationMode() {
+    const btn = document.getElementById('presentBtn');
+    const controls = document.getElementById('presentationControls');
+    if (!btn || !controls) return;
+    this.presentationActive = false;
+    this.presentationIndex = 0;
+
+    btn.addEventListener('click', () => {
+      this.startPresentation();
+    });
+
+    document.getElementById('presNext').addEventListener('click', () => {
+      this.presentationNavigate(1);
+    });
+
+    document.getElementById('presPrev').addEventListener('click', () => {
+      this.presentationNavigate(-1);
+    });
+
+    document.getElementById('presExit').addEventListener('click', () => {
+      this.stopPresentation();
+    });
+
+    // Arrow keys in presentation mode
+    document.addEventListener('keydown', (e) => {
+      if (!this.presentationActive) return;
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        e.preventDefault();
+        this.presentationNavigate(1);
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        this.presentationNavigate(-1);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        this.stopPresentation();
+      }
+    });
+  }
+
+  startPresentation() {
+    if (!this.app.workshop || !this.app.workshop.anchors || this.app.workshop.anchors.length === 0) {
+      this.app.showToast('Ajoutez des ancres pour le mode presentation');
+      return;
+    }
+    this.presentationActive = true;
+    this.presentationIndex = 0;
+    document.getElementById('presentationControls').style.display = 'flex';
+    document.getElementById('toolbar').style.display = 'none';
+    this.navigateToAnchor(0);
+  }
+
+  stopPresentation() {
+    this.presentationActive = false;
+    document.getElementById('presentationControls').style.display = 'none';
+    document.getElementById('toolbar').style.display = 'flex';
+  }
+
+  presentationNavigate(dir) {
+    const anchors = this.app.workshop ? this.app.workshop.anchors : [];
+    if (anchors.length === 0) return;
+    this.presentationIndex = Math.max(0, Math.min(anchors.length - 1, this.presentationIndex + dir));
+    this.navigateToAnchor(this.presentationIndex);
+  }
+
+  navigateToAnchor(index) {
+    const anchors = this.app.workshop ? this.app.workshop.anchors : [];
+    if (index < 0 || index >= anchors.length) return;
+    const anchor = anchors[index];
+    document.getElementById('presIndicator').textContent = `${index + 1}/${anchors.length}`;
+    this.app.animateToView(anchor.x, anchor.y, anchor.zoom || 1);
   }
 }
