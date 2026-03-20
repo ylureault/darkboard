@@ -176,14 +176,15 @@ class InputHandler {
       this.app.renderer.pan(-e.deltaY, 0);
       this.app.renderer.markDirty();
     } else {
-      // Normal scroll = pan vertically (trackpad 2-finger sends deltaX & deltaY)
-      if (Math.abs(e.deltaX) > 0 || e.deltaMode === 0) {
+      // Distinguish trackpad (has deltaX or small deltaY steps) from mouse wheel (large deltaY jumps, no deltaX)
+      const isTrackpad = Math.abs(e.deltaX) > 0 || (e.deltaMode === 0 && Math.abs(e.deltaY) < 50);
+      if (isTrackpad) {
         // Trackpad: pan in both directions
         this.app.renderer.pan(-e.deltaX, -e.deltaY);
         this.app.renderer.markDirty();
       } else {
-        // Mouse wheel: zoom
-        const delta = -e.deltaY * 0.001;
+        // Mouse wheel: zoom toward cursor
+        const delta = -e.deltaY * 0.003;
         const newZoom = this.app.renderer.camera.zoom * (1 + delta);
         this.app.renderer.setZoom(newZoom, e.clientX, e.clientY);
         this.app.updateZoomDisplay();
@@ -285,12 +286,11 @@ class InputHandler {
       return;
     }
 
-    // Tool shortcuts
-    // Remap: C=connector, O=circle (oval), N=sticky (new), S=sticky
+    // Tool shortcuts (match toolbar labels)
     const toolMap = {
-      v: 'select', h: 'hand', r: 'rect', o: 'circle', l: 'line',
-      a: 'arrow', d: 'draw', s: 'sticky', n: 'sticky', t: 'text',
-      e: 'eraser', f: 'frame', g: 'envelope', c: 'connector',
+      v: 'select', h: 'hand', r: 'rect', c: 'circle', o: 'circle',
+      l: 'line', a: 'arrow', d: 'draw', s: 'sticky', n: 'sticky',
+      t: 'text', e: 'eraser', f: 'frame', g: 'envelope',
       k: 'connector', m: 'card', i: 'list'
     };
 

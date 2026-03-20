@@ -761,11 +761,16 @@ class DarkBoardApp {
     };
 
     editor.addEventListener('blur', (e) => {
-      if (e.relatedTarget && (e.relatedTarget.closest('.formatting-toolbar') || e.relatedTarget.closest('.fmt-color-picker'))) {
-        setTimeout(() => editor.focus(), 10);
-        return;
-      }
-      finishEdit();
+      // Delay to check if click landed on toolbar/picker
+      setTimeout(() => {
+        const active = document.activeElement;
+        const tb = document.querySelector('.formatting-toolbar');
+        const cp = document.querySelector('.fmt-color-picker');
+        if (tb && (tb.contains(active) || tb.contains(e.relatedTarget))) { editor.focus(); return; }
+        if (cp && (cp.contains(active) || cp.contains(e.relatedTarget))) { editor.focus(); return; }
+        if (active === editor) return; // Already refocused
+        finishEdit();
+      }, 50);
     });
     editor.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
@@ -812,41 +817,52 @@ class DarkBoardApp {
     `;
 
     const editorRect = editor.getBoundingClientRect();
-    toolbar.style.left = editorRect.left + 'px';
-    toolbar.style.top = Math.max(0, editorRect.top - 44) + 'px';
-    if (editorRect.top < 50) {
-      toolbar.style.top = (editorRect.bottom + 4) + 'px';
+    // Position toolbar above or below editor
+    let tbLeft = Math.max(4, Math.min(editorRect.left, window.innerWidth - 470));
+    let tbTop = editorRect.top - 48;
+    if (tbTop < 4) {
+      tbTop = editorRect.bottom + 4;
     }
+    toolbar.style.left = tbLeft + 'px';
+    toolbar.style.top = tbTop + 'px';
 
     document.body.appendChild(toolbar);
     this.formattingToolbar = toolbar;
 
     toolbar.addEventListener('mousedown', (e) => e.preventDefault());
 
+    // Font size select - must use change event
+    const fontSelect = toolbar.querySelector('.fmt-select[data-cmd="fontSize"]');
+    if (fontSelect) {
+      fontSelect.addEventListener('mousedown', (e) => e.stopPropagation());
+      fontSelect.addEventListener('change', () => {
+        if (fontSelect.value) {
+          editor.focus();
+          document.execCommand('fontSize', false, fontSelect.value);
+        }
+        fontSelect.value = ''; // Reset to placeholder
+      });
+    }
+
     toolbar.addEventListener('click', (e) => {
       const btn = e.target.closest('.fmt-btn');
-      const select = e.target.closest('.fmt-select');
       if (btn) {
         const cmd = btn.dataset.cmd;
         const action = btn.dataset.action;
         if (cmd) {
-          document.execCommand(cmd, false, null);
           editor.focus();
+          document.execCommand(cmd, false, null);
         } else if (action === 'textColor') {
           this.showColorPicker(toolbar, (color) => {
-            document.execCommand('foreColor', false, color);
             editor.focus();
+            document.execCommand('foreColor', false, color);
           });
         } else if (action === 'highlight') {
           this.showColorPicker(toolbar, (color) => {
-            document.execCommand('hiliteColor', false, color);
             editor.focus();
+            document.execCommand('hiliteColor', false, color);
           });
         }
-      }
-      if (select && select.dataset.cmd === 'fontSize') {
-        document.execCommand('fontSize', false, select.value);
-        editor.focus();
       }
     });
   }
@@ -873,7 +889,8 @@ class DarkBoardApp {
       picker.appendChild(swatch);
     }
     const tbRect = toolbar.getBoundingClientRect();
-    picker.style.left = tbRect.left + 'px';
+    picker.style.position = 'fixed';
+    picker.style.left = Math.max(4, Math.min(tbRect.left, window.innerWidth - 210)) + 'px';
     picker.style.top = (tbRect.bottom + 4) + 'px';
     document.body.appendChild(picker);
     setTimeout(() => {
@@ -921,15 +938,18 @@ class DarkBoardApp {
     panel.className = 'search-panel';
     panel.style.display = 'none';
     panel.innerHTML = `
-      <input type="text" class="search-input" placeholder="Rechercher..." />
-      <span class="search-count">0/0</span>
-      <button class="search-btn" id="searchNext" title="Suivant">▼</button>
-      <button class="search-btn" id="searchPrev" title="Precedent">▲</button>
-      <span class="search-sep"></span>
-      <input type="text" class="replace-input" placeholder="Remplacer par..." />
-      <button class="search-btn replace-btn">Remplacer</button>
-      <button class="search-btn replace-all-btn">Tout</button>
-      <button class="search-btn search-close-btn">✕</button>
+      <div class="search-row">
+        <input type="text" class="search-input" placeholder="Rechercher..." />
+        <span class="search-count">0/0</span>
+        <button class="search-btn" id="searchPrev" title="Precedent">▲</button>
+        <button class="search-btn" id="searchNext" title="Suivant">▼</button>
+        <button class="search-close" title="Fermer">✕</button>
+      </div>
+      <div class="search-row">
+        <input type="text" class="replace-input" placeholder="Remplacer par..." />
+        <button class="search-btn replace-btn">Remplacer</button>
+        <button class="search-btn replace-all-btn">Tout</button>
+      </div>
     `;
     document.body.appendChild(panel);
     this.searchPanel = panel;
@@ -955,7 +975,7 @@ class DarkBoardApp {
     panel.querySelector('#searchPrev').addEventListener('click', () => this.searchNavigate(-1));
     panel.querySelector('.replace-btn').addEventListener('click', () => this.replaceOne(searchInput.value, replaceInput.value));
     panel.querySelector('.replace-all-btn').addEventListener('click', () => this.replaceAll(searchInput.value, replaceInput.value));
-    panel.querySelector('.search-close-btn').addEventListener('click', () => this.closeSearchPanel());
+    panel.querySelector('.search-close').addEventListener('click', () => this.closeSearchPanel());
   }
 
   performSearch(query) {

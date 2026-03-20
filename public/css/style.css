@@ -1452,10 +1452,7 @@ html, body {
 }
 
 .fmt-color-picker {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  margin-top: 4px;
+  position: fixed;
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 10px;

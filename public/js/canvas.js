@@ -109,6 +109,17 @@ class CanvasRenderer {
 
     for (const el of sorted) {
       if (el.hidden) continue; // skip hidden elements (collapsed envelope children)
+      // Search highlight glow
+      if (el._searchHighlight) {
+        const b = getElementBounds(el);
+        ctx.save();
+        ctx.shadowColor = '#4a9eff';
+        ctx.shadowBlur = 16;
+        ctx.strokeStyle = '#4a9eff';
+        ctx.lineWidth = 3 / this.camera.zoom;
+        ctx.strokeRect(b.x - 4, b.y - 4, b.w + 8, b.h + 8);
+        ctx.restore();
+      }
       renderElement(ctx, el, this.selectedIds.has(el.id), this.camera);
     }
 

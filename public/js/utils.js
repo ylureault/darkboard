@@ -66,7 +66,7 @@ function getElementBounds(el) {
     case 'list':
       return { x: el.x, y: el.y, w: el.width, h: el.height };
     case 'circle':
-      return { x: el.x - el.width / 2, y: el.y - el.height / 2, w: el.width, h: el.height };
+      return { x: el.x, y: el.y, w: el.width, h: el.height };
     case 'line':
     case 'arrow':
     case 'connector': {
