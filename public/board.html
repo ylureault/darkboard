@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DarkBoard</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='15' fill='%231a1a2e'/><rect x='15' y='15' width='30' height='30' rx='4' fill='%234a9eff'/><rect x='55' y='15' width='30' height='30' rx='4' fill='%23ff6b6b'/><rect x='15' y='55' width='30' height='30' rx='4' fill='%234ecdc4'/><rect x='55' y='55' width='30' height='30' rx='4' fill='%23ffd966'/></svg>">
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <!-- Toolbar -->
+  <div class="toolbar" id="toolbar">
+    <button class="tool-btn active" data-tool="select" title="Selectionner (V)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 4l7 18 3-7 7-3z"/>
+      </svg>
+      <span class="shortcut">V</span>
+    </button>
+    <button class="tool-btn" data-tool="hand" title="Main (H)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 11V6a2 2 0 00-4 0v1M14 7V4a2 2 0 00-4 0v6M10 5.5V4a2 2 0 00-4 0v8"/>
+        <path d="M18 11a2 2 0 014 0v1a8 8 0 01-8 8h-2c-2.5 0-4-1-6-4l-1.5-2.5a2 2 0 013-2L6 13V4"/>
+      </svg>
+      <span class="shortcut">H</span>
+    </button>
+    <div class="divider"></div>
+    <button class="tool-btn" data-tool="rect" title="Rectangle (R)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+      </svg>
+      <span class="shortcut">R</span>
+    </button>
+    <button class="tool-btn" data-tool="circle" title="Cercle (C)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="9"/>
+      </svg>
+      <span class="shortcut">C</span>
+    </button>
+    <button class="tool-btn" data-tool="line" title="Ligne (L)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="4" y1="20" x2="20" y2="4"/>
+      </svg>
+      <span class="shortcut">L</span>
+    </button>
+    <button class="tool-btn" data-tool="arrow" title="Fleche (A)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="4" y1="20" x2="20" y2="4"/>
+        <polyline points="14,4 20,4 20,10"/>
+      </svg>
+      <span class="shortcut">A</span>
+    </button>
+    <div class="divider"></div>
+    <button class="tool-btn" data-tool="draw" title="Dessin libre (D)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+        <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+        <path d="M2 2l7.586 7.586"/>
+        <circle cx="11" cy="11" r="2"/>
+      </svg>
+      <span class="shortcut">D</span>
+    </button>
+    <button class="tool-btn" data-tool="sticky" title="Post-it (S)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M15.5 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V8.5L15.5 3z"/>
+        <polyline points="14,3 14,9 21,9"/>
+      </svg>
+      <span class="shortcut">S</span>
+    </button>
+    <button class="tool-btn" data-tool="text" title="Texte (T)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="4,7 4,4 20,4 20,7"/>
+        <line x1="12" y1="4" x2="12" y2="20"/>
+        <line x1="8" y1="20" x2="16" y2="20"/>
+      </svg>
+      <span class="shortcut">T</span>
+    </button>
+    <button class="tool-btn" data-tool="frame" title="Cadre/Zone (F)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4 2"/>
+        <line x1="3" y1="9" x2="21" y2="9" stroke-dasharray="0"/>
+      </svg>
+      <span class="shortcut">F</span>
+    </button>
+    <div class="divider"></div>
+    <button class="tool-btn" data-tool="eraser" title="Gomme (E)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M20 20H7L3 16l9-9 8 8-4 4"/>
+        <path d="M6.5 13.5l5-5"/>
+      </svg>
+      <span class="shortcut">E</span>
+    </button>
+  </div>
+
+  <!-- Color panel -->
+  <div class="color-panel" id="colorPanel">
+    <span class="color-section-label">Remplissage</span>
+    <div class="color-row" id="fillColors"></div>
+    <span class="color-section-label">Contour</span>
+    <div class="color-row" id="strokeColors"></div>
+    <span class="color-section-label">Epaisseur</span>
+    <div class="stroke-options" id="strokeWidths"></div>
+  </div>
+
+  <!-- Users panel -->
+  <div class="users-panel" id="usersPanel">
+    <span class="users-count" id="usersCount">1 en ligne</span>
+  </div>
+
+  <!-- Zoom controls -->
+  <div class="zoom-controls">
+    <button class="zoom-btn" id="zoomOut" title="Dezoomer">-</button>
+    <span class="zoom-level" id="zoomLevel" title="Reinitialiser le zoom">100%</span>
+    <button class="zoom-btn" id="zoomIn" title="Zoomer">+</button>
+  </div>
+
+  <!-- Action buttons -->
+  <button class="share-btn" id="exportBtn" title="Exporter en PNG" style="bottom: 56px;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+      <polyline points="7,10 12,15 17,10"/>
+      <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+    Export PNG
+  </button>
+
+  <!-- Share button -->
+  <button class="share-btn" id="shareBtn" title="Partager ce tableau">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+    </svg>
+    Partager
+  </button>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script src="/js/utils.js"></script>
+  <script src="/js/objects.js"></script>
+  <script src="/js/history.js"></script>
+  <script src="/js/canvas.js"></script>
+  <script src="/js/tools.js"></script>
+  <script src="/js/input.js"></script>
+  <script src="/js/sync.js"></script>
+  <script src="/js/ui.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
