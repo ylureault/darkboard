@@ -607,7 +607,7 @@ class DarkBoardApp {
 
   // Rich text types that support contenteditable
   isRichTextType(type) {
-    return type === 'sticky' || type === 'text' || type === 'circle' || type === 'rect';
+    return type === 'sticky' || type === 'text' || type === 'circle' || type === 'rect' || type === 'diamond' || type === 'triangle';
   }
 
   startTextEdit(el) {
@@ -699,6 +699,51 @@ class DarkBoardApp {
     // Show formatting toolbar for rich text types
     if (useRichText) {
       this.showFormattingToolbar(editor, el);
+
+      // Apply memorized formatting to new empty elements
+      if (!el.richText && !el.text) {
+        let initHtml = '';
+        if (this.lastBold) initHtml += '<b>';
+        if (this.lastItalic) initHtml += '<i>';
+        if (this.lastUnderline) initHtml += '<u>';
+        let hasFont = this.lastFontSize || this.lastFontFamily || this.lastTextColor;
+        if (hasFont) {
+          initHtml += '<font';
+          if (this.lastFontSize) initHtml += ` size="${this.lastFontSize}"`;
+          if (this.lastFontFamily) initHtml += ` face="${this.lastFontFamily}"`;
+          if (this.lastTextColor) initHtml += ` color="${this.lastTextColor}"`;
+          initHtml += '>';
+        }
+        initHtml += '\u200B'; // zero-width space as placeholder
+        if (hasFont) initHtml += '</font>';
+        if (this.lastUnderline) initHtml += '</u>';
+        if (this.lastItalic) initHtml += '</i>';
+        if (this.lastBold) initHtml += '</b>';
+        if (initHtml !== '\u200B') {
+          editor.innerHTML = initHtml;
+        }
+      }
+
+      // Apply format painter if active
+      if (this.formatPainterData) {
+        editor.addEventListener('mouseup', () => {
+          if (this.formatPainterData) {
+            const fp = this.formatPainterData;
+            if (fp.bold) document.execCommand('bold', false, null);
+            if (fp.italic) document.execCommand('italic', false, null);
+            if (fp.underline) document.execCommand('underline', false, null);
+            if (fp.strikeThrough) document.execCommand('strikeThrough', false, null);
+            if (fp.fontSize) document.execCommand('fontSize', false, fp.fontSize);
+            if (fp.fontName) document.execCommand('fontName', false, fp.fontName);
+            if (fp.foreColor) document.execCommand('foreColor', false, fp.foreColor);
+            if (fp.hiliteColor) document.execCommand('hiliteColor', false, fp.hiliteColor);
+            this.formatPainterData = null;
+            const activeBtn = document.querySelector('.fmt-btn[data-action="formatPainter"].active');
+            if (activeBtn) activeBtn.classList.remove('active');
+          }
+        }, { once: true });
+      }
+
       const range = document.createRange();
       range.selectNodeContents(editor);
       const sel = window.getSelection();
@@ -805,20 +850,35 @@ class DarkBoardApp {
         <option value="6">28px</option>
         <option value="7">36px</option>
       </select>
+      <select class="fmt-select" data-cmd="fontName" title="Police">
+        <option value="">Police</option>
+        <option value="Arial, sans-serif">Arial</option>
+        <option value="Helvetica, sans-serif">Helvetica</option>
+        <option value="Georgia, serif">Georgia</option>
+        <option value="Times New Roman, serif">Times</option>
+        <option value="Courier New, monospace">Courier</option>
+        <option value="Verdana, sans-serif">Verdana</option>
+        <option value="Trebuchet MS, sans-serif">Trebuchet</option>
+        <option value="Comic Sans MS, cursive">Comic Sans</option>
+      </select>
       <span class="fmt-sep"></span>
       <button class="fmt-btn" data-action="textColor" title="Couleur du texte"><span style="color:#e94560">A</span></button>
       <button class="fmt-btn" data-action="highlight" title="Surlignage"><span style="background:#ffd966;padding:0 3px">H</span></button>
       <span class="fmt-sep"></span>
-      <button class="fmt-btn" data-cmd="justifyLeft" title="Gauche">≡</button>
-      <button class="fmt-btn" data-cmd="justifyCenter" title="Centre">≡</button>
-      <button class="fmt-btn" data-cmd="justifyRight" title="Droite">≡</button>
+      <button class="fmt-btn" data-cmd="justifyLeft" title="Gauche"><span style="font-size:10px;line-height:1;letter-spacing:-1px">&#9776;</span></button>
+      <button class="fmt-btn" data-cmd="justifyCenter" title="Centre"><span style="font-size:11px">&#8801;</span></button>
+      <button class="fmt-btn" data-cmd="justifyRight" title="Droite"><span style="font-size:10px;direction:rtl;display:block">&#9776;</span></button>
       <span class="fmt-sep"></span>
-      <button class="fmt-btn" data-cmd="removeFormat" title="Effacer">✕</button>
+      <button class="fmt-btn" data-cmd="insertUnorderedList" title="Liste a puces">&#8226;</button>
+      <button class="fmt-btn" data-cmd="insertOrderedList" title="Liste numerotee">1.</button>
+      <span class="fmt-sep"></span>
+      <button class="fmt-btn" data-action="formatPainter" title="Pinceau de mise en forme">&#128396;</button>
+      <button class="fmt-btn" data-cmd="removeFormat" title="Effacer">&#10005;</button>
     `;
 
     const editorRect = editor.getBoundingClientRect();
     // Position toolbar above or below editor
-    let tbLeft = Math.max(4, Math.min(editorRect.left, window.innerWidth - 470));
+    let tbLeft = Math.max(4, Math.min(editorRect.left, window.innerWidth - 630));
     let tbTop = editorRect.top - 48;
     if (tbTop < 4) {
       tbTop = editorRect.bottom + 4;
@@ -839,8 +899,25 @@ class DarkBoardApp {
         if (fontSelect.value) {
           editor.focus();
           document.execCommand('fontSize', false, fontSelect.value);
+          // Memorize last font size
+          this.lastFontSize = fontSelect.value;
         }
         fontSelect.value = ''; // Reset to placeholder
+      });
+    }
+
+    // Font family select
+    const fontNameSelect = toolbar.querySelector('.fmt-select[data-cmd="fontName"]');
+    if (fontNameSelect) {
+      fontNameSelect.addEventListener('mousedown', (e) => e.stopPropagation());
+      fontNameSelect.addEventListener('change', () => {
+        if (fontNameSelect.value) {
+          editor.focus();
+          document.execCommand('fontName', false, fontNameSelect.value);
+          // Memorize last font family
+          this.lastFontFamily = fontNameSelect.value;
+        }
+        fontNameSelect.value = '';
       });
     }
 
@@ -852,16 +929,36 @@ class DarkBoardApp {
         if (cmd) {
           editor.focus();
           document.execCommand(cmd, false, null);
+          // Memorize bold/italic/underline state
+          if (cmd === 'bold') this.lastBold = document.queryCommandState('bold');
+          if (cmd === 'italic') this.lastItalic = document.queryCommandState('italic');
+          if (cmd === 'underline') this.lastUnderline = document.queryCommandState('underline');
         } else if (action === 'textColor') {
           this.showColorPicker(toolbar, (color) => {
             editor.focus();
             document.execCommand('foreColor', false, color);
+            this.lastTextColor = color;
           });
         } else if (action === 'highlight') {
           this.showColorPicker(toolbar, (color) => {
             editor.focus();
             document.execCommand('hiliteColor', false, color);
+            this.lastHighlight = color;
           });
+        } else if (action === 'formatPainter') {
+          // Copy current selection formatting
+          this.formatPainterData = {
+            bold: document.queryCommandState('bold'),
+            italic: document.queryCommandState('italic'),
+            underline: document.queryCommandState('underline'),
+            strikeThrough: document.queryCommandState('strikeThrough'),
+            fontSize: document.queryCommandValue('fontSize'),
+            fontName: document.queryCommandValue('fontName'),
+            foreColor: document.queryCommandValue('foreColor'),
+            hiliteColor: document.queryCommandValue('hiliteColor')
+          };
+          btn.classList.add('active');
+          this.showToast('Format copie - selectionnez du texte pour appliquer');
         }
       }
     });

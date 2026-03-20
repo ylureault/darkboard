@@ -1399,7 +1399,7 @@ html, body {
   padding: 4px 6px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.5);
   flex-wrap: wrap;
-  max-width: 460px;
+  max-width: 620px;
 }
 
 .fmt-btn {
