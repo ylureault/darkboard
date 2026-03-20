@@ -83,7 +83,7 @@ class CanvasRenderer {
     ctx.clearRect(0, 0, w, h);
 
     // Background
-    ctx.fillStyle = '#121212';
+    ctx.fillStyle = this.bgColor || '#121212';
     ctx.fillRect(0, 0, w, h);
 
     // Grid
@@ -152,7 +152,7 @@ class CanvasRenderer {
     const startX = Math.floor(startWorld.x / gridSize) * gridSize;
     const startY = Math.floor(startWorld.y / gridSize) * gridSize;
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.strokeStyle = this.gridColor || 'rgba(255, 255, 255, 0.04)';
     ctx.lineWidth = 1;
     ctx.beginPath();
 

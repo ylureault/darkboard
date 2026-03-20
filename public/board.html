@@ -249,20 +249,31 @@
     <button class="zoom-btn" id="zoomOut" title="Dezoomer">-</button>
     <span class="zoom-level" id="zoomLevel" title="Reinitialiser le zoom">100%</span>
     <button class="zoom-btn" id="zoomIn" title="Zoomer">+</button>
+    <button class="zoom-btn" id="zoomFit" title="Adapter a l'ecran">⊞</button>
   </div>
 
   <!-- Action buttons -->
-  <button class="share-btn" id="exportBtn" title="Exporter en PNG" style="bottom: 56px;">
+  <button class="share-btn" id="exportCSV" title="Exporter en CSV" style="bottom: 136px;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+      <polyline points="14,2 14,8 20,8"/>
+      <line x1="8" y1="13" x2="16" y2="13"/>
+      <line x1="8" y1="17" x2="16" y2="17"/>
+    </svg>
+    CSV
+  </button>
+
+  <button class="share-btn" id="exportBtn" title="Exporter en PNG" style="bottom: 96px;">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
       <polyline points="7,10 12,15 17,10"/>
       <line x1="12" y1="15" x2="12" y2="3"/>
     </svg>
-    Export PNG
+    PNG
   </button>
 
   <!-- Share button -->
-  <button class="share-btn" id="shareBtn" title="Partager ce tableau">
+  <button class="share-btn" id="shareBtn" title="Partager ce tableau" style="bottom: 56px;">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
       <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
@@ -270,6 +281,33 @@
     </svg>
     Partager
   </button>
+
+  <!-- Day/night mode toggle -->
+  <button class="theme-toggle" id="themeToggle" title="Mode jour/nuit">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="themeIcon">
+      <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+    </svg>
+  </button>
+
+  <!-- Template button -->
+  <button class="template-btn" id="templateBtn" title="Modeles">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+      <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+      <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+    </svg>
+    Modeles
+  </button>
+
+  <!-- Template modal -->
+  <div class="modal-overlay" id="templateModal" style="display:none;">
+    <div class="modal modal-lg">
+      <h2>Choisir un modele</h2>
+      <div class="template-grid" id="templateGrid"></div>
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn-secondary" id="templateClose">Fermer</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Toast -->
   <div class="toast" id="toast"></div>
