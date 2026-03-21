@@ -36,6 +36,15 @@ class DarkBoardApp {
     // Sticky color memory
     this.lastStickyColor = null;
 
+    // Unsaved changes tracking
+    this.hasUnsavedChanges = false;
+    window.addEventListener('beforeunload', (e) => {
+      if (this.hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+
     // Image drag-and-drop
     this.initDragDrop();
 
@@ -129,8 +138,16 @@ class DarkBoardApp {
 
     canvas.addEventListener('drop', (e) => {
       e.preventDefault();
-      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-      if (files.length === 0) return;
+      const allFiles = Array.from(e.dataTransfer.files);
+      if (allFiles.length === 0) return;
+      const files = allFiles.filter(f => f.type.startsWith('image/'));
+      if (files.length === 0) {
+        this.showToast('Format de fichier non supporte. Utilisez une image (PNG, JPG, GIF, SVG).');
+        return;
+      }
+      if (files.length < allFiles.length) {
+        this.showToast('Certains fichiers ignores (format non supporte)');
+      }
 
       // Check file size (max 5MB)
       for (const file of files) {
@@ -314,6 +331,7 @@ class DarkBoardApp {
     this.history.push(ops, inverseOps);
     this.sync.sendOps(ops);
     this.renderer.markDirty();
+    this.hasUnsavedChanges = true;
   }
 
   applyOps(ops) {
@@ -362,6 +380,7 @@ class DarkBoardApp {
     this.sync.sendOps(ops);
     this.renderer.selectedIds.clear();
     this.renderer.markDirty();
+    this.hasUnsavedChanges = true;
   }
 
   undo() {
@@ -484,6 +503,7 @@ class DarkBoardApp {
       this.history.push(ops, inverseOps);
       this.sync.sendOps(ops);
       this.renderer.markDirty();
+      this.hasUnsavedChanges = true;
     }
   }
 
@@ -1293,6 +1313,30 @@ class DarkBoardApp {
           ops.push({ type: 'update', elementId: el.id, props: { x: minX } });
         }
       }
+    } else if (mode === 'bottom') {
+      const bounds = elements.map(el => getElementBounds(el));
+      const maxBottom = Math.max(...bounds.map(b => b.y + b.h));
+      for (let i = 0; i < elements.length; i++) {
+        const el = elements[i];
+        const newY = maxBottom - bounds[i].h;
+        if (el.y !== newY) {
+          inverseOps.push({ type: 'update', elementId: el.id, props: { y: el.y } });
+          el.y = newY;
+          ops.push({ type: 'update', elementId: el.id, props: { y: newY } });
+        }
+      }
+    } else if (mode === 'right') {
+      const bounds = elements.map(el => getElementBounds(el));
+      const maxRight = Math.max(...bounds.map(b => b.x + b.w));
+      for (let i = 0; i < elements.length; i++) {
+        const el = elements[i];
+        const newX = maxRight - bounds[i].w;
+        if (el.x !== newX) {
+          inverseOps.push({ type: 'update', elementId: el.id, props: { x: el.x } });
+          el.x = newX;
+          ops.push({ type: 'update', elementId: el.id, props: { x: newX } });
+        }
+      }
     } else if (mode === 'centerH') {
       const bounds = elements.map(el => getElementBounds(el));
       const centerY = bounds.reduce((s, b) => s + b.y + b.h / 2, 0) / bounds.length;
@@ -1303,6 +1347,18 @@ class DarkBoardApp {
           inverseOps.push({ type: 'update', elementId: el.id, props: { y: el.y } });
           el.y = newY;
           ops.push({ type: 'update', elementId: el.id, props: { y: newY } });
+        }
+      }
+    } else if (mode === 'centerV') {
+      const bounds = elements.map(el => getElementBounds(el));
+      const centerX = bounds.reduce((s, b) => s + b.x + b.w / 2, 0) / bounds.length;
+      for (let i = 0; i < elements.length; i++) {
+        const el = elements[i];
+        const newX = centerX - bounds[i].w / 2;
+        if (el.x !== newX) {
+          inverseOps.push({ type: 'update', elementId: el.id, props: { x: el.x } });
+          el.x = newX;
+          ops.push({ type: 'update', elementId: el.id, props: { x: newX } });
         }
       }
     }
@@ -1341,6 +1397,23 @@ class DarkBoardApp {
           ops.push({ type: 'update', elementId: el.id, props: { x: currentX } });
         }
         currentX += el.width + gap;
+      }
+    } else if (direction === 'vertical') {
+      elements.sort((a, b) => a.y - b.y);
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      const totalSpan = (last.y + last.height) - first.y;
+      const totalHeights = elements.reduce((s, el) => s + el.height, 0);
+      const gap = (totalSpan - totalHeights) / (elements.length - 1);
+      let currentY = first.y + first.height + gap;
+      for (let i = 1; i < elements.length - 1; i++) {
+        const el = elements[i];
+        if (el.y !== currentY) {
+          inverseOps.push({ type: 'update', elementId: el.id, props: { y: el.y } });
+          el.y = currentY;
+          ops.push({ type: 'update', elementId: el.id, props: { y: currentY } });
+        }
+        currentY += el.height + gap;
       }
     }
 
@@ -1858,9 +1931,13 @@ class DarkBoardApp {
         ${multiSel ? `
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="alignTop">↑ Aligner en haut</div>
+        <div class="context-menu-item" data-action="alignBottom">↓ Aligner en bas</div>
         <div class="context-menu-item" data-action="alignLeft">← Aligner a gauche</div>
+        <div class="context-menu-item" data-action="alignRight">→ Aligner a droite</div>
         <div class="context-menu-item" data-action="alignCenterH">↔ Centrer horizontalement</div>
+        <div class="context-menu-item" data-action="alignCenterV">↕ Centrer verticalement</div>
         <div class="context-menu-item" data-action="distributeH">⇔ Distribuer horizontalement</div>
+        <div class="context-menu-item" data-action="distributeV">⇕ Distribuer verticalement</div>
         ` : ''}
         ${hit.type === 'envelope' ? `
         <div class="context-menu-separator"></div>
@@ -1943,14 +2020,26 @@ class DarkBoardApp {
         case 'alignTop':
           this.alignSelected('top');
           break;
+        case 'alignBottom':
+          this.alignSelected('bottom');
+          break;
         case 'alignLeft':
           this.alignSelected('left');
+          break;
+        case 'alignRight':
+          this.alignSelected('right');
           break;
         case 'alignCenterH':
           this.alignSelected('centerH');
           break;
+        case 'alignCenterV':
+          this.alignSelected('centerV');
+          break;
         case 'distributeH':
           this.distributeSelected('horizontal');
+          break;
+        case 'distributeV':
+          this.distributeSelected('vertical');
           break;
         case 'toggleCollapse':
           this.toggleEnvelopeCollapse(hit);
