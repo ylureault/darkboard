@@ -388,7 +388,7 @@ class UI {
     }
 
     btn.addEventListener('click', () => {
-      modal.style.display = '';
+      modal.style.display = 'flex';
     });
     close.addEventListener('click', () => {
       modal.style.display = 'none';
@@ -569,12 +569,7 @@ class UI {
   initShareButton() {
     document.getElementById('shareBtn').addEventListener('click', () => {
       const url = window.location.href;
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(url).then(() => {
-          this.app.showToast('Lien copie dans le presse-papier !');
-        });
-      } else {
-        // Fallback
+      const fallbackCopy = () => {
         const input = document.createElement('input');
         input.value = url;
         document.body.appendChild(input);
@@ -582,6 +577,15 @@ class UI {
         document.execCommand('copy');
         document.body.removeChild(input);
         this.app.showToast('Lien copie !');
+      };
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(() => {
+          this.app.showToast('Lien copie dans le presse-papier !');
+        }).catch(() => {
+          fallbackCopy();
+        });
+      } else {
+        fallbackCopy();
       }
     });
   }
@@ -687,7 +691,7 @@ class UI {
   }
 
   startPresentation() {
-    if (!this.app.workshop || !this.app.workshop.anchors || this.app.workshop.anchors.length === 0) {
+    if (!this.app.workshop || !this.app.workshop.anchors || this.app.workshop.anchors.size === 0) {
       this.app.showToast('Ajoutez des ancres pour le mode presentation');
       return;
     }
@@ -705,15 +709,15 @@ class UI {
   }
 
   presentationNavigate(dir) {
-    const anchors = this.app.workshop ? this.app.workshop.anchors : [];
+    const anchors = this.app.workshop ? Array.from(this.app.workshop.anchors.values()) : [];
     if (anchors.length === 0) return;
     this.presentationIndex = Math.max(0, Math.min(anchors.length - 1, this.presentationIndex + dir));
     this.navigateToAnchor(this.presentationIndex);
   }
 
   navigateToAnchor(index) {
-    const anchors = this.app.workshop ? this.app.workshop.anchors : [];
-    if (index < 0 || index >= anchors.length) return;
+    const anchors = this.app.workshop ? Array.from(this.app.workshop.anchors.values()) : [];
+    if (anchors.length === 0 || index < 0 || index >= anchors.length) return;
     const anchor = anchors[index];
     document.getElementById('presIndicator').textContent = `${index + 1}/${anchors.length}`;
     this.app.animateToView(anchor.x, anchor.y, anchor.zoom || 1);
