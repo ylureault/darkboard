@@ -12,7 +12,7 @@
   --btn-hover: #3a3a3a;
   --btn-active: #4a9eff;
   --text: #e0e0e0;
-  --text-muted: #888;
+  --text-muted: #999;
   --accent: #4a9eff;
   --danger: #e94560;
   --success: #4ecdc4;
@@ -149,6 +149,16 @@ html, body {
 .brand-badge .brand-insuffle {
   font-size: 14px;
   font-weight: 800;
+}
+
+.selection-count {
+  background: var(--accent);
+  color: white;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 4px;
 }
 
 /* Action sidebar */
@@ -357,11 +367,13 @@ html, body {
 
 .tool-btn .shortcut {
   position: absolute;
-  bottom: 2px;
-  right: 4px;
-  font-size: 9px;
+  bottom: 1px;
+  right: 3px;
+  font-size: 10px;
+  font-weight: 600;
   color: var(--text-muted);
   pointer-events: none;
+  opacity: 0.7;
 }
 
 .tool-btn.active .shortcut {
@@ -1910,6 +1922,28 @@ body.light-theme .brand-badge {
 /* Light theme toast */
 body.light-theme .toast {
   box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+/* Focus visible for accessibility */
+button:focus-visible,
+.tool-btn:focus-visible,
+.share-btn:focus-visible,
+.zoom-btn:focus-visible,
+.pres-btn:focus-visible,
+.fctl-btn:focus-visible,
+.anchor-toggle-btn:focus-visible,
+.template-btn:focus-visible,
+.theme-toggle:focus-visible,
+.help-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
 }
 
 /* Smooth transitions on all interactive elements */

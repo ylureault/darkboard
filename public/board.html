@@ -8,10 +8,10 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='15' fill='%231a1a2e'/><rect x='15' y='15' width='30' height='30' rx='4' fill='%234a9eff'/><rect x='55' y='15' width='30' height='30' rx='4' fill='%23ff6b6b'/><rect x='15' y='55' width='30' height='30' rx='4' fill='%234ecdc4'/><rect x='55' y='55' width='30' height='30' rx='4' fill='%23ffd966'/></svg>">
 </head>
 <body>
-  <canvas id="canvas"></canvas>
+  <canvas id="canvas" aria-label="Tableau blanc collaboratif DarkBoard" role="application"></canvas>
 
   <!-- Name dialog on join -->
-  <div class="modal-overlay" id="nameDialog">
+  <div class="modal-overlay" id="nameDialog" role="dialog" aria-label="Choisir un pseudonyme">
     <div class="modal">
       <div class="brand-header">
         <span class="brand-insuffle">Insuffle</span>
@@ -27,13 +27,13 @@
 
   <!-- Toolbar -->
   <div class="toolbar" id="toolbar">
-    <button class="tool-btn active" data-tool="select" title="Selectionner (V)">
+    <button class="tool-btn active" data-tool="select" title="Selectionner (V)" aria-label="Outil selection, raccourci V">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M4 4l7 18 3-7 7-3z"/>
       </svg>
       <span class="shortcut">V</span>
     </button>
-    <button class="tool-btn" data-tool="hand" title="Main (H)">
+    <button class="tool-btn" data-tool="hand" title="Main / Deplacer la vue (H)" aria-label="Outil main, raccourci H">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M18 11V6a2 2 0 00-4 0v1M14 7V4a2 2 0 00-4 0v6M10 5.5V4a2 2 0 00-4 0v8"/>
         <path d="M18 11a2 2 0 014 0v1a8 8 0 01-8 8h-2c-2.5 0-4-1-6-4l-1.5-2.5a2 2 0 013-2L6 13V4"/>
@@ -41,42 +41,42 @@
       <span class="shortcut">H</span>
     </button>
     <div class="divider"></div>
-    <button class="tool-btn" data-tool="rect" title="Rectangle (R)">
+    <button class="tool-btn" data-tool="rect" title="Rectangle (R)" aria-label="Rectangle, raccourci R">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="3" width="18" height="18" rx="2"/>
       </svg>
       <span class="shortcut">R</span>
     </button>
-    <button class="tool-btn" data-tool="circle" title="Cercle (O)">
+    <button class="tool-btn" data-tool="circle" title="Cercle (O)" aria-label="Cercle, raccourci O">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="9"/>
       </svg>
       <span class="shortcut">O</span>
     </button>
-    <button class="tool-btn" data-tool="diamond" title="Losange">
+    <button class="tool-btn" data-tool="diamond" title="Losange" aria-label="Forme losange">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polygon points="12,2 22,12 12,22 2,12"/>
       </svg>
     </button>
-    <button class="tool-btn" data-tool="triangle" title="Triangle">
+    <button class="tool-btn" data-tool="triangle" title="Triangle" aria-label="Forme triangle">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polygon points="12,3 22,21 2,21"/>
       </svg>
     </button>
-    <button class="tool-btn" data-tool="line" title="Ligne (L)">
+    <button class="tool-btn" data-tool="line" title="Ligne (L)" aria-label="Ligne, raccourci L">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="4" y1="20" x2="20" y2="4"/>
       </svg>
       <span class="shortcut">L</span>
     </button>
-    <button class="tool-btn" data-tool="arrow" title="Fleche (A)">
+    <button class="tool-btn" data-tool="arrow" title="Fleche (A)" aria-label="Fleche, raccourci A">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="4" y1="20" x2="20" y2="4"/>
         <polyline points="14,4 20,4 20,10"/>
       </svg>
       <span class="shortcut">A</span>
     </button>
-    <button class="tool-btn" data-tool="connector" title="Connecteur (K)">
+    <button class="tool-btn" data-tool="connector" title="Connecteur — Relier deux elements (K)" aria-label="Connecteur entre elements, raccourci K">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="5" cy="5" r="3"/><circle cx="19" cy="19" r="3"/>
         <line x1="7" y1="7" x2="17" y2="17"/>
@@ -85,7 +85,7 @@
       <span class="shortcut">K</span>
     </button>
     <div class="divider"></div>
-    <button class="tool-btn" data-tool="draw" title="Dessin libre (D)">
+    <button class="tool-btn" data-tool="draw" title="Dessin libre (D)" aria-label="Dessin libre, raccourci D">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M12 19l7-7 3 3-7 7-3-3z"/>
         <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
@@ -94,14 +94,14 @@
       </svg>
       <span class="shortcut">D</span>
     </button>
-    <button class="tool-btn" data-tool="sticky" title="Post-it (S)">
+    <button class="tool-btn" data-tool="sticky" title="Post-it (S)" aria-label="Post-it, raccourci S">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M15.5 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V8.5L15.5 3z"/>
         <polyline points="14,3 14,9 21,9"/>
       </svg>
       <span class="shortcut">S</span>
     </button>
-    <button class="tool-btn" data-tool="text" title="Texte (T)">
+    <button class="tool-btn" data-tool="text" title="Texte (T)" aria-label="Texte, raccourci T">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="4,7 4,4 20,4 20,7"/>
         <line x1="12" y1="4" x2="12" y2="20"/>
@@ -109,14 +109,14 @@
       </svg>
       <span class="shortcut">T</span>
     </button>
-    <button class="tool-btn" data-tool="envelope" title="Enveloppe (G)">
+    <button class="tool-btn" data-tool="envelope" title="Enveloppe — Contenu revele au clic (G)" aria-label="Enveloppe avec contenu cache, raccourci G">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="6" width="20" height="14" rx="2"/>
         <path d="M2 8l10 6 10-6"/>
       </svg>
       <span class="shortcut">G</span>
     </button>
-    <button class="tool-btn" data-tool="card" title="Carte management (M)">
+    <button class="tool-btn" data-tool="card" title="Carte management — Kanban (M)" aria-label="Carte de gestion Kanban, raccourci M">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="3" width="18" height="18" rx="2"/>
         <line x1="7" y1="8" x2="17" y2="8"/>
@@ -125,14 +125,14 @@
       </svg>
       <span class="shortcut">M</span>
     </button>
-    <button class="tool-btn" data-tool="list" title="Liste (I)">
+    <button class="tool-btn" data-tool="list" title="Liste a puces / checklist (I)" aria-label="Liste, raccourci I">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
         <circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/>
       </svg>
       <span class="shortcut">I</span>
     </button>
-    <button class="tool-btn" data-tool="frame" title="Cadre/Zone (F)">
+    <button class="tool-btn" data-tool="frame" title="Cadre / Zone de regroupement (F)" aria-label="Cadre zone, raccourci F">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4 2"/>
         <line x1="3" y1="9" x2="21" y2="9" stroke-dasharray="0"/>
@@ -140,7 +140,7 @@
       <span class="shortcut">F</span>
     </button>
     <div class="divider"></div>
-    <button class="tool-btn" data-tool="eraser" title="Gomme (E)">
+    <button class="tool-btn" data-tool="eraser" title="Gomme — Effacer des elements (E)" aria-label="Gomme, raccourci E">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M20 20H7L3 16l9-9 8 8-4 4"/>
         <path d="M6.5 13.5l5-5"/>
@@ -208,7 +208,7 @@
   </div>
 
   <!-- Timer setup modal -->
-  <div class="modal-overlay" id="timerModal" style="display:none;">
+  <div class="modal-overlay" id="timerModal" style="display:none;" role="dialog" aria-label="Configuration du timer">
     <div class="modal">
       <h2>Lancer un timer</h2>
       <div class="timer-setup">
@@ -223,7 +223,7 @@
   </div>
 
   <!-- Vote setup modal -->
-  <div class="modal-overlay" id="voteModal" style="display:none;">
+  <div class="modal-overlay" id="voteModal" style="display:none;" role="dialog" aria-label="Configuration du vote">
     <div class="modal">
       <h2>Session de vote</h2>
       <label class="modal-label">Nombre de votes par participant</label>
@@ -362,7 +362,7 @@
   </button>
 
   <!-- Template modal -->
-  <div class="modal-overlay" id="templateModal" style="display:none;">
+  <div class="modal-overlay" id="templateModal" style="display:none;" role="dialog" aria-label="Choix de modele">
     <div class="modal modal-lg">
       <h2>Choisir un modele</h2>
       <div class="template-grid" id="templateGrid"></div>
@@ -378,11 +378,12 @@
     <span class="sync-text" id="syncText">Connexion...</span>
   </div>
 
-  <!-- Insuffle branding badge -->
+  <!-- Insuffle branding badge + selection count -->
   <div class="brand-badge">
     <span class="brand-insuffle">Insuffle</span>
     <span style="opacity:0.5">|</span>
     <span>Insuffle Academie</span>
+    <span class="selection-count" id="selectionCount" style="display:none"></span>
   </div>
 
   <!-- Help / Onboarding overlay -->
@@ -456,7 +457,7 @@
   <button class="help-btn" id="helpBtn" title="Aide et raccourcis (?)">?</button>
 
   <!-- Toast -->
-  <div class="toast" id="toast"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="/js/utils.js"></script>
   <script src="/js/objects.js"></script>

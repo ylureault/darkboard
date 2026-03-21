@@ -94,6 +94,19 @@ class DarkBoardApp {
     } else if (this.renderer.selectedIds.size === 0) {
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
     }
+    this.updateSelectionCount();
+  }
+
+  updateSelectionCount() {
+    const el = document.getElementById('selectionCount');
+    if (!el) return;
+    const count = this.renderer.selectedIds.size;
+    if (count > 1) {
+      el.textContent = `${count} objets`;
+      el.style.display = '';
+    } else {
+      el.style.display = 'none';
+    }
   }
 
   showNameDialog() {
