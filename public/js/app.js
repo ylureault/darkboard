@@ -357,6 +357,50 @@ class DarkBoardApp {
   deleteSelected() {
     if (this.renderer.selectedIds.size === 0) return;
 
+    // Check if deleting an envelope/frame with many children — confirm first
+    for (const id of this.renderer.selectedIds) {
+      const el = this.renderer.elements.get(id);
+      if (el && (el.type === 'envelope' || el.type === 'frame') && el.children && el.children.length > 10) {
+        this.showConfirmDialog(
+          `Cette zone contient ${el.children.length} objets. Supprimer la zone uniquement ou tout supprimer (${el.children.length} objets) ?`,
+          [
+            { label: 'Zone uniquement', action: () => this._doDeleteSelected() },
+            { label: `Tout supprimer (${el.children.length})`, className: 'confirm-danger', action: () => {
+              // Add children to selection for deletion
+              for (const childId of el.children) {
+                this.renderer.selectedIds.add(childId);
+              }
+              this._doDeleteSelected();
+            }},
+            { label: 'Annuler', action: () => {} }
+          ]
+        );
+        return;
+      }
+    }
+
+    // Check if deleting many objects at once (>10)
+    const unlocked = [...this.renderer.selectedIds].filter(id => {
+      const el = this.renderer.elements.get(id);
+      return el && !el.locked;
+    });
+    if (unlocked.length > 10) {
+      this.showConfirmDialog(
+        `Supprimer ${unlocked.length} objets ?`,
+        [
+          { label: 'Supprimer', className: 'confirm-danger', action: () => this._doDeleteSelected() },
+          { label: 'Annuler', action: () => {} }
+        ]
+      );
+      return;
+    }
+
+    this._doDeleteSelected();
+  }
+
+  _doDeleteSelected() {
+    if (this.renderer.selectedIds.size === 0) return;
+
     // Delete connectors attached to selected elements first
     for (const id of this.renderer.selectedIds) {
       this.deleteConnectorsFor(id);
@@ -381,6 +425,29 @@ class DarkBoardApp {
     this.renderer.selectedIds.clear();
     this.renderer.markDirty();
     this.hasUnsavedChanges = true;
+  }
+
+  showConfirmDialog(message, buttons) {
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    const dialog = document.createElement('div');
+    dialog.className = 'confirm-dialog';
+    dialog.innerHTML = `<p>${message}</p>`;
+    const actions = document.createElement('div');
+    actions.className = 'confirm-actions';
+    for (const btn of buttons) {
+      const b = document.createElement('button');
+      b.textContent = btn.label;
+      if (btn.className) b.className = btn.className;
+      b.addEventListener('click', () => {
+        overlay.remove();
+        btn.action();
+      });
+      actions.appendChild(b);
+    }
+    dialog.appendChild(actions);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
   }
 
   undo() {
@@ -660,6 +727,49 @@ class DarkBoardApp {
     }
   }
 
+  getFrameChildren(frameId) {
+    const frame = this.renderer.elements.get(frameId);
+    if (!frame) return [];
+    const fb = getElementBounds(frame);
+    const children = [];
+    for (const [id, el] of this.renderer.elements) {
+      if (id === frameId || el.type === 'frame') continue;
+      const eb = getElementBounds(el);
+      // Element is inside frame if fully contained
+      if (eb.x >= fb.x && eb.y >= fb.y &&
+          eb.x + eb.w <= fb.x + fb.w && eb.y + eb.h <= fb.y + fb.h) {
+        children.push(el);
+      }
+    }
+    return children;
+  }
+
+  moveFrameWithChildren(frameId, dx, dy, precomputedChildren) {
+    const children = precomputedChildren || this.getFrameChildren(frameId);
+    const ops = [];
+    const inverseOps = [];
+    for (const child of children) {
+      // Skip if child is already being moved as part of selection
+      if (this.renderer.selectedIds.has(child.id)) continue;
+      const oldProps = { x: child.x, y: child.y };
+      child.x += dx;
+      child.y += dy;
+      if (child.x2 !== undefined) { child.x2 += dx; child.y2 += dy; }
+      if (child.points) {
+        child.points = child.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+      }
+      const newProps = { x: child.x, y: child.y };
+      if (child.x2 !== undefined) { newProps.x2 = child.x2; newProps.y2 = child.y2; }
+      if (child.points) { newProps.points = child.points; }
+      ops.push({ type: 'update', elementId: child.id, props: newProps });
+      inverseOps.push({ type: 'update', elementId: child.id, props: oldProps });
+    }
+    if (ops.length > 0) {
+      this.history.push(ops, inverseOps);
+      this.sync.sendOps(ops);
+    }
+  }
+
   // Rich text types that support contenteditable
   isRichTextType(type) {
     return type === 'sticky' || type === 'text' || type === 'circle' || type === 'rect' || type === 'diamond' || type === 'triangle';
@@ -749,6 +859,33 @@ class DarkBoardApp {
     }
 
     document.body.appendChild(editor);
+
+    // Intercept paste in contenteditable: strip HTML formatting from external sources
+    if (useRichText) {
+      editor.addEventListener('paste', (e) => {
+        // Ctrl+Shift+V always pastes plain text
+        if (e.shiftKey) {
+          e.preventDefault();
+          const text = e.clipboardData.getData('text/plain');
+          document.execCommand('insertText', false, text);
+          return;
+        }
+        // Default Ctrl+V: also strip external HTML (from Word, web pages, etc.)
+        const html = e.clipboardData.getData('text/html');
+        if (html) {
+          // Check if the HTML comes from an external source (not from our own editor)
+          const isExternal = html.includes('urn:schemas-microsoft-com') ||
+            html.includes('xmlns:o=') || html.includes('class="Mso') ||
+            html.includes('data-pm-slice') || html.includes('docs-internal');
+          if (isExternal) {
+            e.preventDefault();
+            const text = e.clipboardData.getData('text/plain');
+            document.execCommand('insertText', false, text);
+          }
+        }
+      });
+    }
+
     editor.focus();
 
     // Show formatting toolbar for rich text types

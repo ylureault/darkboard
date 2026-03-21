@@ -24,6 +24,7 @@ class SyncClient {
     this.ws.onopen = () => {
       this.connected = true;
       this.reconnectDelay = 1000;
+      this.updateSyncIndicator('online', 'En ligne');
       console.log('Connected to DarkBoard server');
 
       // Join board with name
@@ -47,6 +48,7 @@ class SyncClient {
 
     this.ws.onclose = () => {
       this.connected = false;
+      this.updateSyncIndicator('offline', 'Hors ligne');
       console.log('Disconnected from server');
       this.scheduleReconnect();
     };
@@ -57,11 +59,26 @@ class SyncClient {
   }
 
   scheduleReconnect() {
+    this.updateSyncIndicator('syncing', 'Reconnexion...');
     setTimeout(() => {
       console.log('Attempting to reconnect...');
       this.connect();
     }, this.reconnectDelay);
     this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
+  }
+
+  updateSyncIndicator(state, text) {
+    const dot = document.getElementById('syncDot');
+    const label = document.getElementById('syncText');
+    if (!dot || !label) return;
+    dot.className = 'sync-dot ' + state;
+    label.textContent = text;
+  }
+
+  showSaved() {
+    const now = new Date();
+    const time = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    this.updateSyncIndicator('online', 'Sauvegarde a ' + time);
   }
 
   handleMessage(msg) {
@@ -221,6 +238,9 @@ class SyncClient {
       boardId: getBoardId(),
       ops
     });
+    if (this.connected) {
+      this.showSaved();
+    }
   }
 
   sendCursor(x, y) {

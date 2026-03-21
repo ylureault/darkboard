@@ -115,6 +115,14 @@ const Tools = {
           const el = app.renderer.elements.get(id);
           if (el && !el.locked) this.originalElements.set(id, deepClone(el));
         }
+
+        // Pre-compute frame children for drag (before positions change)
+        this.frameChildren = new Map();
+        for (const [id, orig] of this.originalElements) {
+          if (orig.type === 'frame') {
+            this.frameChildren.set(id, app.getFrameChildren(id));
+          }
+        }
       } else {
         // Start marquee selection
         if (!e.shiftKey) {
@@ -336,11 +344,14 @@ const Tools = {
           app.history.push(ops, inverseOps);
           app.sync.sendOps(ops);
 
-          // Envelope: move children with envelope
+          // Envelope/Frame: move children with container
           for (const [id] of this.originalElements) {
             const el = app.renderer.elements.get(id);
             if (el && el.type === 'envelope') {
               app.moveEnvelopeWithChildren(id, dx, dy);
+            } else if (el && el.type === 'frame') {
+              const precomputed = this.frameChildren && this.frameChildren.get(id);
+              app.moveFrameWithChildren(id, dx, dy, precomputed);
             }
           }
 
