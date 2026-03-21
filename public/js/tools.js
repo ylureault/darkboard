@@ -202,9 +202,9 @@ const Tools = {
           }
         }
 
-        // Compute alignment guides
+        // Compute alignment guides (Ctrl disables snap)
         app.renderer.alignmentGuides = [];
-        if (this.originalElements.size === 1 && !app.renderer.snapToGrid) {
+        if (this.originalElements.size === 1 && !app.renderer.snapToGrid && !e.ctrlKey) {
           const firstOrig = this.originalElements.values().next().value;
           if (firstOrig) {
             const movedBounds = {
@@ -428,7 +428,7 @@ const Tools = {
 
     onDoubleClick(app, worldX, worldY) {
       const hit = app.renderer.hitTest(worldX, worldY);
-      if (hit && (hit.type === 'sticky' || hit.type === 'text' || hit.type === 'rect' || hit.type === 'circle' || hit.type === 'frame' || hit.type === 'envelope' || hit.type === 'diamond' || hit.type === 'triangle' || hit.type === 'card' || hit.type === 'connector')) {
+      if (hit && (hit.type === 'sticky' || hit.type === 'text' || hit.type === 'rect' || hit.type === 'circle' || hit.type === 'frame' || hit.type === 'envelope' || hit.type === 'diamond' || hit.type === 'triangle' || hit.type === 'card' || hit.type === 'list' || hit.type === 'connector')) {
         app.startTextEdit(hit);
       } else if (!hit) {
         // Double-click on empty canvas creates a sticky

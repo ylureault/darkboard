@@ -88,8 +88,19 @@ class InputHandler {
   }
 
   onPointerDown(e) {
-    if (e.button === 1 || e.button === 2 || (this.spaceDown && e.button === 0)) {
-      // Middle click, right click, or space+click: pan
+    if (e.button === 1 || (this.spaceDown && e.button === 0)) {
+      // Middle click or space+click: pan
+      this.isPanning = true;
+      this.lastPanX = e.clientX;
+      this.lastPanY = e.clientY;
+      this.app.renderer.canvas.style.cursor = 'grabbing';
+      return;
+    }
+
+    if (e.button === 2) {
+      // Right click: track for pan vs context menu distinction
+      this.rightClickStart = { x: e.clientX, y: e.clientY };
+      this.rightClickMoved = false;
       this.isPanning = true;
       this.lastPanX = e.clientX;
       this.lastPanY = e.clientY;
@@ -124,6 +135,14 @@ class InputHandler {
     if (this.isPanning) {
       const dx = e.clientX - this.lastPanX;
       const dy = e.clientY - this.lastPanY;
+      // Track if right-click moved beyond 5px threshold
+      if (this.rightClickStart) {
+        const totalDx = e.clientX - this.rightClickStart.x;
+        const totalDy = e.clientY - this.rightClickStart.y;
+        if (Math.hypot(totalDx, totalDy) > 5) {
+          this.rightClickMoved = true;
+        }
+      }
       this.app.renderer.pan(dx, dy);
       this.lastPanX = e.clientX;
       this.lastPanY = e.clientY;
@@ -141,6 +160,15 @@ class InputHandler {
       this.isPanning = false;
       const tool = Tools[this.app.currentTool];
       this.app.renderer.canvas.style.cursor = tool ? tool.cursor : 'default';
+      // If right-click didn't move > 5px, it was a short click — context menu already handled
+      if (this.rightClickStart) {
+        if (this.rightClickMoved) {
+          // Panned with right-click — suppress context menu
+          this.suppressContextMenu = true;
+        }
+        this.rightClickStart = null;
+        this.rightClickMoved = false;
+      }
       return;
     }
 
@@ -176,19 +204,9 @@ class InputHandler {
       this.app.renderer.pan(-e.deltaY, 0);
       this.app.renderer.markDirty();
     } else {
-      // Distinguish trackpad (has deltaX or small deltaY steps) from mouse wheel (large deltaY jumps, no deltaX)
-      const isTrackpad = Math.abs(e.deltaX) > 0 || (e.deltaMode === 0 && Math.abs(e.deltaY) < 50);
-      if (isTrackpad) {
-        // Trackpad: pan in both directions
-        this.app.renderer.pan(-e.deltaX, -e.deltaY);
-        this.app.renderer.markDirty();
-      } else {
-        // Mouse wheel: zoom toward cursor
-        const delta = -e.deltaY * 0.003;
-        const newZoom = this.app.renderer.camera.zoom * (1 + delta);
-        this.app.renderer.setZoom(newZoom, e.clientX, e.clientY);
-        this.app.updateZoomDisplay();
-      }
+      // Default scroll = vertical pan (both mouse wheel and trackpad)
+      this.app.renderer.pan(-e.deltaX, -e.deltaY);
+      this.app.renderer.markDirty();
     }
   }
 
@@ -197,11 +215,46 @@ class InputHandler {
     if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT' || e.target.isContentEditable) {
       // Allow Ctrl shortcuts in contenteditable (formatting)
       if (e.target.isContentEditable && (e.ctrlKey || e.metaKey)) {
-        // Let browser handle B/I/U in contenteditable; intercept Escape
         if (e.key === 'Escape') {
           e.target.blur();
           e.preventDefault();
+          return;
         }
+        // Ctrl+Shift+X: strikethrough
+        if (e.shiftKey && (e.key === 'x' || e.key === 'X')) {
+          e.preventDefault();
+          document.execCommand('strikeThrough', false, null);
+          return;
+        }
+        // Ctrl+Shift+E: center align
+        if (e.shiftKey && (e.key === 'e' || e.key === 'E')) {
+          e.preventDefault();
+          document.execCommand('justifyCenter', false, null);
+          return;
+        }
+        // Ctrl+Shift+>: increase font size
+        if (e.shiftKey && e.key === '>') {
+          e.preventDefault();
+          const current = document.queryCommandValue('fontSize') || '3';
+          const next = Math.min(7, parseInt(current) + 1);
+          document.execCommand('fontSize', false, String(next));
+          return;
+        }
+        // Ctrl+Shift+<: decrease font size
+        if (e.shiftKey && e.key === '<') {
+          e.preventDefault();
+          const current = document.queryCommandValue('fontSize') || '3';
+          const next = Math.max(1, parseInt(current) - 1);
+          document.execCommand('fontSize', false, String(next));
+          return;
+        }
+        // Ctrl+\: remove formatting
+        if (e.key === '\\') {
+          e.preventDefault();
+          document.execCommand('removeFormat', false, null);
+          return;
+        }
+        // Let browser handle B/I/U and other Ctrl shortcuts
         return;
       }
       return;
@@ -345,7 +398,15 @@ class InputHandler {
       return;
     }
 
-    // F5 or F: toggle presentation fullscreen
+    // F key: fullscreen toggle in presentation mode
+    if (lower === 'f' && !e.ctrlKey && !e.metaKey && this.app.ui && this.app.ui.presentationActive) {
+      e.preventDefault();
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen();
+      return;
+    }
+
+    // F5: toggle presentation fullscreen
     if (e.key === 'F5') {
       e.preventDefault();
       if (this.app.ui && this.app.ui.presentationActive) {
@@ -401,6 +462,11 @@ class InputHandler {
   }
 
   onContextMenu(e) {
+    // Suppress context menu if we just panned with right-click
+    if (this.suppressContextMenu) {
+      this.suppressContextMenu = false;
+      return;
+    }
     const world = this.getWorldPos(e);
     this.app.showContextMenu(e.clientX, e.clientY, world.x, world.y);
   }

@@ -123,28 +123,26 @@ html, body {
 
 .brand-badge {
   position: fixed;
-  bottom: 12px;
-  left: 12px;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
-  border-radius: 8px;
-  padding: 4px 10px;
-  font-size: 11px;
+  border-radius: 10px;
+  padding: 6px 16px;
+  font-size: 12px;
   color: var(--text-muted);
   z-index: 50;
-  opacity: 0.7;
-  transition: opacity 0.2s;
-}
-
-.brand-badge:hover {
-  opacity: 1;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  pointer-events: none;
 }
 
 .brand-badge .brand-insuffle {
-  font-size: 13px;
+  font-size: 15px;
+  font-weight: 800;
 }
 
 .modal h2 {
