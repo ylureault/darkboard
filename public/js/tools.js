@@ -30,6 +30,13 @@ const Tools = {
     },
 
     onPointerDown(app, worldX, worldY, e) {
+      // Check comment bubble click
+      const commentHit = app.renderer.hitTestComment(worldX, worldY);
+      if (commentHit) {
+        app.showCommentModal(commentHit.x, commentHit.y, commentHit.elementId);
+        return;
+      }
+
       // Check minimap click
       const mmHit = app.renderer.hitTestMinimap(e.clientX, e.clientY);
       if (mmHit) {
@@ -829,8 +836,25 @@ const Tools = {
 
     onPointerMove(app, worldX, worldY) {
       if (!app.renderer.previewElement) return;
-      app.renderer.previewElement.x2 = worldX;
-      app.renderer.previewElement.y2 = worldY;
+
+      // Snap to target element anchor on hover
+      const hit = app.renderer.hitTest(worldX, worldY);
+      if (hit && hit.type !== 'connector' && hit.id !== this.sourceId) {
+        const anchors = getAnchorPoints(hit);
+        let best = anchors[0];
+        let bestDist = Infinity;
+        for (const a of anchors) {
+          const d = Math.hypot(a.x - worldX, a.y - worldY);
+          if (d < bestDist) { bestDist = d; best = a; }
+        }
+        app.renderer.previewElement.x2 = best.x;
+        app.renderer.previewElement.y2 = best.y;
+        app.renderer.connectorSnapTarget = hit.id;
+      } else {
+        app.renderer.previewElement.x2 = worldX;
+        app.renderer.previewElement.y2 = worldY;
+        app.renderer.connectorSnapTarget = null;
+      }
       app.renderer.markDirty();
     },
 
@@ -865,6 +889,7 @@ const Tools = {
 
       app.addElement(el);
       app.renderer.previewElement = null;
+      app.renderer.connectorSnapTarget = null;
       this.sourceId = null;
       app.renderer.markDirty();
     },
@@ -964,6 +989,12 @@ function createShapeTool(type) {
     startPoint: null,
 
     onPointerDown(app, worldX, worldY) {
+      // Snap start point to grid if enabled
+      if (app.renderer.snapToGrid) {
+        const snapped = app.renderer.snapPosition(worldX, worldY);
+        worldX = snapped.x;
+        worldY = snapped.y;
+      }
       this.startPoint = { x: worldX, y: worldY };
       app.renderer.previewElement = createElement(type, {
         x: worldX, y: worldY, width: 0, height: 0,
@@ -974,6 +1005,12 @@ function createShapeTool(type) {
 
     onPointerMove(app, worldX, worldY, e) {
       if (!this.startPoint) return;
+      // Snap to grid if enabled
+      if (app.renderer.snapToGrid) {
+        const snapped = app.renderer.snapPosition(worldX, worldY);
+        worldX = snapped.x;
+        worldY = snapped.y;
+      }
       let w = worldX - this.startPoint.x;
       let h = worldY - this.startPoint.y;
 
@@ -993,6 +1030,12 @@ function createShapeTool(type) {
 
     onPointerUp(app, worldX, worldY, e) {
       if (!this.startPoint) return;
+      // Snap to grid if enabled
+      if (app.renderer.snapToGrid) {
+        const snapped = app.renderer.snapPosition(worldX, worldY);
+        worldX = snapped.x;
+        worldY = snapped.y;
+      }
       let w = worldX - this.startPoint.x;
       let h = worldY - this.startPoint.y;
 

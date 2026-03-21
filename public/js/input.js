@@ -342,12 +342,19 @@ class InputHandler {
     // Tool shortcuts (match toolbar labels)
     const toolMap = {
       v: 'select', h: 'hand', r: 'rect', c: 'circle', o: 'circle',
-      l: 'line', a: 'arrow', d: 'draw', s: 'sticky', n: 'sticky',
+      l: 'line', a: 'arrow', d: 'draw', s: 'sticky',
       t: 'text', e: 'eraser', f: 'frame', g: 'envelope',
       k: 'connector', m: 'card', i: 'list'
     };
 
     const lower = e.key.toLowerCase();
+
+    // N key: toggle anchors panel
+    if (lower === 'n') {
+      if (this.app.workshop) this.app.workshop.toggleAnchorsPanel();
+      return;
+    }
+
     if (toolMap[lower]) {
       this.app.setTool(toolMap[lower]);
       return;

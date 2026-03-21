@@ -212,6 +212,24 @@ class SyncClient {
         this.app.animateToView(msg.x, msg.y);
         break;
 
+      case 'laser':
+        if (msg.userId !== this.app.myUserId) {
+          this.app.renderer.laserPointers.set(msg.userId, {
+            x: msg.x, y: msg.y,
+            color: msg.color || '#ff0000',
+            name: msg.name
+          });
+          this.app.renderer.markDirty();
+          // Auto-clear after 3 seconds of inactivity
+          clearTimeout(this._laserTimers && this._laserTimers[msg.userId]);
+          if (!this._laserTimers) this._laserTimers = {};
+          this._laserTimers[msg.userId] = setTimeout(() => {
+            this.app.renderer.laserPointers.delete(msg.userId);
+            this.app.renderer.markDirty();
+          }, 3000);
+        }
+        break;
+
       // Anchors
       case 'anchor-add':
         if (this.app.workshop) this.app.workshop.handleAnchorAdd(msg);
@@ -255,6 +273,14 @@ class SyncClient {
       boardId: getBoardId(),
       x, y
     }));
+  }
+
+  sendLaser(x, y) {
+    this.send({
+      type: 'laser',
+      boardId: getBoardId(),
+      x, y
+    });
   }
 
   sendName(name) {

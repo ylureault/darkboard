@@ -1609,43 +1609,121 @@ class DarkBoardApp {
 
   // Comments
   addComment(el) {
-    const text = prompt('Commentaire:');
-    if (!text) return;
     const bounds = getElementBounds(el);
-    const comment = {
-      id: generateId(),
-      x: bounds.x + bounds.w,
-      y: bounds.y,
-      elementId: el.id,
-      text: text,
-      author: this.userName || 'Anonyme',
-      timestamp: Date.now(),
-      replies: [],
-      resolved: false
-    };
-    this.renderer.comments.push(comment);
-    this.renderer.markDirty();
-    this.showToast('Commentaire ajoute');
+    this.showCommentModal(bounds.x + bounds.w, bounds.y, el.id);
   }
 
   // Canvas comment (not attached to object)
   addCanvasComment(x, y) {
-    const text = prompt('Commentaire:');
-    if (!text) return;
-    const comment = {
-      id: generateId(),
-      x: x,
-      y: y,
-      elementId: null,
-      text: text,
-      author: this.userName || 'Anonyme',
-      timestamp: Date.now(),
-      replies: [],
-      resolved: false
-    };
-    this.renderer.comments.push(comment);
-    this.renderer.markDirty();
-    this.showToast('Commentaire ajoute');
+    this.showCommentModal(x, y, null);
+  }
+
+  showCommentModal(x, y, elementId) {
+    // Check if there's an existing comment at this location
+    const existing = elementId
+      ? this.renderer.comments.find(c => c.elementId === elementId)
+      : null;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    const dialog = document.createElement('div');
+    dialog.className = 'confirm-dialog';
+    dialog.style.maxWidth = '450px';
+    dialog.style.textAlign = 'left';
+
+    let html = '';
+    if (existing) {
+      html += `<div style="margin-bottom:12px">
+        <div style="font-weight:bold;margin-bottom:4px">${existing.author} <span style="color:var(--text-muted);font-weight:normal;font-size:11px">${new Date(existing.timestamp).toLocaleString('fr-FR')}</span></div>
+        <div style="background:var(--btn);padding:8px 12px;border-radius:6px;margin-bottom:8px">${existing.text}</div>`;
+      if (existing.replies) {
+        for (const r of existing.replies) {
+          html += `<div style="margin-left:16px;margin-bottom:4px">
+            <div style="font-size:12px;color:var(--text-muted)">${r.author} — ${new Date(r.timestamp).toLocaleString('fr-FR')}</div>
+            <div style="background:var(--btn);padding:6px 10px;border-radius:6px;font-size:13px">${r.text}</div>
+          </div>`;
+        }
+      }
+      html += `</div>`;
+      html += `<textarea class="comment-input" placeholder="Repondre..." style="width:100%;height:60px;background:var(--btn);border:1px solid var(--panel-border);border-radius:6px;color:var(--text);padding:8px;resize:vertical;font-size:13px"></textarea>`;
+    } else {
+      html += `<p style="margin-bottom:8px;font-weight:bold">Ajouter un commentaire</p>`;
+      html += `<textarea class="comment-input" placeholder="Votre commentaire..." style="width:100%;height:80px;background:var(--btn);border:1px solid var(--panel-border);border-radius:6px;color:var(--text);padding:8px;resize:vertical;font-size:13px"></textarea>`;
+    }
+
+    dialog.innerHTML = html;
+    const actions = document.createElement('div');
+    actions.className = 'confirm-actions';
+    actions.style.marginTop = '12px';
+
+    const submitBtn = document.createElement('button');
+    submitBtn.textContent = existing ? 'Repondre' : 'Ajouter';
+    submitBtn.style.background = 'var(--accent)';
+    submitBtn.style.color = 'white';
+    submitBtn.style.border = 'none';
+
+    if (existing) {
+      const resolveBtn = document.createElement('button');
+      resolveBtn.textContent = existing.resolved ? 'Reouvrir' : 'Resoudre';
+      resolveBtn.addEventListener('click', () => {
+        existing.resolved = !existing.resolved;
+        this.renderer.markDirty();
+        overlay.remove();
+        this.showToast(existing.resolved ? 'Commentaire resolu' : 'Commentaire rouvert');
+      });
+      actions.appendChild(resolveBtn);
+    }
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Annuler';
+    cancelBtn.addEventListener('click', () => overlay.remove());
+
+    submitBtn.addEventListener('click', () => {
+      const textarea = dialog.querySelector('.comment-input');
+      const text = textarea.value.trim();
+      if (!text) return;
+
+      if (existing) {
+        existing.replies.push({
+          text: text,
+          author: this.userName || 'Anonyme',
+          timestamp: Date.now()
+        });
+      } else {
+        this.renderer.comments.push({
+          id: generateId(),
+          x: x, y: y,
+          elementId: elementId,
+          text: text,
+          author: this.userName || 'Anonyme',
+          timestamp: Date.now(),
+          replies: [],
+          resolved: false
+        });
+      }
+      this.renderer.markDirty();
+      overlay.remove();
+      this.showToast('Commentaire ajoute');
+    });
+
+    actions.appendChild(submitBtn);
+    actions.appendChild(cancelBtn);
+    dialog.appendChild(actions);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    // Focus textarea and stop key propagation
+    const textarea = dialog.querySelector('.comment-input');
+    setTimeout(() => textarea.focus(), 50);
+    textarea.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        submitBtn.click();
+      }
+      if (e.key === 'Escape') {
+        overlay.remove();
+      }
+    });
   }
 
   // Card editor panel
@@ -2083,6 +2161,12 @@ class DarkBoardApp {
         ` : ''}
         ${hit.type === 'card' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editCard">✏️ Modifier la carte</div>` : ''}
         ${hit.type === 'list' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editList">✏️ Modifier la liste</div>` : ''}
+        ${hit.type === 'connector' ? `
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="connStraight">${hit.lineType !== 'orthogonal' && hit.lineType !== 'curved' ? '✓ ' : ''}Ligne droite</div>
+        <div class="context-menu-item" data-action="connOrthogonal">${hit.lineType === 'orthogonal' ? '✓ ' : ''}Ligne orthogonale</div>
+        <div class="context-menu-item" data-action="connCurved">${hit.lineType === 'curve' ? '✓ ' : ''}Ligne courbee</div>
+        ` : ''}
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="comment">💬 Commenter</div>
         <div class="context-menu-separator"></div>
@@ -2189,6 +2273,15 @@ class DarkBoardApp {
           break;
         case 'editList':
           this.showListEditor(hit);
+          break;
+        case 'connStraight':
+          this.updateSelectedElements({ lineType: 'straight' });
+          break;
+        case 'connOrthogonal':
+          this.updateSelectedElements({ lineType: 'orthogonal' });
+          break;
+        case 'connCurved':
+          this.updateSelectedElements({ lineType: 'curve' });
           break;
         case 'comment':
           this.addComment(hit);

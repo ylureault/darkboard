@@ -147,6 +147,33 @@ class CanvasRenderer {
       ctx.setLineDash([]);
     }
 
+    // Connector snap target highlight
+    if (this.connectorSnapTarget) {
+      const snapEl = this.elements.get(this.connectorSnapTarget);
+      if (snapEl) {
+        const bounds = getElementBounds(snapEl);
+        ctx.save();
+        ctx.strokeStyle = '#4ecdc4';
+        ctx.lineWidth = 3 / this.camera.zoom;
+        ctx.setLineDash([6 / this.camera.zoom, 4 / this.camera.zoom]);
+        ctx.strokeRect(bounds.x - 4 / this.camera.zoom, bounds.y - 4 / this.camera.zoom,
+          bounds.w + 8 / this.camera.zoom, bounds.h + 8 / this.camera.zoom);
+        ctx.setLineDash([]);
+        // Draw anchor points
+        const anchors = getAnchorPoints(snapEl);
+        for (const a of anchors) {
+          ctx.beginPath();
+          ctx.arc(a.x, a.y, 5 / this.camera.zoom, 0, Math.PI * 2);
+          ctx.fillStyle = '#4ecdc4';
+          ctx.fill();
+          ctx.strokeStyle = 'white';
+          ctx.lineWidth = 1.5 / this.camera.zoom;
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
+
     // Laser pointers
     for (const [userId, laser] of this.laserPointers) {
       this.drawLaserPointer(ctx, laser);
@@ -379,6 +406,15 @@ class CanvasRenderer {
       ctx.textAlign = 'left';
     }
     ctx.restore();
+  }
+
+  hitTestComment(worldX, worldY) {
+    const radius = 16 / this.camera.zoom;
+    for (const comment of this.comments) {
+      const d = Math.hypot(comment.x - worldX, comment.y - worldY);
+      if (d < radius) return comment;
+    }
+    return null;
   }
 
   drawMinimap() {
