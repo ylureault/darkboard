@@ -387,6 +387,7 @@ const Tools = {
       this.originalElements = null;
       this.altDuplicated = false;
       app.renderer.markDirty();
+      if (app.updateUrlHash) app.updateUrlHash();
     },
 
     applyResize(el, orig, handle, dx, dy, constrain) {

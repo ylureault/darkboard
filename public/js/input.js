@@ -88,8 +88,8 @@ class InputHandler {
   }
 
   onPointerDown(e) {
-    if (e.button === 1 || (this.spaceDown && e.button === 0)) {
-      // Middle click or space+click: pan
+    if (e.button === 1 || e.button === 2 || (this.spaceDown && e.button === 0)) {
+      // Middle click, right click, or space+click: pan
       this.isPanning = true;
       this.lastPanX = e.clientX;
       this.lastPanY = e.clientY;

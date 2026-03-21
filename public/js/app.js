@@ -48,8 +48,43 @@ class DarkBoardApp {
     // Render vote badges
     this.initVoteRenderer();
 
+    // Element deep-link: update URL hash on selection
+    this.initElementDeepLinks();
+
     // Show name dialog
     this.showNameDialog();
+  }
+
+  initElementDeepLinks() {
+    // On hash change, navigate to element
+    window.addEventListener('hashchange', () => this.navigateToHash());
+    // After initial load/sync, check hash
+    setTimeout(() => this.navigateToHash(), 1000);
+  }
+
+  navigateToHash() {
+    const hash = window.location.hash.slice(1);
+    if (!hash) return;
+    const el = this.renderer.elements.get(hash);
+    if (el) {
+      const bounds = getElementBounds(el);
+      if (bounds) {
+        this.renderer.selectedIds.clear();
+        this.renderer.selectedIds.add(el.id);
+        const cx = bounds.x + bounds.w / 2;
+        const cy = bounds.y + bounds.h / 2;
+        this.animateToView(cx, cy, 1.2);
+      }
+    }
+  }
+
+  updateUrlHash() {
+    if (this.renderer.selectedIds.size === 1) {
+      const id = [...this.renderer.selectedIds][0];
+      window.history.replaceState(null, '', '#' + id);
+    } else if (this.renderer.selectedIds.size === 0) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
   }
 
   showNameDialog() {
@@ -811,7 +846,12 @@ class DarkBoardApp {
         const active = document.activeElement;
         const tb = document.querySelector('.formatting-toolbar');
         const cp = document.querySelector('.fmt-color-picker');
-        if (tb && (tb.contains(active) || tb.contains(e.relatedTarget))) { editor.focus(); return; }
+        if (tb && (tb.contains(active) || tb.contains(e.relatedTarget))) {
+          // If a select dropdown is active, don't steal focus back — let user pick
+          if (active && active.tagName === 'SELECT') return;
+          editor.focus();
+          return;
+        }
         if (cp && (cp.contains(active) || cp.contains(e.relatedTarget))) { editor.focus(); return; }
         if (active === editor) return; // Already refocused
         finishEdit();
@@ -876,20 +916,29 @@ class DarkBoardApp {
       <button class="fmt-btn" data-cmd="removeFormat" title="Effacer">&#10005;</button>
     `;
 
-    const editorRect = editor.getBoundingClientRect();
-    // Position toolbar above or below editor
-    let tbLeft = Math.max(4, Math.min(editorRect.left, window.innerWidth - 630));
-    let tbTop = editorRect.top - 48;
-    if (tbTop < 4) {
-      tbTop = editorRect.bottom + 4;
-    }
-    toolbar.style.left = tbLeft + 'px';
-    toolbar.style.top = tbTop + 'px';
-
+    // Add to DOM first so we can measure
+    toolbar.style.visibility = 'hidden';
     document.body.appendChild(toolbar);
     this.formattingToolbar = toolbar;
 
-    toolbar.addEventListener('mousedown', (e) => e.preventDefault());
+    // Now position relative to editor, accounting for actual toolbar height
+    const editorRect = editor.getBoundingClientRect();
+    const tbRect = toolbar.getBoundingClientRect();
+    const tbHeight = tbRect.height;
+    let tbLeft = Math.max(4, Math.min(editorRect.left, window.innerWidth - tbRect.width - 8));
+    let tbTop = editorRect.top - tbHeight - 8;
+    if (tbTop < 4) {
+      tbTop = editorRect.bottom + 8;
+    }
+    toolbar.style.left = tbLeft + 'px';
+    toolbar.style.top = tbTop + 'px';
+    toolbar.style.visibility = 'visible';
+
+    toolbar.addEventListener('mousedown', (e) => {
+      // Don't preventDefault on select elements - they need native behavior to open dropdown
+      if (e.target.tagName === 'SELECT' || e.target.tagName === 'OPTION') return;
+      e.preventDefault();
+    });
 
     // Font size select - must use change event
     const fontSelect = toolbar.querySelector('.fmt-select[data-cmd="fontSize"]');
