@@ -2109,7 +2109,8 @@ class DarkBoardApp {
     const toast = document.getElementById('toast');
     toast.textContent = message;
     toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 2500);
+    clearTimeout(this._toastTimeout);
+    this._toastTimeout = setTimeout(() => toast.classList.remove('show'), 3500);
   }
 
   showContextMenu(screenX, screenY, worldX, worldY) {

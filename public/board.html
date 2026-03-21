@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DarkBoard</title>
+  <title>Insuffle — DarkBoard</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='15' fill='%231a1a2e'/><rect x='15' y='15' width='30' height='30' rx='4' fill='%234a9eff'/><rect x='55' y='15' width='30' height='30' rx='4' fill='%23ff6b6b'/><rect x='15' y='55' width='30' height='30' rx='4' fill='%234ecdc4'/><rect x='55' y='55' width='30' height='30' rx='4' fill='%23ffd966'/></svg>">
 </head>
@@ -294,21 +294,48 @@
     <button class="zoom-btn" id="toggleSnap" title="Grille magnetique">⊹</button>
   </div>
 
-  <!-- Laser pointer button -->
-  <button class="share-btn" id="laserBtn" title="Pointeur laser" style="bottom: 176px;">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7" stroke-dasharray="3 3"/><circle cx="12" cy="12" r="10" stroke-dasharray="2 4"/>
-    </svg>
-    Laser
-  </button>
-
-  <!-- Presentation mode button -->
-  <button class="share-btn" id="presentBtn" title="Mode presentation" style="bottom: 216px;">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-    </svg>
-    Present.
-  </button>
+  <!-- Right action sidebar -->
+  <div class="action-sidebar" id="actionSidebar">
+    <button class="share-btn" id="presentBtn" title="Mode presentation (ancres)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+      </svg>
+      Presenter
+    </button>
+    <button class="share-btn" id="laserBtn" title="Pointeur laser — visible par tous les participants">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7" stroke-dasharray="3 3"/><circle cx="12" cy="12" r="10" stroke-dasharray="2 4"/>
+      </svg>
+      Laser
+    </button>
+    <div class="action-sidebar-sep"></div>
+    <button class="share-btn" id="exportBtn" title="Exporter le tableau en image PNG">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+        <polyline points="7,10 12,15 17,10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      PNG
+    </button>
+    <button class="share-btn" id="exportCSV" title="Exporter les donnees en CSV">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+        <polyline points="14,2 14,8 20,8"/>
+        <line x1="8" y1="13" x2="16" y2="13"/>
+        <line x1="8" y1="17" x2="16" y2="17"/>
+      </svg>
+      CSV
+    </button>
+    <div class="action-sidebar-sep"></div>
+    <button class="share-btn" id="shareBtn" title="Copier le lien du tableau pour inviter des participants">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+      </svg>
+      Partager
+    </button>
+  </div>
 
   <!-- Presentation controls (hidden by default) -->
   <div class="presentation-controls" id="presentationControls" style="display:none">
@@ -317,36 +344,6 @@
     <button class="pres-btn" id="presNext" title="Ancre suivante">▶</button>
     <button class="pres-btn" id="presExit" title="Quitter">✕</button>
   </div>
-
-  <!-- Action buttons -->
-  <button class="share-btn" id="exportCSV" title="Exporter en CSV" style="bottom: 136px;">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-      <polyline points="14,2 14,8 20,8"/>
-      <line x1="8" y1="13" x2="16" y2="13"/>
-      <line x1="8" y1="17" x2="16" y2="17"/>
-    </svg>
-    CSV
-  </button>
-
-  <button class="share-btn" id="exportBtn" title="Exporter en PNG" style="bottom: 96px;">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-      <polyline points="7,10 12,15 17,10"/>
-      <line x1="12" y1="15" x2="12" y2="3"/>
-    </svg>
-    PNG
-  </button>
-
-  <!-- Share button -->
-  <button class="share-btn" id="shareBtn" title="Partager ce tableau" style="bottom: 56px;">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-    </svg>
-    Partager
-  </button>
 
   <!-- Day/night mode toggle -->
   <button class="theme-toggle" id="themeToggle" title="Mode jour/nuit">
@@ -387,6 +384,76 @@
     <span style="opacity:0.5">|</span>
     <span>Insuffle Academie</span>
   </div>
+
+  <!-- Help / Onboarding overlay -->
+  <div class="modal-overlay" id="helpOverlay" style="display:none">
+    <div class="modal modal-lg help-modal">
+      <div class="brand-header" style="margin-bottom:12px">
+        <span class="brand-insuffle">Insuffle</span>
+        <span class="brand-sep">&times;</span>
+        <span class="brand-darkboard">DarkBoard</span>
+      </div>
+      <p style="color:var(--text-muted);margin-bottom:16px">Raccourcis clavier et astuces</p>
+      <div class="help-grid">
+        <div class="help-section">
+          <h4>Outils</h4>
+          <div class="help-row"><kbd>V</kbd> Selectionner</div>
+          <div class="help-row"><kbd>H</kbd> Main (deplacer la vue)</div>
+          <div class="help-row"><kbd>R</kbd> Rectangle</div>
+          <div class="help-row"><kbd>O</kbd> Cercle</div>
+          <div class="help-row"><kbd>L</kbd> Ligne</div>
+          <div class="help-row"><kbd>A</kbd> Fleche</div>
+          <div class="help-row"><kbd>K</kbd> Connecteur</div>
+          <div class="help-row"><kbd>D</kbd> Dessin libre</div>
+          <div class="help-row"><kbd>S</kbd> Post-it</div>
+          <div class="help-row"><kbd>T</kbd> Texte</div>
+          <div class="help-row"><kbd>F</kbd> Cadre / Zone</div>
+          <div class="help-row"><kbd>E</kbd> Gomme</div>
+          <div class="help-row"><kbd>M</kbd> Carte management</div>
+          <div class="help-row"><kbd>I</kbd> Liste</div>
+          <div class="help-row"><kbd>G</kbd> Enveloppe</div>
+        </div>
+        <div class="help-section">
+          <h4>Actions</h4>
+          <div class="help-row"><kbd>Ctrl+Z</kbd> Annuler</div>
+          <div class="help-row"><kbd>Ctrl+Y</kbd> Retablir</div>
+          <div class="help-row"><kbd>Ctrl+C</kbd> Copier</div>
+          <div class="help-row"><kbd>Ctrl+X</kbd> Couper</div>
+          <div class="help-row"><kbd>Ctrl+V</kbd> Coller</div>
+          <div class="help-row"><kbd>Ctrl+A</kbd> Tout selectionner</div>
+          <div class="help-row"><kbd>Ctrl+G</kbd> Grouper</div>
+          <div class="help-row"><kbd>Ctrl+Shift+G</kbd> Degrouper</div>
+          <div class="help-row"><kbd>Ctrl+D</kbd> Dupliquer</div>
+          <div class="help-row"><kbd>Ctrl+F</kbd> Rechercher / Remplacer</div>
+          <div class="help-row"><kbd>Suppr</kbd> Supprimer</div>
+          <div class="help-row"><kbd>N</kbd> Panneau ancres</div>
+          <div class="help-row"><kbd>?</kbd> Aide (cette fenetre)</div>
+        </div>
+        <div class="help-section">
+          <h4>Navigation</h4>
+          <div class="help-row"><kbd>Molette</kbd> Zoom</div>
+          <div class="help-row"><kbd>Ctrl++/-</kbd> Zoom +/-</div>
+          <div class="help-row"><kbd>Ctrl+0</kbd> Adapter a l'ecran</div>
+          <div class="help-row"><kbd>Fleches</kbd> Deplacer selection (1px)</div>
+          <div class="help-row"><kbd>Shift+Fleches</kbd> Deplacer (10px)</div>
+          <div class="help-row"><kbd>Ctrl+Fleches</kbd> Deplacer (100px)</div>
+          <div class="help-row"><kbd>Alt+Glisser</kbd> Dupliquer un element</div>
+          <div class="help-row"><kbd>Shift</kbd> Proportions contraintes</div>
+          <div class="help-row"><kbd>Espace+Glisser</kbd> Deplacer la vue</div>
+          <h4 style="margin-top:12px">Collaboration</h4>
+          <div class="help-row">Clic sur utilisateur → aller a sa position</div>
+          <div class="help-row">Laser: visible par tous en temps reel</div>
+          <div class="help-row">Animateur: timer, vote, isoloir, suivez-moi</div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn" id="helpClose">Compris !</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help button -->
+  <button class="help-btn" id="helpBtn" title="Aide et raccourcis (?)">?</button>
 
   <!-- Toast -->
   <div class="toast" id="toast"></div>

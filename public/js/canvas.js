@@ -338,18 +338,21 @@ class CanvasRenderer {
     ctx.fill();
 
     // Name label
-    const fontSize = 12 / this.camera.zoom;
-    ctx.font = `bold ${fontSize}px sans-serif`;
+    const fontSize = 13 / this.camera.zoom;
+    ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
     const textWidth = ctx.measureText(user.name).width;
-    const labelPad = 4 / this.camera.zoom;
+    const labelPad = 5 / this.camera.zoom;
 
     ctx.fillStyle = user.color;
-    const rx = 3 / this.camera.zoom;
+    const rx = 4 / this.camera.zoom;
     const labelX = 16;
     const labelY = 16;
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = 4 / this.camera.zoom;
     ctx.beginPath();
     ctx.roundRect(labelX, labelY, textWidth + labelPad * 2, fontSize + labelPad * 2, rx);
     ctx.fill();
+    ctx.shadowColor = 'transparent';
 
     ctx.fillStyle = 'white';
     ctx.textBaseline = 'top';

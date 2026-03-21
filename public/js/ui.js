@@ -15,6 +15,7 @@ class UI {
     this.initSnapToGrid();
     this.initLaserPointer();
     this.initPresentationMode();
+    this.initHelpOverlay();
   }
 
   initToolbar() {
@@ -211,9 +212,25 @@ class UI {
       renderElement(ctx, el, false, { zoom: 1 });
     }
 
+    // Insuffle watermark
+    ctx.translate(minX - pad, minY - pad); // back to export coords
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textBaseline = 'bottom';
+    ctx.textAlign = 'right';
+    // Gradient-like branding
+    ctx.fillStyle = '#4a9eff';
+    ctx.fillText('Insuffle', w - 16, h - 12);
+    ctx.globalAlpha = 0.35;
+    ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = '#888';
+    ctx.fillText('Insuffle Academie — DarkBoard', w - 16, h - 28);
+    ctx.restore();
+
     // Download
     const link = document.createElement('a');
-    link.download = `darkboard-${getBoardId()}.png`;
+    link.download = `insuffle-darkboard-${getBoardId()}.png`;
     link.href = exportCanvas.toDataURL('image/png');
     link.click();
     this.app.showToast('Export PNG termine !');
@@ -700,5 +717,38 @@ class UI {
     const anchor = anchors[index];
     document.getElementById('presIndicator').textContent = `${index + 1}/${anchors.length}`;
     this.app.animateToView(anchor.x, anchor.y, anchor.zoom || 1);
+  }
+
+  // Help overlay
+  initHelpOverlay() {
+    const overlay = document.getElementById('helpOverlay');
+    const helpBtn = document.getElementById('helpBtn');
+    const helpClose = document.getElementById('helpClose');
+    if (!overlay || !helpBtn) return;
+
+    const show = () => { overlay.style.display = 'flex'; };
+    const hide = () => { overlay.style.display = 'none'; };
+
+    helpBtn.addEventListener('click', show);
+    helpClose.addEventListener('click', hide);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) hide();
+    });
+
+    // Show help on first visit
+    if (!localStorage.getItem('darkboard-onboarded')) {
+      localStorage.setItem('darkboard-onboarded', '1');
+      setTimeout(show, 800);
+    }
+  }
+
+  showHelp() {
+    const overlay = document.getElementById('helpOverlay');
+    if (overlay) overlay.style.display = 'flex';
+  }
+
+  hideHelp() {
+    const overlay = document.getElementById('helpOverlay');
+    if (overlay) overlay.style.display = 'none';
   }
 }

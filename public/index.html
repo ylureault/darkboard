@@ -3,162 +3,280 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DarkBoard - Tableau collaboratif</title>
+  <title>Insuffle — DarkBoard | Tableau collaboratif</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='15' fill='%231a1a2e'/><rect x='15' y='15' width='30' height='30' rx='4' fill='%234a9eff'/><rect x='55' y='15' width='30' height='30' rx='4' fill='%23ff6b6b'/><rect x='15' y='55' width='30' height='30' rx='4' fill='%234ecdc4'/><rect x='55' y='55' width='30' height='30' rx='4' fill='%23ffd966'/></svg>">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0d0d1a;
+      background: #0a0a16;
       color: #e0e0e0;
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      overflow-x: hidden;
     }
-    .hero {
+
+    /* Ambient background */
+    .bg-glow {
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 600px;
+      background: radial-gradient(ellipse, rgba(74,158,255,0.12) 0%, rgba(78,205,196,0.06) 40%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 24px 60px;
       text-align: center;
-      max-width: 700px;
-      padding: 40px 20px;
     }
+
+    /* Insuffle brand header */
+    .insuffle-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(74,158,255,0.08);
+      border: 1px solid rgba(74,158,255,0.2);
+      border-radius: 20px;
+      padding: 6px 20px;
+      margin-bottom: 32px;
+      font-size: 13px;
+      color: #4a9eff;
+      letter-spacing: 0.5px;
+    }
+
+    .insuffle-brand strong {
+      font-weight: 800;
+      font-size: 15px;
+      background: linear-gradient(135deg, #4a9eff, #4ecdc4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Logo */
     .logo {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 16px;
-      margin-bottom: 24px;
+      gap: 18px;
+      margin-bottom: 20px;
     }
+
     .logo-icon {
-      width: 64px;
-      height: 64px;
+      width: 72px;
+      height: 72px;
       background: linear-gradient(135deg, #4a9eff, #0f3460);
-      border-radius: 16px;
+      border-radius: 18px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 32px;
+      box-shadow: 0 8px 32px rgba(74,158,255,0.2);
     }
+
     .logo h1 {
-      font-size: 48px;
+      font-size: 52px;
       font-weight: 800;
       background: linear-gradient(135deg, #4a9eff, #e94560);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
+      letter-spacing: -1px;
     }
-    .subtitle {
-      font-size: 20px;
+
+    .tagline {
+      font-size: 22px;
       color: #8892a0;
-      margin-bottom: 48px;
+      margin-bottom: 12px;
       line-height: 1.5;
     }
+
+    .tagline-sub {
+      font-size: 15px;
+      color: #556;
+      margin-bottom: 40px;
+    }
+
+    /* CTA */
     .actions {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 20px;
+      gap: 16px;
+      margin-bottom: 60px;
     }
+
     .btn-new {
       background: linear-gradient(135deg, #4a9eff, #0f3460);
       color: white;
       border: none;
-      padding: 18px 48px;
+      padding: 18px 56px;
       font-size: 20px;
       font-weight: 700;
-      border-radius: 12px;
+      border-radius: 14px;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.25s;
       text-decoration: none;
       display: inline-block;
+      box-shadow: 0 4px 20px rgba(74,158,255,0.2);
     }
+
     .btn-new:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 30px rgba(74, 158, 255, 0.3);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 40px rgba(74,158,255,0.35);
     }
+
+    .or-divider { color: #444; font-size: 13px; }
+
     .join-form {
       display: flex;
       gap: 8px;
       align-items: center;
     }
+
     .join-form input {
-      background: #1e1e2e;
-      border: 2px solid #333;
+      background: #141424;
+      border: 2px solid #2a2a3e;
       color: #e0e0e0;
       padding: 14px 20px;
-      font-size: 16px;
-      border-radius: 10px;
-      width: 280px;
+      font-size: 15px;
+      border-radius: 12px;
+      width: 300px;
       outline: none;
       transition: border-color 0.2s;
     }
-    .join-form input:focus {
-      border-color: #4a9eff;
-    }
-    .join-form input::placeholder {
-      color: #555;
-    }
+
+    .join-form input:focus { border-color: #4a9eff; }
+    .join-form input::placeholder { color: #444; }
+
     .btn-join {
-      background: #1e1e2e;
+      background: #141424;
       color: #4a9eff;
       border: 2px solid #4a9eff;
       padding: 14px 24px;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 600;
-      border-radius: 10px;
+      border-radius: 12px;
       cursor: pointer;
       transition: all 0.2s;
     }
+
     .btn-join:hover {
       background: #4a9eff;
       color: white;
     }
+
+    /* Features grid */
+    .features-title {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #4a9eff;
+      margin-bottom: 24px;
+      font-weight: 700;
+    }
+
     .features {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 24px;
-      margin-top: 64px;
-      padding: 0 20px;
-      max-width: 800px;
+      gap: 16px;
+      margin-bottom: 48px;
     }
+
     .feature {
-      background: #1a1a2e;
-      border: 1px solid #2a2a3e;
+      background: #121220;
+      border: 1px solid #1e1e32;
+      border-radius: 14px;
+      padding: 28px 20px;
+      text-align: center;
+      transition: all 0.25s;
+    }
+
+    .feature:hover {
+      border-color: rgba(74,158,255,0.3);
+      transform: translateY(-2px);
+    }
+
+    .feature-icon { margin-bottom: 14px; }
+    .feature h3 { font-size: 15px; margin-bottom: 8px; color: #e0e0e0; }
+    .feature p { font-size: 13px; color: #667; line-height: 1.5; }
+
+    /* Workshop features */
+    .workshop-features {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 48px;
+    }
+
+    .wf-item {
+      background: #121220;
+      border: 1px solid #1e1e32;
       border-radius: 12px;
-      padding: 24px;
+      padding: 20px 12px;
       text-align: center;
     }
-    .feature-icon {
-      font-size: 36px;
-      margin-bottom: 12px;
-    }
-    .feature h3 {
-      font-size: 16px;
+
+    .wf-item .wf-icon {
+      font-size: 28px;
       margin-bottom: 8px;
-      color: #e0e0e0;
+      display: block;
     }
-    .feature p {
-      font-size: 13px;
-      color: #666;
-      line-height: 1.4;
+
+    .wf-item h4 { font-size: 14px; color: #e0e0e0; margin-bottom: 4px; }
+    .wf-item p { font-size: 11px; color: #556; line-height: 1.4; }
+
+    /* Footer */
+    .footer {
+      margin-top: 32px;
+      padding: 24px;
+      border-top: 1px solid #1e1e32;
+      text-align: center;
     }
-    .or-divider {
-      color: #555;
-      font-size: 14px;
+
+    .footer-brand {
+      font-size: 18px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #4a9eff, #4ecdc4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 4px;
     }
-    @media (max-width: 600px) {
+
+    .footer p {
+      font-size: 12px;
+      color: #445;
+    }
+
+    @media (max-width: 700px) {
       .features { grid-template-columns: 1fr; }
-      .logo h1 { font-size: 32px; }
+      .workshop-features { grid-template-columns: repeat(2, 1fr); }
+      .logo h1 { font-size: 36px; }
       .join-form { flex-direction: column; }
       .join-form input { width: 100%; }
     }
   </style>
 </head>
 <body>
-  <div class="hero">
+  <div class="bg-glow"></div>
+  <div class="container">
+    <!-- Insuffle branding -->
+    <div class="insuffle-brand">
+      par <strong>Insuffle</strong> <span style="opacity:0.4">&times;</span> <strong>Insuffle Academie</strong>
+    </div>
+
+    <!-- Logo -->
     <div class="logo">
       <div class="logo-icon">
-        <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+        <svg width="40" height="40" viewBox="0 0 36 36" fill="none">
           <rect x="2" y="2" width="14" height="14" rx="3" fill="#4a9eff"/>
           <rect x="20" y="2" width="14" height="14" rx="3" fill="#ff6b6b"/>
           <rect x="2" y="20" width="14" height="14" rx="3" fill="#4ecdc4"/>
@@ -167,58 +285,115 @@
       </div>
       <h1>DarkBoard</h1>
     </div>
-    <p style="font-size:14px;color:#4a9eff;margin-bottom:8px;letter-spacing:1px">par <strong>Insuffle</strong> &times; <strong>Insuffle Academie</strong></p>
-    <p class="subtitle">
-      Tableau blanc collaboratif en temps reel.<br>
-      Pas d'inscription. Partagez le lien et travaillez ensemble.
+
+    <p class="tagline">
+      Le tableau blanc collaboratif<br>pour vos ateliers et workshops
     </p>
+    <p class="tagline-sub">
+      Pas d'inscription. Partagez le lien. Travaillez ensemble en temps reel.
+    </p>
+
+    <!-- CTA -->
     <div class="actions">
-      <a href="/new" class="btn-new">Nouveau tableau</a>
+      <a href="/new" class="btn-new">Creer un tableau</a>
       <span class="or-divider">ou rejoindre un tableau existant</span>
       <form class="join-form" onsubmit="joinBoard(event)">
         <input type="text" id="boardCode" placeholder="Code du tableau (ex: a1b2c3d4)" />
         <button type="submit" class="btn-join">Rejoindre</button>
       </form>
     </div>
+
+    <!-- Core features -->
+    <div class="features-title">Un outil complet pour vos ateliers</div>
     <div class="features">
       <div class="feature">
         <div class="feature-icon">
-          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-            <circle cx="14" cy="16" r="6" stroke="#4a9eff" stroke-width="2" fill="none"/>
-            <circle cx="26" cy="16" r="6" stroke="#ff6b6b" stroke-width="2" fill="none"/>
-            <path d="M8 30c0-4 3-7 6-7s4 1 6 3c2-2 3-3 6-3s6 3 6 7" stroke="#4ecdc4" stroke-width="2" fill="none"/>
+          <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+            <circle cx="15" cy="18" r="7" stroke="#4a9eff" stroke-width="2" fill="none"/>
+            <circle cx="29" cy="18" r="7" stroke="#ff6b6b" stroke-width="2" fill="none"/>
+            <path d="M8 34c0-5 4-8 7-8s5 1 7 3c2-2 4-3 7-3s7 3 7 8" stroke="#4ecdc4" stroke-width="2" fill="none"/>
           </svg>
         </div>
-        <h3>Collaboratif</h3>
-        <p>Travaillez a plusieurs en temps reel avec curseurs visibles</p>
+        <h3>Collaboration temps reel</h3>
+        <p>Curseurs visibles, noms, sync instantanee. Jusqu'a 50 participants simultanes.</p>
       </div>
       <div class="feature">
         <div class="feature-icon">
-          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-            <rect x="6" y="6" width="12" height="12" rx="2" stroke="#ffd966" stroke-width="2" fill="none"/>
-            <circle cx="28" cy="12" r="6" stroke="#ff6b6b" stroke-width="2" fill="none"/>
-            <line x1="6" y1="32" x2="34" y2="28" stroke="#4a9eff" stroke-width="2"/>
-            <path d="M14 26 Q20 20 26 26 Q32 32 34 28" stroke="#4ecdc4" stroke-width="2" fill="none"/>
+          <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+            <rect x="6" y="6" width="14" height="14" rx="3" stroke="#ffd966" stroke-width="2" fill="none"/>
+            <circle cx="31" cy="13" r="7" stroke="#ff6b6b" stroke-width="2" fill="none"/>
+            <line x1="6" y1="36" x2="38" y2="32" stroke="#4a9eff" stroke-width="2"/>
+            <path d="M16 30 Q22 22 28 30 Q34 38 38 32" stroke="#4ecdc4" stroke-width="2" fill="none"/>
           </svg>
         </div>
-        <h3>Outils complets</h3>
-        <p>Formes, post-its, dessin libre, texte, fleches et plus</p>
+        <h3>20+ outils de creation</h3>
+        <p>Post-its, formes, dessin libre, texte riche, connecteurs, cartes Kanban, listes.</p>
       </div>
       <div class="feature">
         <div class="feature-icon">
-          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-            <rect x="4" y="4" width="32" height="32" rx="4" stroke="#4a9eff" stroke-width="2" fill="none"/>
-            <path d="M4 20h32M20 4v32" stroke="#333" stroke-width="1"/>
-            <circle cx="12" cy="12" r="3" fill="#ff6b6b"/>
-            <rect x="22" y="22" width="10" height="8" rx="2" fill="#ffd966"/>
-            <line x1="8" y1="28" x2="18" y2="22" stroke="#4ecdc4" stroke-width="2"/>
+          <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+            <rect x="4" y="4" width="36" height="36" rx="5" stroke="#4a9eff" stroke-width="2" fill="none"/>
+            <path d="M4 22h36M22 4v36" stroke="#1e1e32" stroke-width="1"/>
+            <circle cx="14" cy="14" r="4" fill="#ff6b6b"/>
+            <rect x="24" y="24" width="12" height="10" rx="3" fill="#ffd966"/>
+            <line x1="8" y1="32" x2="20" y2="24" stroke="#4ecdc4" stroke-width="2"/>
           </svg>
         </div>
         <h3>Canvas infini</h3>
-        <p>Zoom, defilement et espace de travail sans limites</p>
+        <p>Zoom fluide, minimap, grille magnetique. Aucune limite d'espace de travail.</p>
       </div>
     </div>
+
+    <!-- Workshop features -->
+    <div class="features-title">Concu pour l'animation d'ateliers</div>
+    <div class="workshop-features">
+      <div class="wf-item">
+        <span class="wf-icon" style="color:#ffd966">&#9202;</span>
+        <h4>Timer</h4>
+        <p>Minuteur visible par tous les participants</p>
+      </div>
+      <div class="wf-item">
+        <span class="wf-icon" style="color:#4a9eff">&#9997;</span>
+        <h4>Vote</h4>
+        <p>Sessions de vote avec quotas et resultats masques</p>
+      </div>
+      <div class="wf-item">
+        <span class="wf-icon" style="color:#e94560">&#128065;</span>
+        <h4>Isoloir</h4>
+        <p>Mode isoloir pour brainstorming individuel puis revelation</p>
+      </div>
+      <div class="wf-item">
+        <span class="wf-icon" style="color:#4ecdc4">&#128101;</span>
+        <h4>Suivez-moi</h4>
+        <p>Synchronisez la vue de tous sur l'animateur</p>
+      </div>
+    </div>
+
+    <!-- Additional features list -->
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon" style="font-size:32px">&#127912;</div>
+        <h3>8 modeles</h3>
+        <p>Brainstorming, retro, Kanban, SWOT, matrice, mind map, timeline, user journey.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon" style="font-size:32px">&#128444;</div>
+        <h3>Export PNG & CSV</h3>
+        <p>Exportez votre travail en image haute resolution ou en donnees CSV.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon" style="font-size:32px">&#127760;</div>
+        <h3>Mode presentation</h3>
+        <p>Naviguez entre vos ancres en plein ecran. Pointeur laser pour guider.</p>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="footer-brand">Insuffle</div>
+      <p>Insuffle Academie — Formation et facilitation collaborative</p>
+    </div>
   </div>
+
   <script>
     function joinBoard(e) {
       e.preventDefault();

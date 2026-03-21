@@ -431,16 +431,60 @@ class InputHandler {
       tool.onKeyDown(this.app, e);
     }
 
-    // Escape
+    // ? key: open help overlay
+    if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+      if (this.app.ui) {
+        const helpOverlay = document.getElementById('helpOverlay');
+        if (helpOverlay && helpOverlay.style.display !== 'none') {
+          this.app.ui.hideHelp();
+        } else {
+          this.app.ui.showHelp();
+        }
+      }
+      return;
+    }
+
+    // Escape — close everything in priority order
     if (e.key === 'Escape') {
+      // Close help overlay
+      const helpOverlay = document.getElementById('helpOverlay');
+      if (helpOverlay && helpOverlay.style.display !== 'none') {
+        this.app.ui.hideHelp();
+        return;
+      }
+      // Close any confirm/comment overlays
+      const confirmOverlay = document.querySelector('.confirm-overlay');
+      if (confirmOverlay) { confirmOverlay.remove(); return; }
+      // Close card/list editor panel
+      const cardEditor = document.querySelector('.card-editor-panel');
+      if (cardEditor) { cardEditor.remove(); return; }
+      // Close context menu
+      if (this.app.contextMenuEl) { this.app.hideContextMenu(); return; }
       // Close search panel if open
       if (this.app.searchPanel && this.app.searchPanel.style.display !== 'none') {
         this.app.closeSearchPanel();
         return;
       }
+      // Close anchors panel
+      const anchorsPanel = document.getElementById('anchorsPanel');
+      if (anchorsPanel && anchorsPanel.style.display !== 'none') {
+        anchorsPanel.style.display = 'none';
+        return;
+      }
+      // Close template modal
+      const templateModal = document.getElementById('templateModal');
+      if (templateModal && templateModal.style.display !== 'none') {
+        templateModal.style.display = 'none';
+        return;
+      }
       // Exit presentation mode
       if (this.app.ui && this.app.ui.presentationActive) {
         this.app.ui.stopPresentation();
+        return;
+      }
+      // Deactivate laser
+      if (this.app.ui && this.app.ui.laserActive) {
+        document.getElementById('laserBtn').click();
         return;
       }
       // Return to select tool and clear selection

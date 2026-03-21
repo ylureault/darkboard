@@ -123,7 +123,7 @@ html, body {
 
 .brand-badge {
   position: fixed;
-  top: 12px;
+  top: 62px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -131,18 +131,48 @@ html, body {
   gap: 8px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
-  border-radius: 10px;
-  padding: 6px 16px;
-  font-size: 12px;
+  border-radius: 20px;
+  padding: 5px 16px;
+  font-size: 11px;
   color: var(--text-muted);
   z-index: 50;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
   pointer-events: none;
+  opacity: 0.7;
+  transition: opacity 0.3s;
+}
+
+.brand-badge:hover {
+  opacity: 1;
 }
 
 .brand-badge .brand-insuffle {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 800;
+}
+
+/* Action sidebar */
+.action-sidebar {
+  position: fixed;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 100;
+}
+
+.action-sidebar .share-btn {
+  position: relative;
+  right: auto;
+  bottom: auto;
+}
+
+.action-sidebar-sep {
+  height: 1px;
+  background: var(--panel-border);
+  margin: 2px 8px;
 }
 
 .modal h2 {
@@ -344,7 +374,7 @@ html, body {
 .color-panel {
   position: fixed;
   top: 12px;
-  right: 12px;
+  right: 100px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -894,8 +924,8 @@ html, body {
 
 .anchor-toggle-btn {
   position: fixed;
-  bottom: 56px;
-  right: 140px;
+  bottom: 12px;
+  right: 240px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -967,36 +997,38 @@ html, body {
 }
 
 /* =========================
-   SHARE / ACTION BUTTONS
+   SHARE / ACTION BUTTONS (right sidebar stack)
    ========================= */
 .share-btn {
   position: fixed;
-  bottom: 12px;
-  left: 12px;
+  right: 12px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 10px;
-  padding: 8px 16px;
+  padding: 7px 12px;
   z-index: 100;
   cursor: pointer;
   color: var(--text);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  transition: all 0.15s;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  transition: all 0.2s;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  white-space: nowrap;
 }
 
 .share-btn:hover {
   background: var(--btn-hover);
   border-color: var(--accent);
+  transform: translateX(-2px);
 }
 
 .share-btn svg {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
 }
 
 /* =========================
@@ -1027,8 +1059,8 @@ html, body {
 /* Sync status indicator */
 .sync-indicator {
   position: fixed;
-  bottom: 12px;
-  left: 12px;
+  bottom: 14px;
+  left: 170px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1036,7 +1068,7 @@ html, body {
   border: 1px solid var(--panel-border);
   border-radius: 20px;
   padding: 4px 12px 4px 8px;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
   z-index: 200;
   transition: all 0.3s;
@@ -1258,7 +1290,7 @@ html, body {
    ========================= */
 .theme-toggle {
   position: fixed;
-  bottom: 16px;
+  bottom: 56px;
   left: 16px;
   width: 40px;
   height: 40px;
@@ -1289,7 +1321,7 @@ html, body {
    ========================= */
 .template-btn {
   position: fixed;
-  bottom: 16px;
+  bottom: 56px;
   left: 66px;
   height: 40px;
   padding: 0 14px;
@@ -1744,4 +1776,153 @@ html, body {
   white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.4;
+}
+
+/* =========================
+   HELP OVERLAY & ONBOARDING
+   ========================= */
+.help-modal {
+  max-width: 820px !important;
+  min-width: 720px !important;
+  text-align: left;
+}
+
+.help-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin: 8px 0 16px;
+}
+
+.help-section h4 {
+  font-size: 13px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.help-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 3px 0;
+  line-height: 1.3;
+}
+
+.help-row kbd {
+  background: var(--btn);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-family: inherit;
+  color: var(--text);
+  white-space: nowrap;
+  min-width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.help-btn {
+  position: fixed;
+  bottom: 56px;
+  left: 120px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  color: var(--accent);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 800;
+  transition: all 0.2s;
+  z-index: 100;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+
+.help-btn:hover {
+  background: var(--accent);
+  color: white;
+  transform: scale(1.1);
+}
+
+/* =========================
+   MODAL ANIMATIONS
+   ========================= */
+.modal-overlay {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal {
+  animation: slideUp 0.25s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* =========================
+   BETTER TOAST
+   ========================= */
+.toast.show {
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+
+/* =========================
+   IMPROVED LIGHT THEME
+   ========================= */
+body.light-theme .toolbar,
+body.light-theme .color-panel,
+body.light-theme .users-panel,
+body.light-theme .facilitator-panel,
+body.light-theme .zoom-controls,
+body.light-theme .share-btn,
+body.light-theme .anchor-toggle-btn,
+body.light-theme .template-btn,
+body.light-theme .theme-toggle,
+body.light-theme .help-btn {
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+body.light-theme .modal {
+  box-shadow: 0 16px 60px rgba(0,0,0,0.15);
+}
+
+body.light-theme .brand-badge {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+/* Light theme toast */
+body.light-theme .toast {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+/* Smooth transitions on all interactive elements */
+button, .tool-btn, .share-btn, .zoom-btn, .pres-btn {
+  transition: all 0.15s ease;
+}
+
+/* Selection pulse for active laser */
+#laserBtn.active {
+  animation: laserPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes laserPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(233, 69, 96, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(233, 69, 96, 0); }
 }
