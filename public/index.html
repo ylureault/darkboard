@@ -93,14 +93,14 @@
 
     .tagline {
       font-size: 22px;
-      color: #8892a0;
+      color: #a0a8b4;
       margin-bottom: 12px;
       line-height: 1.5;
     }
 
     .tagline-sub {
       font-size: 15px;
-      color: #556;
+      color: #7a7a8e;
       margin-bottom: 40px;
     }
 
@@ -133,7 +133,7 @@
       box-shadow: 0 12px 40px rgba(74,158,255,0.35);
     }
 
-    .or-divider { color: #444; font-size: 13px; }
+    .or-divider { color: #7a7a8e; font-size: 13px; }
 
     .join-form {
       display: flex;
@@ -154,7 +154,7 @@
     }
 
     .join-form input:focus { border-color: #4a9eff; }
-    .join-form input::placeholder { color: #444; }
+    .join-form input::placeholder { color: #6a6a7e; }
 
     .btn-join {
       background: #141424;
@@ -206,7 +206,7 @@
 
     .feature-icon { margin-bottom: 14px; }
     .feature h3 { font-size: 15px; margin-bottom: 8px; color: #e0e0e0; }
-    .feature p { font-size: 13px; color: #667; line-height: 1.5; }
+    .feature p { font-size: 13px; color: #9a9ab0; line-height: 1.5; }
 
     /* Workshop features */
     .workshop-features {
@@ -231,7 +231,7 @@
     }
 
     .wf-item h4 { font-size: 14px; color: #e0e0e0; margin-bottom: 4px; }
-    .wf-item p { font-size: 11px; color: #556; line-height: 1.4; }
+    .wf-item p { font-size: 11px; color: #9a9ab0; line-height: 1.4; }
 
     /* Footer */
     .footer {
@@ -253,7 +253,14 @@
 
     .footer p {
       font-size: 12px;
-      color: #445;
+      color: #7a7a8e;
+    }
+
+    .btn-new:focus-visible,
+    .btn-join:focus-visible,
+    .join-form input:focus-visible {
+      outline: 2px solid #4a9eff;
+      outline-offset: 2px;
     }
 
     @media (max-width: 700px) {
@@ -390,17 +397,28 @@
 
     <div class="footer">
       <div class="footer-brand">Insuffle</div>
-      <p>Insuffle Academie — Formation et facilitation collaborative</p>
+      <p>Insuffle — Facilitation et intelligence collective</p>
     </div>
   </div>
 
   <script>
     function joinBoard(e) {
       e.preventDefault();
-      const code = document.getElementById('boardCode').value.trim();
-      if (code) {
-        window.location.href = '/board/' + encodeURIComponent(code);
+      const input = document.getElementById('boardCode');
+      const code = input.value.trim();
+      if (!code) {
+        input.focus();
+        return;
       }
+      // Sanitize: only allow alphanumeric and hyphens
+      const sanitized = code.replace(/[^a-zA-Z0-9-]/g, '');
+      if (!sanitized) {
+        input.value = '';
+        input.placeholder = 'Code invalide — lettres et chiffres uniquement';
+        input.focus();
+        return;
+      }
+      window.location.href = '/board/' + encodeURIComponent(sanitized);
     }
   </script>
 </body>
