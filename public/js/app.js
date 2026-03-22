@@ -110,6 +110,54 @@ class DarkBoardApp {
   }
 
   showNameDialog() {
+    const boardId = getBoardId();
+
+    // Check if the board exists before proceeding
+    fetch(`/api/board/${boardId}`)
+      .then(res => {
+        if (res.ok) {
+          // Board exists — show name dialog or auto-join
+          this.proceedToNameDialog();
+        } else if (res.status === 404) {
+          // Board doesn't exist — propose creation
+          this.showBoardNotFound(boardId);
+        } else {
+          // Other error — try to proceed anyway
+          this.proceedToNameDialog();
+        }
+      })
+      .catch(() => {
+        // Network error — try to proceed anyway
+        this.proceedToNameDialog();
+      });
+  }
+
+  showBoardNotFound(boardId) {
+    const nameDialog = document.getElementById('nameDialog');
+    const notFoundDialog = document.getElementById('boardNotFoundDialog');
+    nameDialog.style.display = 'none';
+    notFoundDialog.style.display = 'flex';
+    document.getElementById('notFoundBoardId').textContent = boardId;
+
+    document.getElementById('createBoardBtn').addEventListener('click', () => {
+      fetch('/api/boards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: boardId })
+      })
+        .then(res => res.json())
+        .then(() => {
+          notFoundDialog.style.display = 'none';
+          this.showToast('Board cree !');
+          this.proceedToNameDialog();
+        })
+        .catch(() => {
+          this.showToast('Erreur lors de la creation du board');
+        });
+    });
+  }
+
+  proceedToNameDialog() {
     const dialog = document.getElementById('nameDialog');
     const input = document.getElementById('nameInput');
     const submit = document.getElementById('nameSubmit');
@@ -123,7 +171,7 @@ class DarkBoardApp {
       return;
     }
 
-    dialog.style.display = '';
+    dialog.style.display = 'flex';
     input.focus();
 
     const joinWithName = () => {

@@ -13,7 +13,8 @@ const wss = new WebSocketServer({ server });
 
 const boardStore = new BoardStore();
 
-// Serve static files
+// Middleware
+app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Landing page
@@ -28,16 +29,42 @@ app.get('/new', (req, res) => {
   res.redirect(`/board/${boardId}`);
 });
 
-// Board page
+// Board page — serve HTML without auto-creating (client checks existence)
 app.get('/board/:id', (req, res) => {
-  const boardId = req.params.id;
-  if (!boardStore.getBoard(boardId)) {
-    boardStore.createBoard(boardId);
-  }
   res.sendFile(path.join(__dirname, 'public', 'board.html'));
 });
 
-// API: get board state
+// ========================
+//  REST API — CRUD (no DELETE)
+// ========================
+
+// LIST all boards
+app.get('/api/boards', (req, res) => {
+  const ids = boardStore.getAllBoardIds();
+  const boards = ids.map(id => {
+    const board = boardStore.getBoard(id);
+    return {
+      id,
+      elementCount: board.elements.size,
+      anchorCount: board.anchors.size,
+      connectedUsers: board.connections.size,
+      lastActivity: board.lastActivity
+    };
+  });
+  res.json({ boards });
+});
+
+// CREATE a new board
+app.post('/api/boards', (req, res) => {
+  const boardId = req.body.id || uuidv4().split('-')[0];
+  if (boardStore.getBoard(boardId)) {
+    return res.status(409).json({ error: 'Board already exists', id: boardId });
+  }
+  boardStore.createBoard(boardId);
+  res.status(201).json({ id: boardId, url: `/board/${boardId}` });
+});
+
+// READ a board
 app.get('/api/board/:id', (req, res) => {
   const board = boardStore.getBoard(req.params.id);
   if (!board) {
@@ -45,6 +72,32 @@ app.get('/api/board/:id', (req, res) => {
   }
   res.json({
     id: req.params.id,
+    elements: Array.from(board.elements.values()),
+    anchors: Array.from(board.anchors.values()),
+    connectedUsers: board.connections.size,
+    lastActivity: board.lastActivity
+  });
+});
+
+// UPDATE a board (add/update elements — no delete)
+app.put('/api/board/:id', (req, res) => {
+  const board = boardStore.getBoard(req.params.id);
+  if (!board) {
+    return res.status(404).json({ error: 'Board not found' });
+  }
+  const { elements } = req.body;
+  if (!Array.isArray(elements)) {
+    return res.status(400).json({ error: 'elements must be an array of operations' });
+  }
+  // Only allow add and update operations — no delete
+  const ops = elements.filter(op => op.type === 'add' || op.type === 'update');
+  if (ops.length > 0) {
+    boardStore.applyOps(req.params.id, ops);
+  }
+  res.json({
+    id: req.params.id,
+    applied: ops.length,
+    rejected: elements.length - ops.length,
     elements: Array.from(board.elements.values())
   });
 });
