@@ -209,23 +209,67 @@ Content-Type: application/json
 
 ---
 
-## 4. API proposee pour Cadrage Live
+## 4. API Cadrage Live (existante)
 
-Pour que DarkBoard puisse interroger Cadrage Live, voici le contrat d'API propose.
+Cadrage Live expose une API REST CRUD sans DELETE, organisee autour
+de 6 ressources : Spaces, Cards, Comments, Axes, Votes, Phases.
 
-### 4.1 Endpoints a implementer cote Cadrage Live
+### 4.1 Endpoints disponibles
+
+#### Spaces (sessions de cadrage)
 
 | Methode | Endpoint | Description |
 |---------|----------|-------------|
-| `GET` | `/api/sessions` | Liste les sessions de cadrage |
-| `GET` | `/api/session/:id` | Detail d'une session de cadrage |
-| `POST` | `/api/session/:id/launch-board` | Demande la creation d'un DarkBoard lie |
+| `GET` | `/api/spaces` | Liste avec filtres + pagination |
+| `POST` | `/api/spaces` | Creer un espace de cadrage |
+| `GET` | `/api/spaces/:id` | Details complets d'un espace |
+| `PATCH` | `/api/spaces/:id` | Mettre a jour les metadonnees |
 
-### 4.2 Modele de donnees d'une session de cadrage
+#### Cards (cartes de contenu)
+
+| Methode | Endpoint | Description |
+|---------|----------|-------------|
+| `GET` | `/api/spaces/:id/cards` | Liste avec filtres phase/colonne/auteur |
+| `GET` | `/api/cards/:cardId` | Detail d'une carte |
+| `POST` | `/api/spaces/:id/cards` | Creer une carte |
+| `PUT` | `/api/cards/:cardId` | Modifier une carte |
+
+#### Comments
+
+| Methode | Endpoint | Description |
+|---------|----------|-------------|
+| `GET` | `/api/cards/:cardId/comments` | Liste des commentaires |
+| `POST` | `/api/cards/:cardId/comments` | Ajouter un commentaire |
+
+#### Axes (positionnement 4C)
+
+| Methode | Endpoint | Description |
+|---------|----------|-------------|
+| `GET` | `/api/spaces/:id/axes` | Positions + finales |
+| `PUT` | `/api/spaces/:id/axes/:axisKey` | Positionner un axe (participant) |
+| `PUT` | `/api/spaces/:id/axes-final/:axisKey` | Position finale (facilitateur) |
+
+> Les `axisKey` correspondent aux axes du cadrage : cap, contraintes, capacites, cadence, etc.
+
+#### Votes
+
+| Methode | Endpoint | Description |
+|---------|----------|-------------|
+| `GET` | `/api/spaces/:id/votes` | Comptage par carte |
+| `POST` | `/api/spaces/:id/votes` | Voter (max 3 par participant) |
+
+#### Phases
+
+| Methode | Endpoint | Description |
+|---------|----------|-------------|
+| `GET` | `/api/spaces/:id/phase-states` | Etats lock/hidden par phase |
+| `PUT` | `/api/spaces/:id/phase-states/:phase` | Verrouiller/masquer une phase |
+
+### 4.2 Modele de donnees d'un Space
 
 ```json
 {
-  "id": "session-uuid",
+  "id": "space-uuid",
   "title": "Retrospective Sprint 42",
   "facilitator": {
     "name": "Yoan",
@@ -233,70 +277,82 @@ Pour que DarkBoard puisse interroger Cadrage Live, voici le contrat d'API propos
   },
   "createdAt": "2026-03-22T10:00:00Z",
   "status": "draft | ready | in_progress | completed",
+  "participantCount": 12,
+  "format": "retrospective"
+}
+```
 
-  "cadrage": {
-    "objectif": "Identifier les points d'amelioration du sprint",
-    "participants": {
-      "count": 12,
-      "profils": ["developpeurs", "product owner", "scrum master"]
-    },
-    "duree": "90min",
-    "format": "retrospective",
+### 4.3 Modele de donnees d'une Card
 
+```json
+{
+  "cardId": "card-uuid",
+  "spaceId": "space-uuid",
+  "phase": "AVANT | PENDANT | APRES",
+  "column": "colonne-1",
+  "author": "participant-name",
+  "content": "Ameliorer la communication inter-equipes",
+  "votes": 5,
+  "comments": [],
+  "createdAt": "2026-03-22T10:15:00Z"
+}
+```
+
+### 4.4 Modele de donnees des Axes
+
+```json
+{
+  "spaceId": "space-uuid",
+  "axes": {
     "cap": {
-      "description": "Ameliorer la velocity de 20% au prochain sprint",
-      "indicateurs": ["velocity", "satisfaction equipe"]
+      "positions": [
+        { "participant": "Alice", "value": 7 },
+        { "participant": "Bob", "value": 5 }
+      ],
+      "final": 6
     },
-    "contraintes": [
-      "Equipe distribuee (3 fuseaux horaires)",
-      "Budget formation limite"
-    ],
-    "capacites": [
-      "Equipe motivee",
-      "Outils collaboratifs en place"
-    ],
-    "cadence": {
-      "frequence": "bi-mensuel",
-      "prochaine_session": "2026-04-05"
-    }
-  },
-
-  "board": {
-    "id": null,
-    "url": null,
-    "template": "retrospective",
-    "status": "not_created"
+    "contraintes": { "positions": [...], "final": 8 },
+    "capacites": { "positions": [...], "final": 4 },
+    "cadence": { "positions": [...], "final": 7 }
   }
 }
 ```
 
-### 4.3 Lancement d'un board depuis Cadrage Live
+### 4.5 Phases du cadrage
+
+Le cadrage se deroule en 3 phases sequentielles :
+
+| Phase | Role | Description |
+|-------|------|-------------|
+| **AVANT** | Preparation | Cadrer les objectifs, contraintes, contexte avant le temps collectif |
+| **PENDANT** | Facilitation | Piloter la dynamique et le contenu pendant le temps collectif |
+| **APRES** | Suivi | Capitaliser, suivre les actions, mesurer les resultats |
+
+Chaque phase peut etre **verrouilee** (plus de modifications) ou **masquee**
+(invisible pour les participants) via l'endpoint `phase-states`.
+
+### 4.6 Lancement d'un board depuis Cadrage Live
+
+Pour lier un Space a un DarkBoard, Cadrage Live doit :
+
+1. Lire le space : `GET /api/spaces/:id`
+2. Lire les cards : `GET /api/spaces/:id/cards`
+3. Lire les axes : `GET /api/spaces/:id/axes`
+4. Creer le board : `POST /api/boards` sur DarkBoard
+5. Pre-remplir : `PUT /api/board/:boardId` sur DarkBoard
+6. Stocker le lien : `PATCH /api/spaces/:id` avec la reference du board
 
 ```http
-POST /api/session/session-uuid/launch-board
+PATCH /api/spaces/space-uuid
 Content-Type: application/json
 
 {
-  "darkboard_url": "https://darkboard.insuffle.com",
-  "template": "retrospective",
-  "prefill": true
-}
-```
-
-Ce endpoint doit :
-1. Appeler `POST /api/boards` sur DarkBoard pour creer le board
-2. Appeler `PUT /api/board/:id` pour pre-remplir le template
-3. Stocker le lien du board dans la session
-4. Retourner l'URL du board
-
-**Reponse** :
-```json
-{
-  "session_id": "session-uuid",
-  "board_id": "cadrage-retro-42",
-  "board_url": "https://darkboard.insuffle.com/board/cadrage-retro-42",
-  "template_applied": "retrospective",
-  "elements_created": 15
+  "board": {
+    "id": "cadrage-retro-42",
+    "url": "https://darkboard.insuffle.com/board/cadrage-retro-42",
+    "status": "active",
+    "linkedAt": "2026-03-22T10:30:00Z"
+  }
 }
 ```
 
@@ -309,18 +365,25 @@ Ce endpoint doit :
 ```
 Facilitateur                Cadrage Live              DarkBoard
      |                           |                        |
-     |-- Cree session cadrage -->|                        |
-     |-- Remplit objectif, 4C -->|                        |
+     |-- Cree un space -------->|                        |
+     |-- Ajoute cards (AVANT) ->|                        |
+     |-- Positionne axes 4C --->|                        |
      |-- Clique "Lancer le      |                        |
      |   tableau" --------------->|                        |
+     |                           |-- GET /api/spaces/:id  |
+     |                           |-- GET .../cards        |
+     |                           |-- GET .../axes         |
+     |                           |                        |
      |                           |-- POST /api/boards --->|
      |                           |<-- 201 {id, url} ------|
      |                           |                        |
      |                           |-- PUT /api/board/:id ->|
-     |                           |   (pre-remplir         |
-     |                           |    template + infos    |
-     |                           |    de cadrage)         |
+     |                           |   (pre-remplir avec    |
+     |                           |    cards + axes)       |
      |                           |<-- 200 OK -------------|
+     |                           |                        |
+     |                           |-- PATCH /api/spaces/:id|
+     |                           |   (stocker lien board) |
      |                           |                        |
      |<-- Redirection board URL--|                        |
      |-- Rejoint le board -------|----------------------->|
@@ -328,31 +391,37 @@ Facilitateur                Cadrage Live              DarkBoard
 
 ### 5.2 Scenario 2 — Afficher le cadrage dans DarkBoard
 
-Quand un board est lie a une session de cadrage, DarkBoard peut afficher
+Quand un board est lie a un space Cadrage Live, DarkBoard peut afficher
 un panneau lateral avec les informations de cadrage.
 
 ```
 Participant             DarkBoard                   Cadrage Live
      |                      |                            |
      |-- Ouvre le board ---->|                            |
-     |                      |-- GET /api/session/:id --->|
-     |                      |<-- {cadrage data} ---------|
+     |                      |-- GET /api/spaces/:id ---->|
+     |                      |<-- {space data} -----------|
+     |                      |-- GET .../cards ---------->|
+     |                      |<-- {cards par phase} ------|
+     |                      |-- GET .../axes ----------->|
+     |                      |<-- {axes 4C + finales} ----|
      |                      |                            |
      |<-- Affiche panneau   |                            |
-     |   "Cadrage" avec     |                            |
-     |   objectif, 4C, etc  |                            |
+     |   "Cadrage" :        |                            |
+     |   - Cards AVANT      |                            |
+     |   - Axes 4C          |                            |
+     |   - Phase en cours   |                            |
 ```
 
 ### 5.3 Scenario 3 — Deep linking bidirectionnel
 
 **Cadrage Live → DarkBoard** :
 ```
-https://darkboard.insuffle.com/board/{boardId}?source=cadrage&session={sessionId}
+https://darkboard.insuffle.com/board/{boardId}?source=cadrage&space={spaceId}
 ```
 
 **DarkBoard → Cadrage Live** :
 ```
-https://cadrage.insuffle.com/session/{sessionId}?from=darkboard&board={boardId}
+https://cadrage.insuffle.com/space/{spaceId}?from=darkboard&board={boardId}
 ```
 
 ### 5.4 Scenario 4 — Embed DarkBoard dans Cadrage Live
@@ -471,9 +540,9 @@ un identifiant de session stocke dans les metadonnees du board.
   "id": "cadrage-retro-42",
   "meta": {
     "source": "cadrage.insuffle.com",
-    "sessionId": "session-uuid",
-    "sessionUrl": "https://cadrage.insuffle.com/session/session-uuid",
-    "template": "retrospective",
+    "spaceId": "space-uuid",
+    "spaceUrl": "https://cadrage.insuffle.com/api/spaces/space-uuid",
+    "format": "retrospective",
     "createdFrom": "cadrage-api",
     "createdAt": "2026-03-22T10:30:00Z"
   },
@@ -482,10 +551,9 @@ un identifiant de session stocke dans les metadonnees du board.
 }
 ```
 
-**Cote Cadrage Live** — stocker la reference au board :
+**Cote Cadrage Live** — stocker la reference au board via `PATCH /api/spaces/:id` :
 ```json
 {
-  "id": "session-uuid",
   "board": {
     "id": "cadrage-retro-42",
     "url": "https://darkboard.insuffle.com/board/cadrage-retro-42",
@@ -595,14 +663,22 @@ body.embed-mode .help-btn {
 
 #### D. Panneau de cadrage
 
-Afficher un panneau lateral quand le board est lie a une session de cadrage.
+Afficher un panneau lateral quand le board est lie a un space Cadrage Live.
 
 ```javascript
-// Si le board a une meta.sessionId, afficher le cadrage
-if (board.meta && board.meta.sessionId) {
-  fetch(board.meta.sessionUrl)
-    .then(res => res.json())
-    .then(session => showCadragePanel(session));
+// Si le board a une meta.spaceId, charger les donnees du cadrage
+if (board.meta && board.meta.spaceId) {
+  const cadrageUrl = 'https://cadrage.insuffle.com';
+  const spaceId = board.meta.spaceId;
+
+  Promise.all([
+    fetch(`${cadrageUrl}/api/spaces/${spaceId}`).then(r => r.json()),
+    fetch(`${cadrageUrl}/api/spaces/${spaceId}/cards`).then(r => r.json()),
+    fetch(`${cadrageUrl}/api/spaces/${spaceId}/axes`).then(r => r.json()),
+    fetch(`${cadrageUrl}/api/spaces/${spaceId}/phase-states`).then(r => r.json())
+  ]).then(([space, cards, axes, phases]) => {
+    showCadragePanel({ space, cards, axes, phases });
+  });
 }
 ```
 
@@ -638,25 +714,36 @@ app.use((req, res, next) => {
 
 ```javascript
 class DarkBoardService {
-  constructor(baseUrl = 'https://darkboard.insuffle.com') {
-    this.baseUrl = baseUrl;
+  constructor(darkboardUrl = 'https://darkboard.insuffle.com',
+              cadrageUrl  = 'https://cadrage.insuffle.com') {
+    this.darkboardUrl = darkboardUrl;
+    this.cadrageUrl   = cadrageUrl;
   }
 
-  // Creer un board lie a une session
-  async createBoard(session) {
-    const boardId = `cadrage-${session.id.slice(0, 8)}`;
+  /**
+   * Flux complet : lire un Space Cadrage Live → creer + pre-remplir un DarkBoard
+   */
+  async launchBoard(spaceId) {
+    // 1. Lire les donnees du space
+    const [space, cards, axes] = await Promise.all([
+      this.fetch(`${this.cadrageUrl}/api/spaces/${spaceId}`),
+      this.fetch(`${this.cadrageUrl}/api/spaces/${spaceId}/cards`),
+      this.fetch(`${this.cadrageUrl}/api/spaces/${spaceId}/axes`)
+    ]);
 
-    // 1. Creer le board
-    const createRes = await fetch(`${this.baseUrl}/api/boards`, {
+    const boardId = `cadrage-${spaceId.slice(0, 8)}`;
+
+    // 2. Creer le board DarkBoard
+    const createRes = await fetch(`${this.darkboardUrl}/api/boards`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         id: boardId,
         meta: {
           source: 'cadrage.insuffle.com',
-          sessionId: session.id,
-          sessionUrl: `https://cadrage.insuffle.com/api/session/${session.id}`,
-          template: session.cadrage.format
+          spaceId: spaceId,
+          spaceUrl: `${this.cadrageUrl}/api/spaces/${spaceId}`,
+          format: space.format
         }
       })
     });
@@ -665,80 +752,141 @@ class DarkBoardService {
       throw new Error('Impossible de creer le board');
     }
 
-    // 2. Pre-remplir avec le template et les donnees de cadrage
-    const elements = this.buildCadrageElements(session);
-    await fetch(`${this.baseUrl}/api/board/${boardId}`, {
+    // 3. Pre-remplir avec les cards et axes du cadrage
+    const elements = this.buildElements(space, cards, axes);
+    await fetch(`${this.darkboardUrl}/api/board/${boardId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ elements })
     });
 
+    // 4. Stocker le lien du board dans le space Cadrage Live
+    await fetch(`${this.cadrageUrl}/api/spaces/${spaceId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        board: {
+          id: boardId,
+          url: `${this.darkboardUrl}/board/${boardId}`,
+          status: 'active',
+          linkedAt: new Date().toISOString()
+        }
+      })
+    });
+
     return {
       boardId,
-      boardUrl: `${this.baseUrl}/board/${boardId}`
+      boardUrl: `${this.darkboardUrl}/board/${boardId}`
     };
   }
 
-  // Construire les elements visuels a partir du cadrage
-  buildCadrageElements(session) {
+  /**
+   * Construire les elements DarkBoard a partir des donnees Cadrage Live
+   */
+  buildElements(space, cards, axes) {
     const ops = [];
-    const c = session.cadrage;
     let y = -500;
 
-    // Titre
+    // Titre du space
     ops.push({
       type: 'add',
-      elementId: `cadrage-title-${session.id}`,
+      elementId: `cadrage-title`,
       element: {
-        id: `cadrage-title-${session.id}`,
+        id: `cadrage-title`,
         type: 'text',
-        x: -400, y: y,
-        text: c.objectif || session.title,
+        x: -400, y,
+        text: space.title,
         fontSize: 32, stroke: '#ffffff',
         w: 800, h: 50, locked: true
       }
     });
     y += 80;
 
-    // Post-its 4C
-    const axes = [
+    // Axes 4C — post-its avec positions finales du facilitateur
+    const axeConfig = [
       { key: 'cap',          color: '#4a9eff', label: 'CAP' },
       { key: 'contraintes',  color: '#e94560', label: 'CONTRAINTES' },
       { key: 'capacites',    color: '#4ecdc4', label: 'CAPACITES' },
       { key: 'cadence',      color: '#ffd966', label: 'CADENCE' }
     ];
 
-    axes.forEach((axe, i) => {
-      const data = c[axe.key];
+    axeConfig.forEach((axe, i) => {
+      const data = axes.axes?.[axe.key];
       if (!data) return;
-      const content = Array.isArray(data)
-        ? data.map(d => `- ${d}`).join('\n')
-        : typeof data === 'object'
-          ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join('\n')
-          : String(data);
+
+      const avgPos = data.positions?.length
+        ? (data.positions.reduce((s, p) => s + p.value, 0) / data.positions.length).toFixed(1)
+        : '?';
+      const finalPos = data.final ?? '—';
+      const text = `${axe.label}\n\nMoyenne: ${avgPos}/10\nFinale: ${finalPos}/10\n(${data.positions?.length || 0} participants)`;
 
       ops.push({
         type: 'add',
-        elementId: `cadrage-${axe.key}-${session.id}`,
+        elementId: `cadrage-axe-${axe.key}`,
         element: {
-          id: `cadrage-${axe.key}-${session.id}`,
+          id: `cadrage-axe-${axe.key}`,
           type: 'sticky',
-          x: -400 + (i * 210), y: y,
+          x: -400 + (i * 210), y,
           w: 200, h: 200,
-          text: `${axe.label}\n\n${content}`,
+          text,
           fill: axe.color,
           fontSize: 12, locked: true
         }
+      });
+    });
+    y += 240;
+
+    // Cards par phase — regroupees en colonnes
+    const phases = ['AVANT', 'PENDANT', 'APRES'];
+    const phaseColors = {
+      'AVANT': '#4a9eff',
+      'PENDANT': '#ffd966',
+      'APRES': '#4ecdc4'
+    };
+
+    phases.forEach((phase, pi) => {
+      const phaseCards = cards.filter(c => c.phase === phase);
+      if (!phaseCards.length) return;
+
+      // Header de phase
+      ops.push({
+        type: 'add',
+        elementId: `cadrage-phase-${phase}`,
+        element: {
+          id: `cadrage-phase-${phase}`,
+          type: 'text',
+          x: -400 + (pi * 300), y,
+          text: phase,
+          fontSize: 20, stroke: phaseColors[phase],
+          w: 280, h: 30, locked: true
+        }
+      });
+
+      // Cards de cette phase
+      phaseCards.forEach((card, ci) => {
+        ops.push({
+          type: 'add',
+          elementId: `cadrage-card-${card.cardId}`,
+          element: {
+            id: `cadrage-card-${card.cardId}`,
+            type: 'sticky',
+            x: -400 + (pi * 300),
+            y: y + 40 + (ci * 130),
+            w: 280, h: 120,
+            text: `${card.content}\n\n— ${card.author}${card.votes ? ` (${card.votes} votes)` : ''}`,
+            fill: phaseColors[phase],
+            fontSize: 12, locked: true
+          }
+        });
       });
     });
 
     return ops;
   }
 
-  // Recuperer l'etat d'un board
-  async getBoardState(boardId) {
-    const res = await fetch(`${this.baseUrl}/api/board/${boardId}`);
-    if (!res.ok) return null;
+  async fetch(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
     return res.json();
   }
 }
@@ -798,22 +946,27 @@ app.use('/api', rateLimit({
 ### 11.1 Parcours facilitateur
 
 ```
-1. Le facilitateur ouvre cadrage.insuffle.com
-2. Il cree une nouvelle session de cadrage
-3. Il remplit :
-   - Objectif de l'atelier
-   - Nombre et profils des participants
-   - Duree prevue
-   - Format (brainstorming, retro, etc.)
-   - Axes 4C (Cap, Contraintes, Capacites, Cadence)
-4. Il clique "Lancer le tableau DarkBoard"
-5. → Cadrage Live cree le board via API
-6. → Cadrage Live pre-remplit le template + infos de cadrage
-7. → Le facilitateur est redirige vers DarkBoard
-8. Il partage le lien DarkBoard aux participants
-9. L'atelier se deroule sur DarkBoard
-10. Les infos de cadrage restent visibles (post-its verrouilles)
-11. Apres l'atelier, retour vers Cadrage Live pour le debrief
+1.  Le facilitateur ouvre cadrage.insuffle.com
+2.  Il cree un Space (POST /api/spaces)
+3.  Phase AVANT — il prepare le cadrage :
+    - Ajoute des Cards (objectifs, contexte, contraintes)
+    - Les participants positionnent les Axes 4C
+    - Le facilitateur valide les positions finales (axes-final)
+    - Il peut verrouiller la phase AVANT quand c'est pret
+4.  Il clique "Lancer le tableau DarkBoard"
+5.  → Cadrage Live lit le space + cards + axes via son API
+6.  → Cadrage Live cree le board DarkBoard (POST /api/boards)
+7.  → Cadrage Live pre-remplit le board (PUT /api/board/:id)
+       avec les cards AVANT + axes 4C en post-its verrouilles
+8.  → Le lien est stocke dans le space (PATCH /api/spaces/:id)
+9.  → Le facilitateur est redirige vers DarkBoard
+10. Phase PENDANT — l'atelier se deroule sur DarkBoard
+    - Les infos de cadrage restent visibles (verrouilles)
+    - Le facilitateur anime avec les outils DarkBoard
+      (timer, vote, isoloir, suivez-moi)
+11. Phase APRES — retour vers Cadrage Live
+    - Le facilitateur ajoute des Cards de suivi
+    - Capitalisation des resultats
 ```
 
 ### 11.2 Parcours participant
@@ -821,9 +974,12 @@ app.use('/api', rateLimit({
 ```
 1. Le participant recoit un lien DarkBoard
 2. Il ouvre le lien, choisit un pseudo, rejoint le board
-3. Il voit les infos de cadrage (objectif, contraintes) en haut du board
+3. Il voit les infos de cadrage en haut du board :
+   - Titre et objectif du space
+   - Cards AVANT (contexte, preparation)
+   - Axes 4C avec positions moyennes et finales
 4. Il travaille sur le board collaborativement
-5. (Optionnel) Un lien "Voir le cadrage complet" renvoie vers Cadrage Live
+5. (Optionnel) Un lien "Voir le cadrage" renvoie vers Cadrage Live
 ```
 
 ---
@@ -874,10 +1030,10 @@ DarkBoard pourrait emettre des webhooks :
 
 | Priorite | Tache | Complexite |
 |----------|-------|-----------|
-| P0 | Service `DarkBoardService` (creation + pre-remplissage) | Moyenne |
+| P0 | Service `DarkBoardService` (lecture space/cards/axes → creation board) | Moyenne |
 | P0 | Bouton "Lancer le tableau" dans l'interface | Faible |
-| P1 | Stockage du lien board dans la session | Faible |
-| P1 | Endpoint `/api/session/:id` pour DarkBoard | Moyenne |
+| P0 | Stockage du lien board via `PATCH /api/spaces/:id` | Faible |
+| P1 | CORS pour autoriser DarkBoard a lire les spaces/cards/axes | Faible |
 | P2 | Receiver de webhooks DarkBoard | Moyenne |
 | P3 | Embed DarkBoard en iframe | Faible |
 
