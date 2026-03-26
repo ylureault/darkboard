@@ -360,8 +360,9 @@ const Tools = {
     },
 
     onPointerUp(app, worldX, worldY, e) {
-      // Clear alignment guides
+      // Clear alignment guides and snap indicator
       app.renderer.alignmentGuides = [];
+      app.hideSnapIndicator();
 
       // Handle anchor-connect: finalize connector creation
       if (this.dragType === 'anchor-connect') {
