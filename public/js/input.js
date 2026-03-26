@@ -442,6 +442,38 @@ class InputHandler {
       return;
     }
 
+    // In presentation mode, handle navigation keys and skip tool shortcuts
+    if (this.app.ui && this.app.ui.presentationActive) {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown') {
+        e.preventDefault();
+        this.app.ui.presentationNavigate(1);
+        return;
+      }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
+        e.preventDefault();
+        this.app.ui.presentationNavigate(-1);
+        return;
+      }
+      if (lower === 'f' && !e.ctrlKey && !e.metaKey) {
+        // Toggle fullscreen in presentation mode
+        if (document.fullscreenElement) document.exitFullscreen();
+        else document.documentElement.requestFullscreen().catch(() => {});
+        return;
+      }
+      if (e.key === 'Escape') {
+        this.app.ui.stopPresentation();
+        return;
+      }
+      // Number keys for direct anchor navigation
+      if (e.key >= '1' && e.key <= '9') {
+        const idx = parseInt(e.key) - 1;
+        this.app.ui.presentationIndex = idx;
+        this.app.ui.navigateToAnchor(idx);
+        return;
+      }
+      return; // Ignore all other keys during presentation
+    }
+
     if (toolMap[lower]) {
       this.app.setTool(toolMap[lower]);
       return;
@@ -449,13 +481,6 @@ class InputHandler {
 
     // Arrow key movement of selected elements
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-      // In presentation mode, navigate anchors
-      if (this.app.ui && this.app.ui.presentationActive) {
-        e.preventDefault();
-        if (e.key === 'ArrowRight') this.app.ui.presentationNavigate(1);
-        else if (e.key === 'ArrowLeft') this.app.ui.presentationNavigate(-1);
-        return;
-      }
       if (this.app.renderer.selectedIds.size > 0) {
         e.preventDefault();
         const step = e.ctrlKey ? 100 : (e.shiftKey ? 10 : 1);
@@ -470,35 +495,7 @@ class InputHandler {
     }
 
     // PageUp/PageDown for presentation mode
-    if (e.key === 'PageDown') {
-      if (this.app.ui && this.app.ui.presentationActive) {
-        e.preventDefault();
-        this.app.ui.presentationNavigate(1);
-        return;
-      }
-    }
-    if (e.key === 'PageUp') {
-      if (this.app.ui && this.app.ui.presentationActive) {
-        e.preventDefault();
-        this.app.ui.presentationNavigate(-1);
-        return;
-      }
-    }
-
-    // Number keys 1-9 for direct anchor navigation in presentation mode
-    if (this.app.ui && this.app.ui.presentationActive && e.key >= '1' && e.key <= '9') {
-      e.preventDefault();
-      this.app.ui.navigateToAnchor(parseInt(e.key) - 1);
-      return;
-    }
-
-    // F key: fullscreen toggle in presentation mode
-    if (lower === 'f' && !e.ctrlKey && !e.metaKey && this.app.ui && this.app.ui.presentationActive) {
-      e.preventDefault();
-      if (document.fullscreenElement) document.exitFullscreen();
-      else document.documentElement.requestFullscreen();
-      return;
-    }
+    // (Presentation mode keys are handled above, before toolMap)
 
     // F5: toggle presentation fullscreen
     if (e.key === 'F5') {

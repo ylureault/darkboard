@@ -288,7 +288,7 @@ class UI {
 
   exportJSON() {
     const elements = Array.from(this.app.renderer.elements.values());
-    const anchors = this.app.renderer.anchors ? Array.from(this.app.renderer.anchors.values()) : [];
+    const anchors = this.app.workshop && this.app.workshop.anchors ? Array.from(this.app.workshop.anchors.values()) : [];
     if (elements.length === 0) {
       this.app.showToast('Rien a exporter');
       return;
@@ -918,20 +918,7 @@ class UI {
       this.stopPresentation();
     });
 
-    // Arrow keys in presentation mode
-    document.addEventListener('keydown', (e) => {
-      if (!this.presentationActive) return;
-      if (e.key === 'ArrowRight' || e.key === ' ') {
-        e.preventDefault();
-        this.presentationNavigate(1);
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        this.presentationNavigate(-1);
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        this.stopPresentation();
-      }
-    });
+    // Presentation mode keys are handled in input.js onKeyDown
   }
 
   startPresentation() {
