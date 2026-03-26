@@ -2938,4 +2938,10 @@ class DarkBoardApp {
 // Boot
 window.addEventListener('DOMContentLoaded', () => {
   window.app = new DarkBoardApp();
+  // Remove loading overlay
+  const loadingOverlay = document.getElementById('loadingOverlay');
+  if (loadingOverlay) {
+    loadingOverlay.style.opacity = '0';
+    setTimeout(() => loadingOverlay.remove(), 300);
+  }
 });

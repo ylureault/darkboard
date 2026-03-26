@@ -934,7 +934,7 @@ function drawEnvelope(ctx, el) {
 }
 
 function drawConnector(ctx, el) {
-  if (!el.x || !el.y || !el.x2 || !el.y2) return;
+  if (el.x == null || el.y == null || el.x2 == null || el.y2 == null) return;
   const style = el.connectorStyle || 'arrow';
 
   ctx.strokeStyle = el.stroke || '#ffffff';
