@@ -543,10 +543,8 @@ const Tools = {
       } else if (!hit) {
         // Double-click on empty canvas creates a sticky
         const el = createSticky(worldX - 100, worldY - 100);
-        // Use remembered color if set
-        if (app.lastStickyColor) {
-          el.fill = app.lastStickyColor;
-        }
+        // Use cycling color instead of random
+        el.fill = app.getNextStickyColor();
         app.lastStickyColor = el.fill;
         app.addElement(el);
         app.renderer.selectedIds.clear();
@@ -818,7 +816,7 @@ const Tools = {
       } else {
         // Simple click: default 200x200 sticky
         const el = createSticky(this.startPoint.x - 100, this.startPoint.y - 100);
-        if (app.lastStickyColor) el.fill = app.lastStickyColor;
+        el.fill = app.getNextStickyColor();
         app.lastStickyColor = el.fill;
         app.addElement(el);
         app.renderer.selectedIds.clear();
