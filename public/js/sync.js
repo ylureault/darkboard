@@ -126,6 +126,7 @@ class SyncClient {
         this.app.updateUsersPanel();
         this.app.renderer.markDirty();
         this.updateOnlineCount();
+        this.app.updateEmptyHint();
 
         // Init workshop state
         if (this.app.workshop) {

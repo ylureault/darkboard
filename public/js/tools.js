@@ -343,6 +343,13 @@ const Tools = {
         const orig = this.originalElements.get(elementId);
         if (el && orig) {
           this.applyResize(el, orig, handle, dx, dy, e.shiftKey);
+          // Show dimension tooltip during resize
+          app.renderer._resizeDimensions = {
+            w: Math.round(el.width),
+            h: Math.round(el.height),
+            x: el.x + el.width / 2,
+            y: el.y + el.height + 20 / app.renderer.camera.zoom
+          };
         }
       } else if (this.dragType === 'marquee') {
         app.renderer.selectionBox = normalizeRect(
@@ -501,6 +508,7 @@ const Tools = {
       this.resizeHandle = null;
       this.originalElements = null;
       this.altDuplicated = false;
+      app.renderer._resizeDimensions = null;
       app.renderer.markDirty();
       if (app.updateUrlHash) app.updateUrlHash();
     },
@@ -792,6 +800,7 @@ const Tools = {
 
       const color = app.renderer.previewElement ? app.renderer.previewElement.fill : (app.lastStickyColor || '#FFD966');
       app.renderer.previewElement = null;
+      let created = null;
 
       if (this.dragged) {
         // Dragged: use drawn dimensions
@@ -817,6 +826,7 @@ const Tools = {
           app.addElement(el);
           app.renderer.selectedIds.clear();
           app.renderer.selectedIds.add(el.id);
+          created = el;
         }
       } else {
         // Simple click: default 200x200 sticky
@@ -826,11 +836,17 @@ const Tools = {
         app.addElement(el);
         app.renderer.selectedIds.clear();
         app.renderer.selectedIds.add(el.id);
+        created = el;
       }
 
       this.startPoint = null;
       this.dragged = false;
       app.renderer.markDirty();
+
+      // Auto-start text editing (like Miro)
+      if (created) {
+        setTimeout(() => app.startTextEdit(created), 50);
+      }
     },
 
     onKeyDown(app, e) {

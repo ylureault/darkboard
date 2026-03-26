@@ -280,6 +280,30 @@ class CanvasRenderer {
       ctx.restore();
     }
 
+    // Dimension tooltip during resize
+    if (this._resizeDimensions) {
+      const dim = this._resizeDimensions;
+      const label = `${dim.w} × ${dim.h}`;
+      const fs = 12 / this.camera.zoom;
+      ctx.font = `600 ${fs}px system-ui, sans-serif`;
+      const tm = ctx.measureText(label);
+      const px = 6 / this.camera.zoom;
+      const py = 3 / this.camera.zoom;
+      const bw = tm.width + px * 2;
+      const bh = fs + py * 2;
+      const bx = dim.x - bw / 2;
+      const by = dim.y;
+      ctx.fillStyle = 'rgba(30, 30, 30, 0.85)';
+      ctx.beginPath();
+      const r = 4 / this.camera.zoom;
+      ctx.roundRect(bx, by, bw, bh, r);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, dim.x, by + bh / 2);
+    }
+
     // Remote cursors
     for (const [userId, user] of this.remoteUsers) {
       this.drawRemoteCursor(ctx, user);

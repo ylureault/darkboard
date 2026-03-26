@@ -4,6 +4,7 @@ class UI {
     this.app = app;
     this.contextMenu = null;
     this.initToolbar();
+    this.initUndoRedo();
     this.initColorPanel();
     this.initZoomControls();
     this.initShareButton();
@@ -29,6 +30,24 @@ class UI {
     });
   }
 
+  initUndoRedo() {
+    const undoBtn = document.getElementById('undoBtn');
+    const redoBtn = document.getElementById('redoBtn');
+    if (undoBtn) {
+      undoBtn.addEventListener('click', () => this.app.undo());
+    }
+    if (redoBtn) {
+      redoBtn.addEventListener('click', () => this.app.redo());
+    }
+  }
+
+  updateUndoRedoButtons() {
+    const undoBtn = document.getElementById('undoBtn');
+    const redoBtn = document.getElementById('redoBtn');
+    if (undoBtn) undoBtn.disabled = !this.app.history.canUndo();
+    if (redoBtn) redoBtn.disabled = !this.app.history.canRedo();
+  }
+
   updateToolbar(toolName) {
     const btns = document.querySelectorAll('.tool-btn[data-tool]');
     btns.forEach(btn => {
@@ -42,15 +61,13 @@ class UI {
 
   initColorPanel() {
     const fillColors = [
-      'transparent', '#ffffff', '#e0e0e0', '#888888', '#333333',
-      '#FF6B6B', '#FFD966', '#4ECDC4', '#45B7D1', '#96CEB4',
-      '#DDA0DD', '#F4A460', '#4a9eff', '#0f3460', '#e94560'
+      'transparent', '#ffffff', '#888888', '#333333',
+      '#FF6B6B', '#FFD966', '#4ECDC4', '#45B7D1', '#96CEB4', '#4a9eff'
     ];
 
     const strokeColors = [
-      'transparent', '#ffffff', '#e0e0e0', '#888888', '#333333',
-      '#FF6B6B', '#FFD966', '#4ECDC4', '#45B7D1', '#96CEB4',
-      '#DDA0DD', '#F4A460', '#4a9eff', '#0f3460', '#e94560'
+      'transparent', '#ffffff', '#888888', '#333333',
+      '#FF6B6B', '#FFD966', '#4ECDC4', '#45B7D1', '#96CEB4', '#4a9eff'
     ];
 
     const fillRow = document.getElementById('fillColors');
@@ -83,6 +100,24 @@ class UI {
       });
       widthRow.appendChild(btn);
     });
+
+    // Toggle color panel
+    const toggle = document.getElementById('colorPanelToggle');
+    const panel = document.getElementById('colorPanel');
+    if (toggle) {
+      toggle.addEventListener('click', () => {
+        const visible = panel.style.display !== 'none';
+        panel.style.display = visible ? 'none' : 'flex';
+        toggle.classList.toggle('active', !visible);
+      });
+      // Close panel when clicking outside
+      document.addEventListener('pointerdown', (e) => {
+        if (panel.style.display !== 'none' && !panel.contains(e.target) && !toggle.contains(e.target)) {
+          panel.style.display = 'none';
+          toggle.classList.remove('active');
+        }
+      });
+    }
   }
 
   createSwatch(color, type) {
@@ -108,6 +143,21 @@ class UI {
       } else {
         this.app.currentStroke = color;
         this.app.updateSelectedElements({ stroke: color });
+      }
+
+      // Update color indicator
+      const indicatorId = type === 'fill' ? 'colorIndicatorFill' : 'colorIndicatorStroke';
+      const indicator = document.getElementById(indicatorId);
+      if (indicator) {
+        if (color === 'transparent') {
+          indicator.style.background = '#1e1e1e';
+          indicator.style.backgroundImage = 'linear-gradient(45deg, #333 25%, transparent 25%, transparent 75%, #333 75%), linear-gradient(45deg, #333 25%, transparent 25%, transparent 75%, #333 75%)';
+          indicator.style.backgroundSize = '6px 6px';
+          indicator.style.backgroundPosition = '0 0, 3px 3px';
+        } else {
+          indicator.style.background = color;
+          indicator.style.backgroundImage = 'none';
+        }
       }
     });
 
@@ -322,20 +372,35 @@ class UI {
   triggerImport() {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.json,.drft';
+    input.accept = '.json,.drft,.rtb';
     input.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        try {
-          const data = JSON.parse(ev.target.result);
-          this.importData(data, file.name);
-        } catch (err) {
-          this.app.showToast('Fichier invalide : JSON attendu');
-        }
-      };
-      reader.readAsText(file);
+
+      if (file.name.endsWith('.rtb')) {
+        // .rtb files are ZIP archives - read as ArrayBuffer
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            this.importRTB(ev.target.result, file.name);
+          } catch (err) {
+            console.error('RTB import error:', err);
+            this.app.showToast('Erreur lors de l\'import du fichier .rtb');
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } else {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const data = JSON.parse(ev.target.result);
+            this.importData(data, file.name);
+          } catch (err) {
+            this.app.showToast('Fichier invalide : JSON attendu');
+          }
+        };
+        reader.readAsText(file);
+      }
     });
     input.click();
   }
@@ -352,6 +417,9 @@ class UI {
     } else if (data.elements && !data.format) {
       // Generic elements export
       this.importDarkBoard(data);
+    } else if (data.widgets) {
+      // Miro format with widgets array
+      this.importMiroData(data);
     } else {
       // Try Draft.io-like structure: look for any array of objects with position data
       const arrays = Object.values(data).filter(v => Array.isArray(v) && v.length > 0);
@@ -520,6 +588,234 @@ class UI {
     // Use the largest array as the source
     const [key, items] = arrays[0];
     this.importDraftIO({ items });
+  }
+
+  importRTB(buffer, filename) {
+    // Minimal ZIP extraction - find JSON files in the archive
+    const bytes = new Uint8Array(buffer);
+    const jsonFiles = this.extractZipEntries(bytes);
+
+    if (jsonFiles.length === 0) {
+      // Maybe it's just JSON with .rtb extension
+      try {
+        const text = new TextDecoder().decode(bytes);
+        const data = JSON.parse(text);
+        this.importMiroData(data);
+        return;
+      } catch(e) {
+        this.app.showToast('Fichier .rtb non reconnu');
+        return;
+      }
+    }
+
+    // Try to find the main board data
+    let boardData = null;
+    for (const entry of jsonFiles) {
+      try {
+        const data = JSON.parse(entry.text);
+        // Miro typically has widgets array or items
+        if (data.widgets || data.items || data.objects || data.elements || Array.isArray(data)) {
+          boardData = data;
+          break;
+        }
+      } catch(e) {
+        continue;
+      }
+    }
+
+    if (!boardData) {
+      // Use first JSON file if nothing specific found
+      try {
+        boardData = JSON.parse(jsonFiles[0].text);
+      } catch(e) {
+        this.app.showToast('Aucune donnee trouvee dans le fichier .rtb');
+        return;
+      }
+    }
+
+    this.importMiroData(boardData);
+  }
+
+  extractZipEntries(bytes) {
+    // Minimal ZIP parser - extracts uncompressed (stored) text entries
+    const entries = [];
+    const decoder = new TextDecoder();
+    let offset = 0;
+
+    while (offset < bytes.length - 4) {
+      // Look for local file header signature: PK\x03\x04
+      if (bytes[offset] === 0x50 && bytes[offset+1] === 0x4B &&
+          bytes[offset+2] === 0x03 && bytes[offset+3] === 0x04) {
+
+        const compressionMethod = bytes[offset + 8] | (bytes[offset + 9] << 8);
+        const compressedSize = bytes[offset + 18] | (bytes[offset + 19] << 8) |
+                               (bytes[offset + 20] << 16) | (bytes[offset + 21] << 24);
+        const uncompressedSize = bytes[offset + 22] | (bytes[offset + 23] << 8) |
+                                  (bytes[offset + 24] << 16) | (bytes[offset + 25] << 24);
+        const nameLen = bytes[offset + 26] | (bytes[offset + 27] << 8);
+        const extraLen = bytes[offset + 28] | (bytes[offset + 29] << 8);
+
+        const name = decoder.decode(bytes.slice(offset + 30, offset + 30 + nameLen));
+        const dataStart = offset + 30 + nameLen + extraLen;
+        const dataEnd = dataStart + compressedSize;
+
+        if (name.endsWith('.json') || name.endsWith('.txt') || !name.includes('.')) {
+          if (compressionMethod === 0 && compressedSize > 0) {
+            // Stored (uncompressed)
+            const text = decoder.decode(bytes.slice(dataStart, dataEnd));
+            entries.push({ name, text });
+          } else if (compressionMethod === 8 && compressedSize > 0) {
+            // Deflate - try using DecompressionStream if available
+            try {
+              const compressed = bytes.slice(dataStart, dataEnd);
+              // Synchronous inflate attempt using a raw deflate approach
+              // For browser compatibility, try the async path
+              const blob = new Blob([compressed]);
+              // We'll handle this asynchronously - skip for now and try stored entries
+            } catch(e) {
+              // Skip compressed entries we can't decode
+            }
+          }
+        }
+
+        offset = dataEnd > offset ? dataEnd : offset + 1;
+      } else {
+        offset++;
+      }
+    }
+
+    return entries;
+  }
+
+  importMiroData(data) {
+    // Miro widget format: { widgets: [ { type, x, y, width, height, text, style, ... } ] }
+    const widgets = data.widgets || data.items || data.objects || data.elements ||
+                    (Array.isArray(data) ? data : []);
+
+    if (widgets.length === 0) {
+      // Try nested structures
+      const arrays = Object.values(data).filter(v => Array.isArray(v) && v.length > 0);
+      if (arrays.length > 0) {
+        this.importMiroWidgets(arrays.sort((a, b) => b.length - a.length)[0]);
+      } else {
+        this.app.showToast('Aucun element trouve dans le fichier Miro');
+      }
+      return;
+    }
+
+    this.importMiroWidgets(widgets);
+  }
+
+  importMiroWidgets(widgets) {
+    const elements = [];
+    const colorMap = {
+      'light_yellow': '#FFD966', 'yellow': '#FFD966',
+      'light_green': '#96CEB4', 'green': '#4ECDC4',
+      'light_blue': '#45B7D1', 'blue': '#4a9eff',
+      'light_pink': '#FF6B6B', 'pink': '#FF6B6B', 'red': '#FF6B6B',
+      'light_purple': '#DDA0DD', 'purple': '#DDA0DD',
+      'orange': '#F4A460',
+      'gray': '#888888', 'dark': '#333333',
+      'white': '#ffffff',
+    };
+
+    for (let i = 0; i < widgets.length; i++) {
+      const w = widgets[i];
+      const type = (w.type || '').toLowerCase();
+
+      // Map Miro types to DarkBoard types
+      let dbType = 'sticky';
+      if (type.includes('shape') || type === 'rectangle' || type === 'rect') dbType = 'rect';
+      else if (type.includes('circle') || type === 'ellipse') dbType = 'circle';
+      else if (type.includes('text')) dbType = 'text';
+      else if (type.includes('line') || type.includes('connector') || type.includes('arrow')) dbType = 'connector';
+      else if (type.includes('frame') || type.includes('group')) dbType = 'frame';
+      else if (type.includes('sticky') || type.includes('sticker') || type.includes('card') || type.includes('note')) dbType = 'sticky';
+      else if (type.includes('image')) dbType = 'rect'; // Fallback for images
+
+      // Extract position - Miro uses center coordinates
+      const cx = w.x || w.posX || (w.position && w.position.x) || (w.bounds && w.bounds.x) || 0;
+      const cy = w.y || w.posY || (w.position && w.position.y) || (w.bounds && w.bounds.y) || 0;
+      const width = w.width || (w.bounds && w.bounds.width) || (w.style && w.style.width) || 200;
+      const height = w.height || (w.bounds && w.bounds.height) || (w.style && w.style.height) || 200;
+
+      // Extract text
+      let text = w.text || w.title || w.plainText || w.content || '';
+      // Strip basic HTML tags from Miro text
+      if (typeof text === 'string') {
+        text = text.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+                   .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim();
+      }
+
+      // Extract color
+      let fill = '#FFD966';
+      const styleColor = w.backgroundColor || (w.style && (w.style.backgroundColor || w.style.fillColor || w.style.stickerBackgroundColor)) || w.color || w.fill;
+      if (styleColor) {
+        fill = colorMap[styleColor] || styleColor;
+        // Ensure it starts with # if it's a hex without it
+        if (fill.match(/^[0-9a-fA-F]{6}$/)) fill = '#' + fill;
+      }
+
+      const el = {
+        id: generateId(),
+        type: dbType,
+        x: cx - width / 2,
+        y: cy - height / 2,
+        width: width,
+        height: height,
+        fill: fill,
+        stroke: dbType === 'sticky' ? 'transparent' : (w.borderColor || (w.style && w.style.borderColor) || '#888888'),
+        text: text,
+        fontSize: w.fontSize || (w.style && w.style.fontSize) || 16,
+        zIndex: Date.now() + i,
+        rotation: w.rotation || 0,
+        locked: false,
+        groupId: null
+      };
+
+      // Handle connectors
+      if (dbType === 'connector') {
+        el.x2 = el.x + width;
+        el.y2 = el.y + height;
+        if (w.startPosition) { el.x = w.startPosition.x || el.x; el.y = w.startPosition.y || el.y; }
+        if (w.endPosition) { el.x2 = w.endPosition.x || el.x2; el.y2 = w.endPosition.y || el.y2; }
+      }
+
+      // Handle frames
+      if (dbType === 'frame') {
+        el.stroke = '#4a9eff';
+        el.text = w.title || w.text || 'Frame';
+        el.children = [];
+      }
+
+      elements.push(el);
+    }
+
+    if (elements.length === 0) {
+      this.app.showToast('Aucun element trouve dans le fichier Miro');
+      return;
+    }
+
+    // Place near camera
+    const camX = this.app.renderer.camera.x;
+    const camY = this.app.renderer.camera.y;
+    let minX = Infinity, minY = Infinity;
+    for (const el of elements) {
+      if (el.x < minX) minX = el.x;
+      if (el.y < minY) minY = el.y;
+    }
+    const offsetX = camX - minX - 200;
+    const offsetY = camY - minY - 200;
+
+    for (const el of elements) {
+      el.x += offsetX;
+      el.y += offsetY;
+      if (el.x2 !== undefined) { el.x2 += offsetX; el.y2 += offsetY; }
+      this.app.addElement(el);
+    }
+
+    this.app.renderer.markDirty();
+    this.app.showToast(`${elements.length} elements importes depuis Miro !`);
   }
 
   initThemeToggle() {

@@ -631,6 +631,8 @@ class DarkBoardApp {
     this.renderer.markDirty();
     this.hasUnsavedChanges = true;
     this.updateTitle();
+    if (this.ui) this.ui.updateUndoRedoButtons();
+    this.updateEmptyHint();
   }
 
   applyOps(ops) {
@@ -652,6 +654,7 @@ class DarkBoardApp {
     }
     this.renderer.markDirty();
     this.updateTitle();
+    this.updateEmptyHint();
   }
 
   deleteSelected() {
@@ -758,6 +761,7 @@ class DarkBoardApp {
       this.showToast('Annul\u00e9');
       this.updateTitle();
     }
+    if (this.ui) this.ui.updateUndoRedoButtons();
   }
 
   redo() {
@@ -768,6 +772,7 @@ class DarkBoardApp {
       this.showToast('R\u00e9tabli');
       this.updateTitle();
     }
+    if (this.ui) this.ui.updateUndoRedoButtons();
   }
 
   selectAll() {
@@ -1364,6 +1369,23 @@ class DarkBoardApp {
         // Immediately start editing the new sticky
         setTimeout(() => this.startTextEdit(newEl), 50);
       }
+
+      // If Tab was pressed on a sticky, create a new one to the right
+      if (this._createStickyRight) {
+        const src = this._createStickyRight;
+        this._createStickyRight = null;
+        const gap = 16;
+        const newEl = createSticky(src.x + src.width + gap, src.y);
+        newEl.width = src.width;
+        newEl.height = src.height;
+        newEl.fill = src.fill;
+        newEl.fontSize = src.fontSize;
+        this.addElement(newEl);
+        this.renderer.selectedIds.clear();
+        this.renderer.selectedIds.add(newEl.id);
+        this.renderer.markDirty();
+        setTimeout(() => this.startTextEdit(newEl), 50);
+      }
     };
 
     editor.addEventListener('blur', (e) => {
@@ -1385,15 +1407,28 @@ class DarkBoardApp {
     });
     editor.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
+        this._createStickyBelow = null;
+        this._createStickyRight = null;
         editor.blur();
+        this.setTool('select');
+        e.stopPropagation();
+        return;
       }
-      // Enter without Shift: finish edit (and create new sticky below if sticky)
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         if (el.type === 'sticky') {
           this._createStickyBelow = el;
         }
         editor.blur();
+        e.stopPropagation();
+        return;
+      }
+      if (e.key === 'Tab' && el.type === 'sticky') {
+        e.preventDefault();
+        this._createStickyRight = el;
+        editor.blur();
+        e.stopPropagation();
+        return;
       }
       e.stopPropagation();
     });
@@ -2738,6 +2773,12 @@ class DarkBoardApp {
     const boardId = getBoardId();
     const count = this.renderer.elements.size;
     document.title = `DarkBoard - ${boardId} (${count} \u00e9l\u00e9ments)`;
+  }
+
+  updateEmptyHint() {
+    const hint = document.getElementById('emptyBoardHint');
+    if (!hint) return;
+    hint.style.display = this.renderer.elements.size === 0 ? '' : 'none';
   }
 
   // --- Feature: Hover tooltip showing element type ---
