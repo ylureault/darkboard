@@ -60,7 +60,7 @@
   </div>
 
   <!-- Toolbar -->
-  <div class="toolbar" id="toolbar">
+  <div class="toolbar" id="toolbar" role="toolbar" aria-label="Barre d'outils de dessin">
     <button class="tool-btn active" data-tool="select" title="Selectionner (V)" aria-label="Outil selection, raccourci V">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M4 4l7 18 3-7 7-3z"/>
@@ -184,7 +184,7 @@
   </div>
 
   <!-- Color panel -->
-  <div class="color-panel" id="colorPanel">
+  <div class="color-panel" id="colorPanel" role="toolbar" aria-label="Panneau couleurs et epaisseur">
     <span class="color-section-label">Remplissage</span>
     <div class="color-row" id="fillColors"></div>
     <span class="color-section-label">Contour</span>
@@ -194,12 +194,12 @@
   </div>
 
   <!-- Users panel -->
-  <div class="users-panel" id="usersPanel">
+  <div class="users-panel" id="usersPanel" role="status" aria-label="Utilisateurs en ligne">
     <span class="users-count" id="usersCount">1 en ligne</span>
   </div>
 
   <!-- Facilitator panel -->
-  <div class="facilitator-panel" id="facilitatorPanel" style="display:none;">
+  <div class="facilitator-panel" id="facilitatorPanel" style="display:none;" role="toolbar" aria-label="Panneau animateur">
     <div class="facilitator-label">Animateur</div>
     <div class="facilitator-controls">
       <button class="fctl-btn" id="btnTimer" title="Chrono — Lancer un minuteur" aria-label="Chrono, lancer un minuteur">
@@ -299,7 +299,7 @@
   </div>
 
   <!-- Anchors panel (sidebar) -->
-  <div class="anchors-panel" id="anchorsPanel" style="display:none;">
+  <div class="anchors-panel" id="anchorsPanel" style="display:none;" role="complementary" aria-label="Panneau ancres">
     <div class="anchors-header">
       <span>Ancres</span>
       <button class="anchors-close" id="anchorsClose" aria-label="Fermer le panneau ancres">x</button>
@@ -428,10 +428,10 @@
 
   <!-- Presentation controls (hidden by default) -->
   <div class="presentation-controls" id="presentationControls" style="display:none">
-    <button class="pres-btn" id="presPrev" title="Ancre precedente">◀</button>
+    <button class="pres-btn" id="presPrev" title="Ancre precedente" aria-label="Ancre precedente">&#9664;</button>
     <span class="pres-indicator" id="presIndicator">1/1</span>
-    <button class="pres-btn" id="presNext" title="Ancre suivante">▶</button>
-    <button class="pres-btn" id="presExit" title="Quitter">✕</button>
+    <button class="pres-btn" id="presNext" title="Ancre suivante" aria-label="Ancre suivante">&#9654;</button>
+    <button class="pres-btn" id="presExit" title="Quitter" aria-label="Quitter le mode presentation">&#10005;</button>
   </div>
 
   <!-- Theme and Template buttons are now in the bottom-bar-left -->

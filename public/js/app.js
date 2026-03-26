@@ -381,15 +381,23 @@ class DarkBoardApp {
             this.addElement(el);
             this.renderer.selectedIds.add(el.id);
           } else {
+            // Smart grid paste: 5 per row centered on camera
             const gap = 16;
+            const stickyW = 200;
             const stickyH = 200;
+            const perRow = Math.min(lines.length, 5);
             for (let i = 0; i < lines.length; i++) {
-              const el = createSticky(cx - 100, cy - 100 + i * (stickyH + gap));
+              const col = i % perRow;
+              const row = Math.floor(i / perRow);
+              const el = createSticky(
+                cx - (perRow * (stickyW + gap)) / 2 + col * (stickyW + gap),
+                cy - 100 + row * (stickyH + gap)
+              );
               el.text = lines[i];
               this.addElement(el);
               this.renderer.selectedIds.add(el.id);
             }
-            this.showToast(`${lines.length} post-its colles`);
+            this.showToast(`${lines.length} \u00e9l\u00e9ments coll\u00e9s`);
           }
         }
         this.renderer.markDirty();
@@ -622,6 +630,7 @@ class DarkBoardApp {
     this.sync.sendOps(ops);
     this.renderer.markDirty();
     this.hasUnsavedChanges = true;
+    this.updateTitle();
   }
 
   applyOps(ops) {
@@ -642,6 +651,7 @@ class DarkBoardApp {
       }
     }
     this.renderer.markDirty();
+    this.updateTitle();
   }
 
   deleteSelected() {
@@ -745,6 +755,8 @@ class DarkBoardApp {
     if (ops) {
       this.applyOps(ops);
       this.sync.sendOps(ops);
+      this.showToast('Annul\u00e9');
+      this.updateTitle();
     }
   }
 
@@ -753,6 +765,8 @@ class DarkBoardApp {
     if (ops) {
       this.applyOps(ops);
       this.sync.sendOps(ops);
+      this.showToast('R\u00e9tabli');
+      this.updateTitle();
     }
   }
 
@@ -778,20 +792,54 @@ class DarkBoardApp {
   paste() {
     if (this.clipboard.length === 0) return;
     this.renderer.selectedIds.clear();
-    const offset = 20;
-    for (const orig of this.clipboard) {
+    const cx = this.renderer.camera.x;
+    const cy = this.renderer.camera.y;
+    const count = this.clipboard.length;
+
+    if (count > 1) {
+      // Smart paste: arrange in grid pattern (5 per row) centered on camera
+      const perRow = Math.min(count, 5);
+      const gap = 16;
+      for (let i = 0; i < count; i++) {
+        const orig = this.clipboard[i];
+        const el = deepClone(orig);
+        el.id = generateId();
+        const col = i % perRow;
+        const row = Math.floor(i / perRow);
+        const elW = el.width || 200;
+        const elH = el.height || 200;
+        el.x = cx - (perRow * (elW + gap)) / 2 + col * (elW + gap);
+        el.y = cy - 100 + row * (elH + gap);
+        if (el.x2 !== undefined) {
+          const dx = el.x - orig.x;
+          const dy = el.y - orig.y;
+          el.x2 = orig.x2 + dx;
+          el.y2 = orig.y2 + dy;
+        }
+        if (el.points) {
+          const dx = el.x - orig.x;
+          const dy = el.y - orig.y;
+          el.points = el.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+        }
+        el.zIndex = Date.now() + i;
+        this.addElement(el);
+        this.renderer.selectedIds.add(el.id);
+      }
+    } else {
+      const orig = this.clipboard[0];
       const el = deepClone(orig);
       el.id = generateId();
-      el.x += offset;
-      el.y += offset;
-      if (el.x2 !== undefined) { el.x2 += offset; el.y2 += offset; }
+      el.x += 20;
+      el.y += 20;
+      if (el.x2 !== undefined) { el.x2 += 20; el.y2 += 20; }
       if (el.points) {
-        el.points = el.points.map(p => ({ x: p.x + offset, y: p.y + offset }));
+        el.points = el.points.map(p => ({ x: p.x + 20, y: p.y + 20 }));
       }
       el.zIndex = Date.now();
       this.addElement(el);
       this.renderer.selectedIds.add(el.id);
     }
+    this.showToast(`${count} \u00e9l\u00e9ments coll\u00e9s`);
     this.renderer.markDirty();
   }
 
@@ -1256,6 +1304,16 @@ class DarkBoardApp {
           if (el.type === 'sticky') {
             const lines = newPlain.split('\n').length;
             const minH = Math.max(200, lines * (el.fontSize || 16) * 1.4 + 28);
+            if (minH > el.height) {
+              props.height = minH;
+              oldProps.height = el.height;
+              el.height = minH;
+            }
+          }
+          // Auto-resize other shape types when text overflows
+          if (el.type === 'rect' || el.type === 'circle' || el.type === 'diamond' || el.type === 'triangle') {
+            const lines = newPlain.split('\n').length;
+            const minH = Math.max(el.height, lines * (el.fontSize || 16) * 1.4 + 20);
             if (minH > el.height) {
               props.height = minH;
               oldProps.height = el.height;
