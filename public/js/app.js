@@ -31,10 +31,20 @@ class DarkBoardApp {
     this.workshop = new Workshop(this);
 
     // Update title
-    document.title = `DarkBoard - ${getBoardId()}`;
+    this.updateTitle();
 
-    // Sticky color memory
+    // Sticky color cycling (sequential instead of random)
     this.lastStickyColor = null;
+    this.stickyColorIndex = 0;
+
+    // Toast queue for stacked toasts
+    this._toastQueue = [];
+    this._toastActiveCount = 0;
+
+    // Hover tooltip state
+    this._hoverTooltipTimer = null;
+    this._hoverTooltip = null;
+    this.initHoverTooltip();
 
     // Unsaved changes tracking
     this.hasUnsavedChanges = false;
@@ -759,6 +769,9 @@ class DarkBoardApp {
     for (const id of this.renderer.selectedIds) {
       const el = this.renderer.elements.get(id);
       if (el) this.clipboard.push(deepClone(el));
+    }
+    if (this.clipboard.length > 0) {
+      this.showToast(`${this.clipboard.length} \u00e9l\u00e9ments copi\u00e9s`);
     }
   }
 
@@ -2408,11 +2421,57 @@ class DarkBoardApp {
   }
 
   showToast(message) {
-    const toast = document.getElementById('toast');
+    // Queue multiple toasts and show them stacked
+    const toast = document.createElement('div');
+    toast.className = 'toast show';
     toast.textContent = message;
-    toast.classList.add('show');
-    clearTimeout(this._toastTimeout);
-    this._toastTimeout = setTimeout(() => toast.classList.remove('show'), 3500);
+    toast.style.position = 'fixed';
+    toast.style.left = '50%';
+    toast.style.transform = 'translateX(-50%)';
+    toast.style.zIndex = '10000';
+    toast.style.background = 'var(--panel, #23272e)';
+    toast.style.color = 'var(--text, #e0e0e0)';
+    toast.style.padding = '10px 24px';
+    toast.style.borderRadius = '8px';
+    toast.style.fontSize = '14px';
+    toast.style.pointerEvents = 'none';
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s, bottom 0.3s';
+    toast.style.boxShadow = '0 2px 12px rgba(0,0,0,0.4)';
+
+    document.body.appendChild(toast);
+    this._toastQueue.push(toast);
+    this._repositionToasts();
+
+    // Animate in
+    requestAnimationFrame(() => { toast.style.opacity = '1'; });
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => {
+        toast.remove();
+        const idx = this._toastQueue.indexOf(toast);
+        if (idx !== -1) this._toastQueue.splice(idx, 1);
+        this._repositionToasts();
+      }, 300);
+    }, 3500);
+
+    // Also update the original toast element for backward compatibility
+    const origToast = document.getElementById('toast');
+    if (origToast) {
+      origToast.textContent = message;
+      origToast.classList.add('show');
+      clearTimeout(this._toastTimeout);
+      this._toastTimeout = setTimeout(() => origToast.classList.remove('show'), 3500);
+    }
+  }
+
+  _repositionToasts() {
+    let bottom = 80;
+    for (let i = this._toastQueue.length - 1; i >= 0; i--) {
+      this._toastQueue[i].style.bottom = bottom + 'px';
+      bottom += 48;
+    }
   }
 
   showContextMenu(screenX, screenY, worldX, worldY) {
@@ -2613,6 +2672,207 @@ class DarkBoardApp {
     if (this._closeMenu) {
       document.removeEventListener('pointerdown', this._closeMenu);
       this._closeMenu = null;
+    }
+  }
+
+  // --- Feature: Element count in page title ---
+  updateTitle() {
+    const boardId = getBoardId();
+    const count = this.renderer.elements.size;
+    document.title = `DarkBoard - ${boardId} (${count} \u00e9l\u00e9ments)`;
+  }
+
+  // --- Feature: Hover tooltip showing element type ---
+  initHoverTooltip() {
+    const canvas = this.renderer.canvas;
+    canvas.addEventListener('mousemove', (e) => {
+      clearTimeout(this._hoverTooltipTimer);
+      this._removeHoverTooltip();
+      const world = this.renderer.screenToWorld(e.clientX, e.clientY);
+      this._hoverTooltipTimer = setTimeout(() => {
+        const hit = this.renderer.hitTest(world.x, world.y);
+        if (hit) {
+          this._showHoverTooltip(e.clientX, e.clientY, hit.type);
+        }
+      }, 1000);
+    });
+    canvas.addEventListener('mouseleave', () => {
+      clearTimeout(this._hoverTooltipTimer);
+      this._removeHoverTooltip();
+    });
+    canvas.addEventListener('mousedown', () => {
+      clearTimeout(this._hoverTooltipTimer);
+      this._removeHoverTooltip();
+    });
+  }
+
+  _showHoverTooltip(x, y, type) {
+    this._removeHoverTooltip();
+    const typeLabels = {
+      sticky: 'Post-it', text: 'Texte', rect: 'Rectangle', circle: 'Cercle',
+      line: 'Ligne', arrow: 'Fl\u00e8che', draw: 'Dessin', frame: 'Cadre',
+      envelope: 'Enveloppe', connector: 'Connecteur', diamond: 'Losange',
+      triangle: 'Triangle', card: 'Carte', list: 'Liste', image: 'Image'
+    };
+    const tip = document.createElement('div');
+    tip.className = 'hover-tooltip';
+    tip.textContent = typeLabels[type] || type;
+    tip.style.cssText = `position:fixed;left:${x + 12}px;top:${y - 28}px;background:rgba(0,0,0,0.8);color:#fff;padding:4px 10px;border-radius:4px;font-size:12px;pointer-events:none;z-index:9999;white-space:nowrap;`;
+    document.body.appendChild(tip);
+    this._hoverTooltip = tip;
+  }
+
+  _removeHoverTooltip() {
+    if (this._hoverTooltip) {
+      this._hoverTooltip.remove();
+      this._hoverTooltip = null;
+    }
+  }
+
+  // --- Feature: Duplicate with smart offset (Ctrl+Shift+D) ---
+  duplicateSelectedWithOffset() {
+    this.copySelected();
+    if (this.clipboard.length === 0) return;
+    this.renderer.selectedIds.clear();
+    const offset = 20;
+    for (const orig of this.clipboard) {
+      const el = deepClone(orig);
+      el.id = generateId();
+      el.x += offset;
+      el.y += offset;
+      if (el.x2 !== undefined) { el.x2 += offset; el.y2 += offset; }
+      if (el.points) {
+        el.points = el.points.map(p => ({ x: p.x + offset, y: p.y + offset }));
+      }
+      el.zIndex = Date.now();
+      this.addElement(el);
+      this.renderer.selectedIds.add(el.id);
+    }
+    this.renderer.markDirty();
+  }
+
+  // --- Feature: Paste at specific location (for middle-click paste) ---
+  pasteAt(worldX, worldY) {
+    if (this.clipboard.length === 0) return;
+    // Calculate centroid of clipboard elements
+    let cx = 0, cy = 0;
+    for (const el of this.clipboard) {
+      cx += el.x + (el.width || 0) / 2;
+      cy += el.y + (el.height || 0) / 2;
+    }
+    cx /= this.clipboard.length;
+    cy /= this.clipboard.length;
+
+    this.renderer.selectedIds.clear();
+    for (const orig of this.clipboard) {
+      const el = deepClone(orig);
+      el.id = generateId();
+      el.x += worldX - cx;
+      el.y += worldY - cy;
+      if (el.x2 !== undefined) { el.x2 += worldX - cx; el.y2 += worldY - cy; }
+      if (el.points) {
+        const dx = worldX - cx, dy = worldY - cy;
+        el.points = el.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+      }
+      el.zIndex = Date.now();
+      this.addElement(el);
+      this.renderer.selectedIds.add(el.id);
+    }
+    this.showToast(`${this.clipboard.length} \u00e9l\u00e9ments coll\u00e9s`);
+    this.renderer.markDirty();
+  }
+
+  // --- Feature: Bring to front / Send to back ---
+  bringToFront() {
+    if (this.renderer.selectedIds.size === 0) return;
+    const now = Date.now();
+    let offset = 0;
+    const ops = [], inverseOps = [];
+    for (const id of this.renderer.selectedIds) {
+      const el = this.renderer.elements.get(id);
+      if (el) {
+        inverseOps.push({ type: 'update', elementId: id, props: { zIndex: el.zIndex } });
+        el.zIndex = now + 1000 + (offset++);
+        ops.push({ type: 'update', elementId: id, props: { zIndex: el.zIndex } });
+      }
+    }
+    if (ops.length > 0) {
+      this.history.push(ops, inverseOps);
+      this.sync.sendOps(ops);
+      this.renderer.markDirty();
+    }
+  }
+
+  sendToBack() {
+    if (this.renderer.selectedIds.size === 0) return;
+    let minZ = Infinity;
+    for (const [, el] of this.renderer.elements) {
+      if (el.zIndex < minZ) minZ = el.zIndex;
+    }
+    let offset = 0;
+    const ops = [], inverseOps = [];
+    for (const id of this.renderer.selectedIds) {
+      const el = this.renderer.elements.get(id);
+      if (el) {
+        inverseOps.push({ type: 'update', elementId: id, props: { zIndex: el.zIndex } });
+        el.zIndex = Math.max(1, minZ - 100 + (offset++));
+        ops.push({ type: 'update', elementId: id, props: { zIndex: el.zIndex } });
+      }
+    }
+    if (ops.length > 0) {
+      this.history.push(ops, inverseOps);
+      this.sync.sendOps(ops);
+      this.renderer.markDirty();
+    }
+  }
+
+  // --- Feature: Lock/unlock toggle ---
+  toggleLockSelected() {
+    if (this.renderer.selectedIds.size === 0) return;
+    // Check if any is locked
+    let anyLocked = false;
+    for (const id of this.renderer.selectedIds) {
+      const el = this.renderer.elements.get(id);
+      if (el && el.locked) { anyLocked = true; break; }
+    }
+    const newLocked = !anyLocked;
+    this.updateSelectedElements({ locked: newLocked });
+    this.showToast(newLocked ? 'Objet verrouill\u00e9' : 'Objet d\u00e9verrouill\u00e9');
+  }
+
+  // --- Feature: Zoom to fit selected elements (Ctrl+Shift+0) ---
+  zoomToSelection() {
+    if (this.renderer.selectedIds.size === 0) {
+      // If nothing selected, fit all
+      if (this.ui) this.ui.fitToScreen();
+      return;
+    }
+    this.centerOnSelection();
+  }
+
+  // --- Feature: Sticky color cycling ---
+  getNextStickyColor() {
+    const colors = typeof STICKY_COLORS !== 'undefined' ? STICKY_COLORS : ['#FFD966', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#DDA0DD', '#F4A460'];
+    const color = colors[this.stickyColorIndex % colors.length];
+    this.stickyColorIndex++;
+    return color;
+  }
+
+  // --- Feature: Snap feedback indicator ---
+  showSnapIndicator() {
+    if (this._snapIndicator) return;
+    const indicator = document.createElement('div');
+    indicator.className = 'snap-indicator';
+    indicator.textContent = 'SNAP';
+    indicator.style.cssText = 'position:fixed;top:60px;right:16px;background:rgba(74,158,255,0.2);color:#4a9eff;padding:4px 12px;border-radius:4px;font-size:11px;font-weight:bold;pointer-events:none;z-index:9999;border:1px solid rgba(74,158,255,0.4);';
+    document.body.appendChild(indicator);
+    this._snapIndicator = indicator;
+  }
+
+  hideSnapIndicator() {
+    if (this._snapIndicator) {
+      this._snapIndicator.remove();
+      this._snapIndicator = null;
     }
   }
 }

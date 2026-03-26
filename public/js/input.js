@@ -9,6 +9,18 @@ class InputHandler {
     this.pointerDown = false;
     this.zoomMode = false; // Z key held
 
+    // Pinch zoom momentum
+    this.pinchVelocity = 0;
+    this.pinchMomentumRaf = null;
+
+    // Double-tap detection for mobile
+    this.lastTapTime = 0;
+    this.lastTapX = 0;
+    this.lastTapY = 0;
+
+    // Right-click movement tracking
+    this.pointerDownPos = null;
+
     this.bindEvents();
   }
 
@@ -35,11 +47,16 @@ class InputHandler {
       this.onContextMenu(e);
     });
 
-    // Touch: pinch zoom
-    this.touchState = { dist: 0, center: null };
+    // Touch: pinch zoom with momentum
+    this.touchState = { dist: 0, center: null, lastScale: 1, lastTime: 0 };
     canvas.addEventListener('touchstart', (e) => {
       if (e.touches.length === 2) {
         e.preventDefault();
+        // Cancel any ongoing momentum
+        if (this.pinchMomentumRaf) {
+          cancelAnimationFrame(this.pinchMomentumRaf);
+          this.pinchMomentumRaf = null;
+        }
         const d = Math.hypot(
           e.touches[0].clientX - e.touches[1].clientX,
           e.touches[0].clientY - e.touches[1].clientY
@@ -49,6 +66,32 @@ class InputHandler {
           x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
           y: (e.touches[0].clientY + e.touches[1].clientY) / 2
         };
+        this.touchState.lastScale = 1;
+        this.touchState.lastTime = Date.now();
+        this.pinchVelocity = 0;
+      }
+
+      // Double-tap detection (single touch only)
+      if (e.touches.length === 1) {
+        const now = Date.now();
+        const touch = e.touches[0];
+        const dx = touch.clientX - this.lastTapX;
+        const dy = touch.clientY - this.lastTapY;
+        const dist = Math.hypot(dx, dy);
+
+        if (now - this.lastTapTime < 300 && dist < 30) {
+          // Double-tap detected
+          e.preventDefault();
+          const currentZoom = this.app.renderer.camera.zoom;
+          const targetZoom = Math.abs(currentZoom - 1.5) < 0.1 ? 1.0 : 1.5;
+          // Animate zoom to target
+          this.animateZoomTo(targetZoom, touch.clientX, touch.clientY);
+          this.lastTapTime = 0;
+        } else {
+          this.lastTapTime = now;
+          this.lastTapX = touch.clientX;
+          this.lastTapY = touch.clientY;
+        }
       }
     }, { passive: false });
 
@@ -66,13 +109,24 @@ class InputHandler {
 
         if (this.touchState.dist > 0) {
           const scale = d / this.touchState.dist;
-          const newZoom = this.app.renderer.camera.zoom * scale;
+          // Smooth the scale factor using interpolation
+          const smoothScale = 1 + (scale - 1) * 0.8;
+          const newZoom = this.app.renderer.camera.zoom * smoothScale;
           this.app.renderer.setZoom(newZoom, center.x, center.y);
 
           // Pan
           const dx = center.x - this.touchState.center.x;
           const dy = center.y - this.touchState.center.y;
           this.app.renderer.pan(dx, dy);
+
+          // Track velocity for momentum
+          const now = Date.now();
+          const dt = now - this.touchState.lastTime;
+          if (dt > 0) {
+            this.pinchVelocity = (smoothScale - 1) / dt * 16; // velocity per frame
+          }
+          this.touchState.lastScale = smoothScale;
+          this.touchState.lastTime = now;
 
           this.app.updateZoomDisplay();
         }
@@ -81,6 +135,16 @@ class InputHandler {
         this.touchState.center = center;
       }
     }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+      // Apply pinch momentum when releasing a two-finger gesture
+      if (e.touches.length < 2 && Math.abs(this.pinchVelocity) > 0.001) {
+        const center = this.touchState.center;
+        if (center) {
+          this.applyPinchMomentum(this.pinchVelocity, center.x, center.y);
+        }
+      }
+    }, { passive: true });
   }
 
   getWorldPos(e) {
@@ -88,8 +152,24 @@ class InputHandler {
   }
 
   onPointerDown(e) {
-    if (e.button === 1 || (this.spaceDown && e.button === 0)) {
-      // Middle click or space+click: pan
+    if (e.button === 1) {
+      // Middle click: paste at cursor position if clipboard has content, otherwise pan
+      e.preventDefault();
+      const world = this.getWorldPos(e);
+      if (this.app.clipboard && this.app.clipboard.length > 0) {
+        this.app.pasteAt(world.x, world.y);
+        return;
+      }
+      // Fallback to pan
+      this.isPanning = true;
+      this.lastPanX = e.clientX;
+      this.lastPanY = e.clientY;
+      this.app.renderer.canvas.style.cursor = 'grabbing';
+      return;
+    }
+
+    if (this.spaceDown && e.button === 0) {
+      // Space+click: pan
       this.isPanning = true;
       this.lastPanX = e.clientX;
       this.lastPanY = e.clientY;
@@ -510,6 +590,44 @@ class InputHandler {
         this.app.renderer.canvas.style.cursor = tool ? tool.cursor : 'default';
       }
     }
+  }
+
+  applyPinchMomentum(velocity, cx, cy) {
+    if (this.pinchMomentumRaf) cancelAnimationFrame(this.pinchMomentumRaf);
+    const decay = 0.92;
+    const threshold = 0.0005;
+    let vel = velocity;
+
+    const step = () => {
+      vel *= decay;
+      if (Math.abs(vel) < threshold) {
+        this.pinchMomentumRaf = null;
+        return;
+      }
+      const scale = 1 + vel;
+      const newZoom = this.app.renderer.camera.zoom * scale;
+      this.app.renderer.setZoom(newZoom, cx, cy);
+      this.app.updateZoomDisplay();
+      this.pinchMomentumRaf = requestAnimationFrame(step);
+    };
+    this.pinchMomentumRaf = requestAnimationFrame(step);
+  }
+
+  animateZoomTo(targetZoom, cx, cy) {
+    const startZoom = this.app.renderer.camera.zoom;
+    const duration = 250;
+    const startTime = performance.now();
+
+    const step = (now) => {
+      const t = Math.min(1, (now - startTime) / duration);
+      // Ease out cubic
+      const ease = 1 - Math.pow(1 - t, 3);
+      const zoom = startZoom + (targetZoom - startZoom) * ease;
+      this.app.renderer.setZoom(zoom, cx, cy);
+      this.app.updateZoomDisplay();
+      if (t < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }
 
   onContextMenu(e) {

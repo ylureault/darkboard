@@ -7,6 +7,9 @@ class SyncClient {
     this.reconnectDelay = 1000;
     this.maxReconnectDelay = 16000;
     this.cursorThrottle = null;
+    this.reconnectAttempts = 0;
+    this.offlineQueue = [];
+    this.onlineUserCount = 0;
   }
 
   connect() {
@@ -24,6 +27,7 @@ class SyncClient {
     this.ws.onopen = () => {
       this.connected = true;
       this.reconnectDelay = 1000;
+      this.reconnectAttempts = 0;
       this.updateSyncIndicator('online', 'En ligne');
       console.log('Connected to DarkBoard server');
 
@@ -34,6 +38,17 @@ class SyncClient {
         userId: getSessionId(),
         name: this.app.userName
       }));
+
+      // Flush offline queue
+      if (this.offlineQueue.length > 0) {
+        console.log('Flushing ' + this.offlineQueue.length + ' queued operations');
+        const queue = this.offlineQueue.slice();
+        this.offlineQueue = [];
+        for (const msg of queue) {
+          this.ws.send(JSON.stringify(msg));
+        }
+        this.showSaved();
+      }
     };
 
     this.ws.onmessage = (event) => {
@@ -59,9 +74,10 @@ class SyncClient {
   }
 
   scheduleReconnect() {
-    this.updateSyncIndicator('syncing', 'Reconnexion...');
+    this.reconnectAttempts++;
+    this.updateSyncIndicator('syncing', 'Reconnexion... (tentative ' + this.reconnectAttempts + ')');
     setTimeout(() => {
-      console.log('Attempting to reconnect...');
+      console.log('Attempting to reconnect (attempt ' + this.reconnectAttempts + ')...');
       this.connect();
     }, this.reconnectDelay);
     this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
@@ -73,6 +89,15 @@ class SyncClient {
     if (!dot || !label) return;
     dot.className = 'sync-dot ' + state;
     label.textContent = text;
+  }
+
+  updateOnlineCount() {
+    // Count remote users + self
+    this.onlineUserCount = this.app.renderer.remoteUsers.size + 1;
+    const el = document.getElementById('syncUsers');
+    if (el) {
+      el.textContent = this.onlineUserCount + ' utilisateur' + (this.onlineUserCount !== 1 ? 's' : '') + ' en ligne';
+    }
   }
 
   showSaved() {
@@ -100,6 +125,7 @@ class SyncClient {
         this.app.isFacilitator = msg.isFacilitator;
         this.app.updateUsersPanel();
         this.app.renderer.markDirty();
+        this.updateOnlineCount();
 
         // Init workshop state
         if (this.app.workshop) {
@@ -136,12 +162,14 @@ class SyncClient {
           lastActivity: Date.now()
         });
         this.app.updateUsersPanel();
+        this.updateOnlineCount();
         this.app.showToast(`${msg.name} a rejoint le tableau`);
         break;
 
       case 'user-leave':
         this.app.renderer.remoteUsers.delete(msg.userId);
         this.app.updateUsersPanel();
+        this.updateOnlineCount();
         this.app.renderer.markDirty();
         break;
 
@@ -246,19 +274,29 @@ class SyncClient {
   }
 
   send(msg) {
-    if (!this.connected || !this.ws) return;
+    if (!this.connected || !this.ws) {
+      // Queue operation messages while offline
+      if (msg.type === 'op') {
+        this.offlineQueue.push(msg);
+      }
+      return;
+    }
     this.ws.send(JSON.stringify(msg));
   }
 
   sendOps(ops) {
-    this.send({
+    const msg = {
       type: 'op',
       boardId: getBoardId(),
       ops
-    });
-    if (this.connected) {
-      this.showSaved();
+    };
+    if (!this.connected || !this.ws) {
+      this.offlineQueue.push(msg);
+      this.updateSyncIndicator('offline', 'Hors ligne (' + this.offlineQueue.length + ' en attente)');
+      return;
     }
+    this.ws.send(JSON.stringify(msg));
+    this.showSaved();
   }
 
   sendCursor(x, y) {

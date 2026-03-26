@@ -62,6 +62,8 @@ html, body {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -159,6 +161,13 @@ html, body {
   font-size: 11px;
   font-weight: 700;
   margin-left: 4px;
+  animation: selectionPop 0.25s ease-out;
+}
+
+@keyframes selectionPop {
+  0% { transform: scale(0.6); opacity: 0.5; }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 /* ============================
@@ -170,7 +179,9 @@ html, body {
   display: flex;
   align-items: center;
   gap: 2px;
-  background: var(--panel);
+  background: rgba(30, 30, 30, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--panel-border);
   border-radius: 10px;
   padding: 4px 6px;
@@ -408,12 +419,15 @@ html, body {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: var(--panel);
+  background: rgba(30, 30, 30, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--panel-border);
   border-radius: 12px;
   padding: 6px 8px;
   z-index: 100;
   box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  transition: all 0.2s ease;
 }
 
 .toolbar .divider {
@@ -445,6 +459,7 @@ html, body {
 .tool-btn.active {
   background: var(--btn-active);
   color: white;
+  box-shadow: 0 0 8px rgba(74, 158, 255, 0.5), 0 0 2px rgba(74, 158, 255, 0.3);
 }
 
 .tool-btn svg {
@@ -477,12 +492,15 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  background: var(--panel);
+  background: rgba(30, 30, 30, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--panel-border);
   border-radius: 12px;
   padding: 8px;
   z-index: 100;
   box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  transition: all 0.2s ease;
 }
 
 .color-section-label {
@@ -510,7 +528,8 @@ html, body {
 }
 
 .color-swatch:hover {
-  transform: scale(1.15);
+  transform: scale(1.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .color-swatch.active {
@@ -660,6 +679,7 @@ html, body {
   padding: 8px;
   z-index: 100;
   box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  transition: all 0.2s ease;
 }
 
 .facilitator-label {
@@ -713,18 +733,32 @@ html, body {
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 12px;
-  padding: 12px 24px;
+  padding: 20px 40px 16px;
   z-index: 110;
   text-align: center;
   box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  overflow: hidden;
+}
+
+.timer-display::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--success));
+  border-radius: 0 0 12px 12px;
+  opacity: 0.7;
 }
 
 .timer-time {
-  font-size: 48px;
+  font-size: 56px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--text);
   line-height: 1;
+  letter-spacing: -1px;
 }
 
 .timer-time.warning {
@@ -753,8 +787,8 @@ html, body {
 
 .timer-controls {
   display: flex;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 8px;
+  margin-top: 12px;
   justify-content: center;
 }
 
@@ -789,7 +823,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: var(--panel);
+  background: linear-gradient(135deg, var(--panel) 0%, rgba(74, 158, 255, 0.08) 100%);
   border: 1px solid var(--accent);
   border-radius: 10px;
   padding: 8px 16px;
@@ -959,11 +993,20 @@ html, body {
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
-  transition: background 0.1s;
+  transition: all 0.15s ease;
 }
 
 .anchor-item:hover {
   background: var(--btn-hover);
+  transform: translateX(4px);
+  border-left: 2px solid var(--accent);
+  padding-left: 10px;
+  box-shadow: inset 0 0 0 1px rgba(74, 158, 255, 0.1);
+}
+
+.anchor-item:active {
+  transform: translateX(2px);
+  background: rgba(74, 158, 255, 0.12);
 }
 
 .anchor-item .anchor-icon {
@@ -1125,7 +1168,7 @@ html, body {
    ========================= */
 .toast {
   position: fixed;
-  bottom: 60px;
+  bottom: 80px;
   left: 50%;
   transform: translateX(-50%) translateY(20px);
   background: var(--panel);
@@ -1957,7 +2000,23 @@ button:focus-visible,
 .anchor-toggle-btn:focus-visible,
 .template-btn:focus-visible,
 .theme-toggle:focus-visible,
-.help-btn:focus-visible {
+.help-btn:focus-visible,
+.bb-btn:focus-visible,
+.fmt-btn:focus-visible,
+.modal-btn:focus-visible,
+.quota-btn:focus-visible,
+.color-swatch:focus-visible,
+.stroke-btn:focus-visible,
+.anchor-item:focus-visible,
+.anchors-close:focus-visible,
+.anchors-add:focus-visible,
+.timer-ctrl-btn:focus-visible,
+.vote-bar-btn:focus-visible,
+.isolation-btn:focus-visible,
+.follow-stop-btn:focus-visible,
+.search-btn:focus-visible,
+.confirm-actions button:focus-visible,
+a:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -1982,4 +2041,204 @@ button, .tool-btn, .share-btn, .zoom-btn, .pres-btn {
 @keyframes laserPulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(233, 69, 96, 0.4); }
   50% { box-shadow: 0 0 0 8px rgba(233, 69, 96, 0); }
+}
+
+/* =========================
+   5. CUSTOM SCROLLBAR (dark theme)
+   ========================= */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+body.light-theme ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+body.light-theme ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Thin scrollbar for Firefox */
+.anchors-list,
+.anchor-search-results,
+.template-grid,
+.card-editor-panel {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+body.light-theme .anchors-list,
+body.light-theme .anchor-search-results,
+body.light-theme .template-grid,
+body.light-theme .card-editor-panel {
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+/* =========================
+   13. FACILITATOR AVATAR GOLDEN GLOW
+   ========================= */
+.user-avatar.facilitator {
+  box-shadow: 0 0 8px rgba(255, 217, 102, 0.6), 0 0 16px rgba(255, 217, 102, 0.25);
+}
+
+/* =========================
+   14. RESPONSIVE TOOLBAR - hide shortcut labels on narrow screens
+   ========================= */
+@media (max-width: 768px) {
+  .tool-btn .shortcut {
+    display: none;
+  }
+
+  .toolbar {
+    gap: 2px;
+    padding: 4px 6px;
+  }
+
+  .tool-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .bb-btn-label span:not(.bb-btn-icon) {
+    display: none;
+  }
+}
+
+/* =========================
+   15. BOTTOM BAR BUTTON CSS TOOLTIPS
+   ========================= */
+.bb-btn {
+  position: relative;
+}
+
+.bb-btn[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 200;
+}
+
+.bb-btn[data-tooltip]:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* =========================
+   16. BRAND BADGE FADE ON INTERACTION
+   ========================= */
+body.user-interacting .brand-badge {
+  opacity: 0.25;
+  transition: opacity 0.6s ease;
+}
+
+body:not(.user-interacting) .brand-badge {
+  opacity: 0.7;
+  transition: opacity 0.6s ease;
+}
+
+/* =========================
+   17. ISOLATION BANNER PULSING BORDER
+   ========================= */
+.isolation-banner {
+  animation: isolationPulse 2s ease-in-out infinite;
+}
+
+@keyframes isolationPulse {
+  0%, 100% {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 0 rgba(233, 69, 96, 0.3);
+  }
+  50% {
+    border-color: rgba(233, 69, 96, 0.6);
+    box-shadow: 0 0 12px 2px rgba(233, 69, 96, 0.15);
+  }
+}
+
+/* =========================
+   18. FOLLOW BANNER SLIDE-IN ANIMATION
+   ========================= */
+.follow-banner {
+  animation: followSlideUp 0.35s ease-out;
+}
+
+@keyframes followSlideUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* =========================
+   19. CUSTOM CURSOR STYLES FOR TOOL MODES
+   ========================= */
+body.tool-select #canvas { cursor: default; }
+body.tool-pan #canvas { cursor: grab; }
+body.tool-pan.panning #canvas { cursor: grabbing; }
+body.tool-draw #canvas { cursor: crosshair; }
+body.tool-line #canvas { cursor: crosshair; }
+body.tool-arrow #canvas { cursor: crosshair; }
+body.tool-rect #canvas { cursor: crosshair; }
+body.tool-circle #canvas { cursor: crosshair; }
+body.tool-text #canvas { cursor: text; }
+body.tool-sticky #canvas { cursor: cell; }
+body.tool-eraser #canvas { cursor: not-allowed; }
+body.tool-laser #canvas { cursor: crosshair; }
+body.tool-vote #canvas { cursor: pointer; }
+
+/* =========================
+   20. LOADING SPINNER FOR SYNC RECONNECTION
+   ========================= */
+.sync-reconnecting {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--warning);
+  padding: 0 4px;
+}
+
+.sync-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 217, 102, 0.25);
+  border-top-color: var(--warning);
+  border-radius: 50%;
+  animation: syncSpin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes syncSpin {
+  to { transform: rotate(360deg); }
 }

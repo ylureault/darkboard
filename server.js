@@ -13,9 +13,53 @@ const wss = new WebSocketServer({ server });
 
 const boardStore = new BoardStore();
 
+// Rate limiting for board creation: max 10 per minute per IP
+const boardCreationMap = new Map(); // ip -> { count, resetTime }
+function checkBoardCreationRate(ip) {
+  const now = Date.now();
+  const entry = boardCreationMap.get(ip);
+  if (!entry || now > entry.resetTime) {
+    boardCreationMap.set(ip, { count: 1, resetTime: now + 60000 });
+    return true;
+  }
+  if (entry.count >= 10) {
+    return false;
+  }
+  entry.count++;
+  return true;
+}
+// Clean up stale rate limit entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of boardCreationMap) {
+    if (now > entry.resetTime) boardCreationMap.delete(ip);
+  }
+}, 300000);
+
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  next();
+});
+
+// Request logging for API calls
+app.use('/api', (req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} (${req.ip})`);
+  next();
+});
+
 // Middleware
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+
+// Cache-control headers for static assets
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.css') || filePath.endsWith('.js')) {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
+  }
+}));
 
 // Landing page
 app.get('/', (req, res) => {
@@ -24,6 +68,9 @@ app.get('/', (req, res) => {
 
 // Create new board and redirect
 app.get('/new', (req, res) => {
+  if (!checkBoardCreationRate(req.ip)) {
+    return res.status(429).json({ error: 'Rate limit exceeded. Max 10 boards per minute.' });
+  }
   const boardId = uuidv4().split('-')[0];
   boardStore.createBoard(boardId);
   res.redirect(`/board/${boardId}`);
@@ -56,6 +103,9 @@ app.get('/api/boards', (req, res) => {
 
 // CREATE a new board
 app.post('/api/boards', (req, res) => {
+  if (!checkBoardCreationRate(req.ip)) {
+    return res.status(429).json({ error: 'Rate limit exceeded. Max 10 boards per minute.' });
+  }
   const boardId = req.body.id || uuidv4().split('-')[0];
   if (boardStore.getBoard(boardId)) {
     return res.status(409).json({ error: 'Board already exists', id: boardId });
@@ -75,6 +125,20 @@ app.get('/api/board/:id', (req, res) => {
     elements: Array.from(board.elements.values()),
     anchors: Array.from(board.anchors.values()),
     connectedUsers: board.connections.size,
+    lastActivity: board.lastActivity
+  });
+});
+
+// STATS for a board
+app.get('/api/board/:id/stats', (req, res) => {
+  const board = boardStore.getBoard(req.params.id);
+  if (!board) {
+    return res.status(404).json({ error: 'Board not found' });
+  }
+  res.json({
+    id: req.params.id,
+    elementCount: board.elements.size,
+    userCount: board.connections.size,
     lastActivity: board.lastActivity
   });
 });
@@ -104,7 +168,7 @@ app.put('/api/board/:id', (req, res) => {
 
 // WebSocket
 wss.on('connection', (ws, req) => {
-  handleWebSocket(ws, req, boardStore);
+  handleWebSocket(ws, req, boardStore, wss);
 });
 
 // Cleanup stale boards

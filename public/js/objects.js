@@ -432,6 +432,11 @@ function renderElement(ctx, el, selected, camera) {
     ctx.translate(-cx, -cy);
   }
 
+  // Element opacity support
+  if (el.opacity !== undefined && el.opacity !== null && el.opacity < 1) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, el.opacity));
+  }
+
   // Lock indicator
   if (el.locked) {
     const bounds = getElementBounds(el);
@@ -628,38 +633,103 @@ function drawArrow(ctx, el) {
 
 function drawSticky(ctx, el) {
   const r = 6;
-  ctx.shadowColor = 'rgba(0,0,0,0.3)';
-  ctx.shadowBlur = 12;
-  ctx.shadowOffsetY = 4;
+
+  // Layered shadows for realistic look
+  ctx.shadowColor = 'rgba(0,0,0,0.15)';
+  ctx.shadowBlur = 16;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 8;
 
   ctx.beginPath();
   ctx.roundRect(el.x, el.y, el.width, el.height, r);
   ctx.fillStyle = el.fill || '#FFD966';
   ctx.fill();
 
+  // Second shadow layer (closer, sharper)
+  ctx.shadowColor = 'rgba(0,0,0,0.1)';
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetY = 2;
+  ctx.fill();
+
   ctx.shadowColor = 'transparent';
 
+  // Corner fold with gradient
   const foldSize = 24;
   ctx.beginPath();
   ctx.moveTo(el.x + el.width - foldSize, el.y);
   ctx.lineTo(el.x + el.width, el.y + foldSize);
   ctx.lineTo(el.x + el.width - foldSize, el.y + foldSize);
   ctx.closePath();
-  ctx.fillStyle = 'rgba(0,0,0,0.1)';
+  const foldGrad = ctx.createLinearGradient(
+    el.x + el.width - foldSize, el.y,
+    el.x + el.width, el.y + foldSize
+  );
+  foldGrad.addColorStop(0, 'rgba(0,0,0,0.08)');
+  foldGrad.addColorStop(1, 'rgba(0,0,0,0.2)');
+  ctx.fillStyle = foldGrad;
   ctx.fill();
 
   const textContent = el.richText || el.text;
   if (textContent) {
+    const maxW = el.width - 28;
+    const maxH = el.height - 28;
     if (el.richText) {
       const segments = parseRichText(el.richText);
-      renderRichText(ctx, segments, el.x + 14, el.y + 14, el.width - 28, el.fontSize || 16, '#1a1a1a', el.textAlign || 'left');
+      // Auto-size: reduce font if text overflows
+      let fs = el.fontSize || 16;
+      const minFs = 10;
+      while (fs > minFs) {
+        const testLineH = fs * 1.4;
+        // Rough estimate of lines needed
+        let totalW = 0;
+        for (const seg of segments) {
+          if (seg.text) {
+            ctx.font = `${seg.bold ? 'bold ' : ''}${seg.italic ? 'italic ' : ''}${fs}px -apple-system, BlinkMacSystemFont, sans-serif`;
+            totalW += ctx.measureText(seg.text).width;
+          }
+        }
+        const estLines = Math.ceil(totalW / maxW) + segments.filter(s => s.text === '\n').length;
+        if (estLines * testLineH <= maxH) break;
+        fs -= 1;
+      }
+      renderRichText(ctx, segments, el.x + 14, el.y + 14, maxW, fs, '#1a1a1a', el.textAlign || 'left');
     } else {
+      // Auto-size for plain text
+      let fs = el.fontSize || 16;
+      const minFs = 10;
+      while (fs > minFs) {
+        ctx.font = `${fs}px -apple-system, BlinkMacSystemFont, sans-serif`;
+        const lines = estimateWrapLines(ctx, el.text, maxW);
+        if (lines * fs * 1.4 <= maxH) break;
+        fs -= 1;
+      }
       ctx.fillStyle = '#1a1a1a';
-      ctx.font = `${el.fontSize || 16}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.font = `${fs}px -apple-system, BlinkMacSystemFont, sans-serif`;
       ctx.textBaseline = 'top';
-      wrapText(ctx, el.text, el.x + 14, el.y + 14, el.width - 28, (el.fontSize || 16) * 1.4);
+      wrapText(ctx, el.text, el.x + 14, el.y + 14, maxW, fs * 1.4);
     }
   }
+}
+
+// Estimate number of wrapped lines for plain text
+function estimateWrapLines(ctx, text, maxWidth) {
+  let count = 0;
+  const paragraphs = text.split('\n');
+  for (const para of paragraphs) {
+    const words = para.split(' ');
+    let currentLine = '';
+    for (const word of words) {
+      const test = currentLine ? currentLine + ' ' + word : word;
+      if (ctx.measureText(test).width > maxWidth && currentLine) {
+        count++;
+        currentLine = word;
+      } else {
+        currentLine = test;
+      }
+    }
+    count++;
+  }
+  return count;
 }
 
 function drawText(ctx, el) {
@@ -726,6 +796,26 @@ function drawFrame(ctx, el) {
     ctx.fillStyle = 'white';
     ctx.textBaseline = 'top';
     ctx.fillText(el.text, el.x + labelPad, el.y - labelH + labelPad);
+
+    // Children count badge (next to title)
+    if (el._childrenCount !== undefined && el._childrenCount > 0) {
+      const badgeText = String(el._childrenCount);
+      ctx.font = 'bold 10px sans-serif';
+      const btw = ctx.measureText(badgeText).width;
+      const bx = el.x + textWidth + labelPad * 2 + 8;
+      const by = el.y - labelH + 4;
+      const bw = Math.max(btw + 8, 18);
+      const bh = 16;
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, 8);
+      ctx.fill();
+      ctx.fillStyle = 'white';
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center';
+      ctx.fillText(badgeText, bx + bw / 2, by + bh / 2);
+      ctx.textAlign = 'left';
+    }
   }
 }
 
@@ -817,6 +907,30 @@ function drawEnvelope(ctx, el) {
     ctx.stroke();
     ctx.globalAlpha = 1;
   }
+
+  // Subtle expand/collapse arrow hint at bottom-right of header
+  ctx.save();
+  const arrowX = el.x + el.width - 70;
+  const arrowY = el.y + headerH / 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  if (collapsed) {
+    // Down arrow hint (expand)
+    ctx.beginPath();
+    ctx.moveTo(arrowX - 4, arrowY - 3);
+    ctx.lineTo(arrowX, arrowY + 2);
+    ctx.lineTo(arrowX + 4, arrowY - 3);
+    ctx.stroke();
+  } else {
+    // Up arrow hint (collapse)
+    ctx.beginPath();
+    ctx.moveTo(arrowX - 4, arrowY + 2);
+    ctx.lineTo(arrowX, arrowY - 3);
+    ctx.lineTo(arrowX + 4, arrowY + 2);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawConnector(ctx, el) {
@@ -832,19 +946,25 @@ function drawConnector(ctx, el) {
   }
 
   if (el.lineType === 'curve') {
-    // Bezier curve
+    // Quadratic bezier curve with perpendicular offset for a smooth arc
     const mx = (el.x + el.x2) / 2;
     const my = (el.y + el.y2) / 2;
     const dx = el.x2 - el.x;
     const dy = el.y2 - el.y;
-    const cx1 = el.x + dx * 0.5;
-    const cy1 = el.y;
-    const cx2 = el.x2 - dx * 0.5;
-    const cy2 = el.y2;
+    const dist = Math.hypot(dx, dy);
+    // Control point offset perpendicular to the line
+    const offset = dist * 0.3;
+    const nx = -dy / (dist || 1);
+    const ny = dx / (dist || 1);
+    const cpx = mx + nx * offset;
+    const cpy = my + ny * offset;
     ctx.beginPath();
     ctx.moveTo(el.x, el.y);
-    ctx.bezierCurveTo(cx1, cy1, cx2, cy2, el.x2, el.y2);
+    ctx.quadraticCurveTo(cpx, cpy, el.x2, el.y2);
     ctx.stroke();
+    // Store control point for label positioning
+    el._cpx = cpx;
+    el._cpy = cpy;
   } else if (el.lineType === 'orthogonal') {
     // Right angle path
     const mx = (el.x + el.x2) / 2;
@@ -888,15 +1008,27 @@ function drawConnector(ctx, el) {
     ctx.stroke();
   }
 
-  // Label
+  // Label at midpoint (use curve control point if available for better placement)
   if (el.text) {
-    const mx = (el.x + el.x2) / 2;
-    const my = (el.y + el.y2) / 2;
+    let mx, my;
+    if (el.lineType === 'curve' && el._cpx !== undefined) {
+      // For quadratic bezier, the visual midpoint is at t=0.5: Q(0.5) = avg of endpoints and cp
+      mx = (el.x + 2 * el._cpx + el.x2) / 4;
+      my = (el.y + 2 * el._cpy + el.y2) / 4;
+    } else {
+      mx = (el.x + el.x2) / 2;
+      my = (el.y + el.y2) / 2;
+    }
     const fontSize = el.fontSize || 12;
     ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
     const tw = ctx.measureText(el.text).width;
-    ctx.fillStyle = 'rgba(30,30,30,0.8)';
-    ctx.fillRect(mx - tw / 2 - 4, my - fontSize / 2 - 4, tw + 8, fontSize + 8);
+    // Background pill for label
+    const padX = 6;
+    const padY = 4;
+    ctx.fillStyle = 'rgba(30,30,30,0.85)';
+    ctx.beginPath();
+    ctx.roundRect(mx - tw / 2 - padX, my - fontSize / 2 - padY, tw + padX * 2, fontSize + padY * 2, 4);
+    ctx.fill();
     ctx.fillStyle = '#e0e0e0';
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
@@ -915,7 +1047,15 @@ function drawDiamond(ctx, el) {
   ctx.lineTo(el.x, cy);
   ctx.closePath();
   if (el.fill && el.fill !== 'transparent') {
-    ctx.fillStyle = el.fill;
+    if (el.gradientFill) {
+      // Gradient fill from top to bottom
+      const grad = ctx.createLinearGradient(cx, el.y, cx, el.y + el.height);
+      grad.addColorStop(0, el.fill);
+      grad.addColorStop(1, el.gradientFill);
+      ctx.fillStyle = grad;
+    } else {
+      ctx.fillStyle = el.fill;
+    }
     ctx.fill();
   }
   if (el.stroke && el.stroke !== 'transparent' && el.strokeWidth > 0) {
@@ -1025,8 +1165,14 @@ function drawCard(ctx, el) {
   ctx.lineWidth = el.strokeWidth || 1;
   ctx.stroke();
 
-  // Priority strip (left edge)
-  if (el.cardPriority && CARD_PRIORITY_COLORS[el.cardPriority]) {
+  // Status color bar (left edge)
+  if (el.cardStatus && CARD_STATUS_COLORS[el.cardStatus]) {
+    ctx.fillStyle = CARD_STATUS_COLORS[el.cardStatus];
+    ctx.beginPath();
+    ctx.roundRect(el.x, el.y, 5, h, [r, 0, 0, r]);
+    ctx.fill();
+  } else if (el.cardPriority && CARD_PRIORITY_COLORS[el.cardPriority]) {
+    // Fallback to priority strip if no status
     ctx.fillStyle = CARD_PRIORITY_COLORS[el.cardPriority];
     ctx.beginPath();
     ctx.roundRect(el.x, el.y, 5, h, [r, 0, 0, r]);
@@ -1049,8 +1195,22 @@ function drawCard(ctx, el) {
     ctx.fillStyle = color;
     ctx.textBaseline = 'top';
     ctx.fillText(label, xPad + 6, yOff + 1);
+    // Priority dot next to status badge
+    if (el.cardPriority && CARD_PRIORITY_COLORS[el.cardPriority]) {
+      ctx.fillStyle = CARD_PRIORITY_COLORS[el.cardPriority];
+      ctx.beginPath();
+      ctx.arc(xPad + tw + 20, yOff + 7, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
     yOff += 24;
   } else {
+    // Priority dot standalone when no status
+    if (el.cardPriority && CARD_PRIORITY_COLORS[el.cardPriority]) {
+      ctx.fillStyle = CARD_PRIORITY_COLORS[el.cardPriority];
+      ctx.beginPath();
+      ctx.arc(xPad + 4, yOff + 6, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
     yOff += 4;
   }
 
@@ -1277,6 +1437,46 @@ function drawImage(ctx, el) {
     ctx.shadowOffsetY = 2;
     ctx.drawImage(img, el.x, el.y, el.width, el.height);
     ctx.shadowColor = 'transparent';
+  } else {
+    // Placeholder while image is loading
+    ctx.fillStyle = '#2a2a2a';
+    ctx.beginPath();
+    ctx.roundRect(el.x, el.y, el.width, el.height, 4);
+    ctx.fill();
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Image icon in center
+    const cx = el.x + el.width / 2;
+    const cy = el.y + el.height / 2;
+    const iconS = Math.min(32, el.width * 0.3, el.height * 0.3);
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 1.5;
+    // Outer frame
+    ctx.beginPath();
+    ctx.roundRect(cx - iconS, cy - iconS * 0.8, iconS * 2, iconS * 1.6, 2);
+    ctx.stroke();
+    // Mountain shape
+    ctx.beginPath();
+    ctx.moveTo(cx - iconS * 0.7, cy + iconS * 0.4);
+    ctx.lineTo(cx - iconS * 0.2, cy - iconS * 0.1);
+    ctx.lineTo(cx + iconS * 0.2, cy + iconS * 0.2);
+    ctx.lineTo(cx + iconS * 0.5, cy - iconS * 0.2);
+    ctx.lineTo(cx + iconS * 0.7, cy + iconS * 0.4);
+    ctx.stroke();
+    // Sun circle
+    ctx.beginPath();
+    ctx.arc(cx + iconS * 0.4, cy - iconS * 0.35, iconS * 0.15, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Loading text
+    ctx.fillStyle = '#666';
+    ctx.font = '11px sans-serif';
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'center';
+    ctx.fillText('Loading...', cx, cy + iconS * 0.8 + 6);
+    ctx.textAlign = 'left';
   }
 }
 
@@ -1287,14 +1487,51 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
     const words = line.split(' ');
     let currentLine = '';
     for (const word of words) {
-      const test = currentLine ? currentLine + ' ' + word : word;
-      const metrics = ctx.measureText(test);
-      if (metrics.width > maxWidth && currentLine) {
-        ctx.fillText(currentLine, x, y + offsetY);
-        currentLine = word;
-        offsetY += lineHeight;
-      } else {
-        currentLine = test;
+      // Break very long words that exceed maxWidth on their own
+      let remaining = word;
+      while (remaining) {
+        if (ctx.measureText(remaining).width <= maxWidth || remaining.length <= 1) {
+          const test = currentLine ? currentLine + ' ' + remaining : remaining;
+          const metrics = ctx.measureText(test);
+          if (metrics.width > maxWidth && currentLine) {
+            ctx.fillText(currentLine, x, y + offsetY);
+            currentLine = remaining;
+            offsetY += lineHeight;
+          } else {
+            currentLine = test;
+          }
+          remaining = '';
+        } else {
+          // Find how many characters fit
+          let fit = remaining.length;
+          for (let c = 1; c <= remaining.length; c++) {
+            const sub = remaining.substring(0, c);
+            const testStr = currentLine ? currentLine + ' ' + sub : sub;
+            if (ctx.measureText(testStr).width > maxWidth) {
+              fit = Math.max(1, c - 1);
+              break;
+            }
+          }
+          if (fit === remaining.length) {
+            // Whole thing fits with current line
+            const test = currentLine ? currentLine + ' ' + remaining : remaining;
+            currentLine = test;
+            remaining = '';
+          } else {
+            // Split the word
+            const part = remaining.substring(0, fit);
+            if (currentLine) {
+              ctx.fillText(currentLine, x, y + offsetY);
+              offsetY += lineHeight;
+              currentLine = '';
+            }
+            if (ctx.measureText(part).width <= maxWidth && part.length > 0) {
+              ctx.fillText(part, x, y + offsetY);
+              offsetY += lineHeight;
+            }
+            remaining = remaining.substring(fit);
+          }
+        }
       }
     }
     ctx.fillText(currentLine, x, y + offsetY);

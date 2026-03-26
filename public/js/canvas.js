@@ -17,6 +17,8 @@ class CanvasRenderer {
     this.laserPointers = new Map(); // userId -> {x, y, color}
     this.comments = []; // anchored comments
     this.alignmentGuides = []; // { type: 'h'|'v', x?, y? }
+    this._lastMinimapRender = 0; // throttle minimap to every 500ms
+    this._minimapCache = null;
 
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -107,17 +109,50 @@ class CanvasRenderer {
     const sorted = Array.from(this.elements.values())
       .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
 
+    // Viewport culling: compute visible world bounds to skip off-screen elements
+    const viewTLCull = this.screenToWorld(0, 0);
+    const viewBRCull = this.screenToWorld(w, h);
+    const cullPad = 100 / this.camera.zoom; // padding to avoid popping at edges
+    const vpLeft = viewTLCull.x - cullPad;
+    const vpTop = viewTLCull.y - cullPad;
+    const vpRight = viewBRCull.x + cullPad;
+    const vpBottom = viewBRCull.y + cullPad;
+
+    // Precompute frame children counts for badge rendering
+    for (const el of sorted) {
+      if (el.type === 'frame') {
+        let count = 0;
+        const fb = getElementBounds(el);
+        for (const other of sorted) {
+          if (other.id !== el.id && other.type !== 'frame') {
+            const ob = getElementBounds(other);
+            if (ob.x >= fb.x && ob.y >= fb.y && ob.x + ob.w <= fb.x + fb.w && ob.y + ob.h <= fb.y + fb.h) {
+              count++;
+            }
+          }
+        }
+        el._childrenCount = count;
+      }
+    }
+
     for (const el of sorted) {
       if (el.hidden) continue; // skip hidden elements (collapsed envelope children)
+
+      // Viewport culling: skip elements entirely outside the visible area
+      const elBounds = getElementBounds(el);
+      if (elBounds.x + elBounds.w < vpLeft || elBounds.x > vpRight ||
+          elBounds.y + elBounds.h < vpTop || elBounds.y > vpBottom) {
+        continue;
+      }
+
       // Search highlight glow
       if (el._searchHighlight) {
-        const b = getElementBounds(el);
         ctx.save();
         ctx.shadowColor = '#4a9eff';
         ctx.shadowBlur = 16;
         ctx.strokeStyle = '#4a9eff';
         ctx.lineWidth = 3 / this.camera.zoom;
-        ctx.strokeRect(b.x - 4, b.y - 4, b.w + 8, b.h + 8);
+        ctx.strokeRect(elBounds.x - 4, elBounds.y - 4, elBounds.w + 8, elBounds.h + 8);
         ctx.restore();
       }
       renderElement(ctx, el, this.selectedIds.has(el.id), this.camera);
@@ -220,9 +255,19 @@ class CanvasRenderer {
 
     ctx.restore();
 
-    // Minimap (rendered in screen space, after ctx.restore)
+    // Minimap (rendered in screen space, after ctx.restore) — throttled to every 500ms
     if (this.minimapEnabled) {
-      this.drawMinimap();
+      const now = performance.now();
+      if (now - this._lastMinimapRender >= 500) {
+        this._lastMinimapRender = now;
+        this.drawMinimap();
+      } else if (this._minimapCache) {
+        // Re-draw the cached minimap between throttle intervals
+        const mmW = 180, mmH = 120;
+        const mmX = window.innerWidth - mmW - 16;
+        const mmY = window.innerHeight - mmH - 60;
+        this.ctx.putImageData(this._minimapCache, mmX, mmY);
+      }
     }
   }
 
@@ -506,6 +551,7 @@ class CanvasRenderer {
     const mmX = window.innerWidth - mmW - 16;
     const mmY = window.innerHeight - mmH - 60;
 
+
     // Compute world bounds of all elements
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const el of this.elements.values()) {
@@ -563,6 +609,13 @@ class CanvasRenderer {
     ctx.strokeRect(vpX, vpY, vpW, vpH);
 
     ctx.restore();
+
+    // Cache the minimap region for throttled reuse
+    try {
+      this._minimapCache = this.ctx.getImageData(mmX, mmY, mmW, mmH);
+    } catch (e) {
+      this._minimapCache = null;
+    }
   }
 
   // Snap a position to grid if enabled
