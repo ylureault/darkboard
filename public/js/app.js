@@ -290,17 +290,33 @@ class DarkBoardApp {
         }
       }
 
-      // If text pasted on canvas, create a sticky with that text
+      // If text pasted on canvas, create stickies
       const text = e.clipboardData.getData('text/plain');
       if (text && this.clipboard.length === 0) {
         e.preventDefault();
         const cx = this.renderer.camera.x;
         const cy = this.renderer.camera.y;
-        const el = createSticky(cx - 100, cy - 100);
-        el.text = text;
-        this.addElement(el);
-        this.renderer.selectedIds.clear();
-        this.renderer.selectedIds.add(el.id);
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+        if (lines.length <= 1) {
+          // Single line or paragraph: one sticky
+          const el = createSticky(cx - 100, cy - 100);
+          el.text = text;
+          this.addElement(el);
+          this.renderer.selectedIds.clear();
+          this.renderer.selectedIds.add(el.id);
+        } else {
+          // Multiple lines: one sticky per line, stacked vertically
+          this.renderer.selectedIds.clear();
+          const gap = 16;
+          const stickyH = 200;
+          for (let i = 0; i < lines.length; i++) {
+            const el = createSticky(cx - 100, cy - 100 + i * (stickyH + gap));
+            el.text = lines[i];
+            this.addElement(el);
+            this.renderer.selectedIds.add(el.id);
+          }
+        }
         this.renderer.markDirty();
       }
     });
@@ -1056,6 +1072,24 @@ class DarkBoardApp {
       editor.remove();
       this.textEditElement = null;
       this.renderer.markDirty();
+
+      // If Enter was pressed on a sticky, create a new one below
+      if (this._createStickyBelow) {
+        const src = this._createStickyBelow;
+        this._createStickyBelow = null;
+        const gap = 16;
+        const newEl = createSticky(src.x, src.y + src.height + gap);
+        newEl.width = src.width;
+        newEl.height = src.height;
+        newEl.fill = src.fill;
+        newEl.fontSize = src.fontSize;
+        this.addElement(newEl);
+        this.renderer.selectedIds.clear();
+        this.renderer.selectedIds.add(newEl.id);
+        this.renderer.markDirty();
+        // Immediately start editing the new sticky
+        setTimeout(() => this.startTextEdit(newEl), 50);
+      }
     };
 
     editor.addEventListener('blur', (e) => {
@@ -1079,8 +1113,12 @@ class DarkBoardApp {
       if (e.key === 'Escape') {
         editor.blur();
       }
-      if (!useRichText && e.key === 'Enter' && !e.shiftKey) {
+      // Enter without Shift: finish edit (and create new sticky below if sticky)
+      if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
+        if (el.type === 'sticky') {
+          this._createStickyBelow = el;
+        }
         editor.blur();
       }
       e.stopPropagation();

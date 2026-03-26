@@ -9,6 +9,8 @@ class UI {
     this.initShareButton();
     this.initExportButton();
     this.initCSVExport();
+    this.initJSONExport();
+    this.initJSONImport();
     this.initThemeToggle();
     this.initTemplates();
     this.initMinimap();
@@ -276,6 +278,248 @@ class UI {
     link.click();
     URL.revokeObjectURL(link.href);
     this.app.showToast('Export CSV termine !');
+  }
+
+  initJSONExport() {
+    document.getElementById('exportJSON').addEventListener('click', () => {
+      this.exportJSON();
+    });
+  }
+
+  exportJSON() {
+    const elements = Array.from(this.app.renderer.elements.values());
+    const anchors = this.app.renderer.anchors ? Array.from(this.app.renderer.anchors.values()) : [];
+    if (elements.length === 0) {
+      this.app.showToast('Rien a exporter');
+      return;
+    }
+
+    const data = {
+      format: 'darkboard',
+      version: 1,
+      boardId: getBoardId(),
+      exportedAt: new Date().toISOString(),
+      elements: elements,
+      anchors: anchors
+    };
+
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.download = `darkboard-${getBoardId()}.json`;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    URL.revokeObjectURL(link.href);
+    this.app.showToast('Export JSON termine !');
+  }
+
+  initJSONImport() {
+    document.getElementById('importJSON').addEventListener('click', () => {
+      this.triggerImport();
+    });
+  }
+
+  triggerImport() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,.drft';
+    input.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          this.importData(data, file.name);
+        } catch (err) {
+          this.app.showToast('Fichier invalide : JSON attendu');
+        }
+      };
+      reader.readAsText(file);
+    });
+    input.click();
+  }
+
+  importData(data, filename) {
+    // Detect format
+    if (data.format === 'darkboard' && data.elements) {
+      this.importDarkBoard(data);
+    } else if (data.cards || data.stickies || data.items || data.objects) {
+      this.importDraftIO(data);
+    } else if (Array.isArray(data)) {
+      // Array of elements (simple format)
+      this.importDarkBoard({ elements: data, anchors: [] });
+    } else if (data.elements && !data.format) {
+      // Generic elements export
+      this.importDarkBoard(data);
+    } else {
+      // Try Draft.io-like structure: look for any array of objects with position data
+      const arrays = Object.values(data).filter(v => Array.isArray(v) && v.length > 0);
+      if (arrays.length > 0) {
+        this.importGenericBoard(data);
+      } else {
+        this.app.showToast('Format non reconnu');
+      }
+    }
+  }
+
+  importDarkBoard(data) {
+    const elements = data.elements || [];
+    if (elements.length === 0) {
+      this.app.showToast('Aucun element a importer');
+      return;
+    }
+
+    // Find bounding box to center imported content
+    let minX = Infinity, minY = Infinity;
+    for (const el of elements) {
+      if (el.x < minX) minX = el.x;
+      if (el.y < minY) minY = el.y;
+    }
+
+    // Offset to place near current camera position
+    const camX = this.app.renderer.camera.x;
+    const camY = this.app.renderer.camera.y;
+    const offsetX = camX - minX - 200;
+    const offsetY = camY - minY - 200;
+
+    // Map old IDs to new IDs for references (children, connectors)
+    const idMap = new Map();
+    let count = 0;
+
+    for (const orig of elements) {
+      const el = deepClone(orig);
+      const newId = generateId();
+      idMap.set(el.id, newId);
+      el.id = newId;
+      el.x += offsetX;
+      el.y += offsetY;
+      if (el.x2 !== undefined) { el.x2 += offsetX; el.y2 += offsetY; }
+      if (el.points) {
+        el.points = el.points.map(p => ({ x: p.x + offsetX, y: p.y + offsetY }));
+      }
+      el.zIndex = Date.now() + count;
+      count++;
+      this.app.addElement(el);
+    }
+
+    // Fix references (children, connectors)
+    for (const [, el] of this.app.renderer.elements) {
+      if (el.children) {
+        el.children = el.children.map(cid => idMap.get(cid) || cid);
+      }
+      if (el.sourceId && idMap.has(el.sourceId)) el.sourceId = idMap.get(el.sourceId);
+      if (el.targetId && idMap.has(el.targetId)) el.targetId = idMap.get(el.targetId);
+    }
+
+    this.app.renderer.markDirty();
+    this.app.showToast(`${count} elements importes !`);
+  }
+
+  importDraftIO(data) {
+    // Draft.io .drft files contain cards, stickies, lists, envelopes, etc.
+    const elements = [];
+    let x = 0, y = 0;
+    const spacing = 220;
+    const perRow = 5;
+
+    // Extract items from various Draft.io structures
+    const items = data.cards || data.stickies || data.items || data.objects || [];
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const col = i % perRow;
+      const row = Math.floor(i / perRow);
+
+      const el = {
+        id: generateId(),
+        type: 'sticky',
+        x: item.x ?? item.position?.x ?? (col * spacing),
+        y: item.y ?? item.position?.y ?? (row * spacing),
+        width: item.width || item.w || 200,
+        height: item.height || item.h || 200,
+        fill: item.color || item.fill || item.backgroundColor || '#FFD966',
+        stroke: 'transparent',
+        text: item.text || item.content || item.title || item.label || item.name || '',
+        richText: item.richText || null,
+        fontSize: item.fontSize || 16,
+        zIndex: Date.now() + i,
+        rotation: item.rotation || 0,
+        locked: false,
+        groupId: null
+      };
+
+      // Handle Draft.io card type → DarkBoard card
+      if (item.type === 'card' || item.cardTitle) {
+        el.type = 'card';
+        el.width = item.width || 280;
+        el.height = item.height || 180;
+        el.cardTitle = item.cardTitle || item.title || item.text || '';
+        el.cardDescription = item.cardDescription || item.description || item.content || '';
+        el.cardStatus = item.status || item.cardStatus || 'A faire';
+        el.cardPriority = item.priority || item.cardPriority || 'Moyenne';
+        el.fill = item.color || item.fill || '#4a9eff';
+      }
+
+      // Handle list type
+      if (item.type === 'list') {
+        el.type = 'list';
+        el.width = item.width || 280;
+        el.height = item.height || 300;
+        el.listItems = item.listItems || item.items || [];
+      }
+
+      // Handle envelope/group type
+      if (item.type === 'envelope' || item.type === 'group' || item.type === 'container') {
+        el.type = 'envelope';
+        el.width = item.width || 300;
+        el.height = item.height || 250;
+        el.children = [];
+      }
+
+      elements.push(el);
+    }
+
+    if (elements.length === 0) {
+      this.app.showToast('Aucun element trouve dans le fichier');
+      return;
+    }
+
+    // Place near camera
+    const camX = this.app.renderer.camera.x;
+    const camY = this.app.renderer.camera.y;
+    let minX = Infinity, minY = Infinity;
+    for (const el of elements) {
+      if (el.x < minX) minX = el.x;
+      if (el.y < minY) minY = el.y;
+    }
+    const offsetX = camX - minX - 200;
+    const offsetY = camY - minY - 200;
+
+    for (const el of elements) {
+      el.x += offsetX;
+      el.y += offsetY;
+      this.app.addElement(el);
+    }
+
+    this.app.renderer.markDirty();
+    this.app.showToast(`${elements.length} elements importes depuis Draft.io !`);
+  }
+
+  importGenericBoard(data) {
+    // Try to find any array that looks like board elements
+    const arrays = Object.entries(data)
+      .filter(([, v]) => Array.isArray(v) && v.length > 0)
+      .sort((a, b) => b[1].length - a[1].length);
+
+    if (arrays.length === 0) {
+      this.app.showToast('Format non reconnu');
+      return;
+    }
+
+    // Use the largest array as the source
+    const [key, items] = arrays[0];
+    this.importDraftIO({ items });
   }
 
   initThemeToggle() {
