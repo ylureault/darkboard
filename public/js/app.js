@@ -299,35 +299,170 @@ class DarkBoardApp {
       }
 
       // If text pasted on canvas, create stickies
+      // Check for Miro/rich HTML data first, then fall back to plain text
+      const html = e.clipboardData.getData('text/html');
       const text = e.clipboardData.getData('text/plain');
-      if (text && this.clipboard.length === 0) {
+
+      if ((html || text) && this.clipboard.length === 0) {
         e.preventDefault();
         const cx = this.renderer.camera.x;
         const cy = this.renderer.camera.y;
-        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-        if (lines.length <= 1) {
-          // Single line or paragraph: one sticky
-          const el = createSticky(cx - 100, cy - 100);
-          el.text = text;
-          this.addElement(el);
-          this.renderer.selectedIds.clear();
-          this.renderer.selectedIds.add(el.id);
-        } else {
-          // Multiple lines: one sticky per line, stacked vertically
+        // Try to parse Miro clipboard data or HTML tables
+        const parsed = this.parseClipboardHTML(html, text);
+
+        if (parsed && parsed.length > 0) {
           this.renderer.selectedIds.clear();
           const gap = 16;
+          const stickyW = 200;
           const stickyH = 200;
-          for (let i = 0; i < lines.length; i++) {
-            const el = createSticky(cx - 100, cy - 100 + i * (stickyH + gap));
-            el.text = lines[i];
+          const perRow = Math.min(parsed.length, 5);
+
+          for (let i = 0; i < parsed.length; i++) {
+            const item = parsed[i];
+            const col = i % perRow;
+            const row = Math.floor(i / perRow);
+            const el = createSticky(
+              cx - (perRow * (stickyW + gap)) / 2 + col * (stickyW + gap),
+              cy - 100 + row * (stickyH + gap)
+            );
+            el.text = item.text;
+            if (item.color) el.fill = item.color;
             this.addElement(el);
             this.renderer.selectedIds.add(el.id);
+          }
+          if (parsed.length > 1) {
+            this.showToast(`${parsed.length} post-its colles`);
+          }
+        } else if (text) {
+          // Fallback: plain text
+          const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+          this.renderer.selectedIds.clear();
+
+          if (lines.length <= 1) {
+            const el = createSticky(cx - 100, cy - 100);
+            el.text = text.trim();
+            this.addElement(el);
+            this.renderer.selectedIds.add(el.id);
+          } else {
+            const gap = 16;
+            const stickyH = 200;
+            for (let i = 0; i < lines.length; i++) {
+              const el = createSticky(cx - 100, cy - 100 + i * (stickyH + gap));
+              el.text = lines[i];
+              this.addElement(el);
+              this.renderer.selectedIds.add(el.id);
+            }
+            this.showToast(`${lines.length} post-its colles`);
           }
         }
         this.renderer.markDirty();
       }
     });
+  }
+
+  /**
+   * Parse HTML clipboard data from Miro, Excel, Google Sheets, or generic HTML.
+   * Returns array of { text, color } objects, or null if not parseable.
+   */
+  parseClipboardHTML(html, plainText) {
+    if (!html) return null;
+
+    // Miro color mapping
+    const MIRO_COLORS = {
+      'light_yellow': '#FFD966', 'yellow': '#F5D128', 'orange': '#FF9D48',
+      'light_green': '#93D275', 'green': '#4DB050', 'dark_green': '#2D8B4E',
+      'cyan': '#45B7D1', 'light_pink': '#F5A0C0', 'pink': '#FF6B9D',
+      'violet': '#B384DB', 'red': '#FF6B6B', 'light_blue': '#7BC4FF',
+      'blue': '#4A9EFF', 'dark_blue': '#2E5AAC', 'gray': '#B0B0B0',
+      'black': '#4A4A4A'
+    };
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const results = [];
+
+    // 1. Detect Miro clipboard: look for miro-data-v1 marker
+    const isMiro = html.includes('miro-data-v1');
+
+    if (isMiro) {
+      // Miro puts each sticky's content in top-level <div> blocks after the <span data-meta>
+      // The HTML structure is: <span data-meta="...">, then <div><div><div>text</div></div></div> per sticky
+      // Also look for background-color styles for color info
+
+      // Try to extract from Miro's HTML structure
+      const topDivs = doc.body.querySelectorAll(':scope > div');
+      if (topDivs.length > 0) {
+        for (const div of topDivs) {
+          const text = (div.textContent || '').trim();
+          if (!text) continue;
+
+          // Try to find color from background-color style
+          let color = null;
+          const bgMatch = div.outerHTML.match(/background-color:\s*([^;"]+)/i);
+          if (bgMatch) {
+            color = bgMatch[1].trim();
+          }
+          // Also check Miro fill color names in data attributes
+          const fillMatch = div.outerHTML.match(/data-fill-color="([^"]+)"/i);
+          if (fillMatch && MIRO_COLORS[fillMatch[1]]) {
+            color = MIRO_COLORS[fillMatch[1]];
+          }
+
+          results.push({ text, color });
+        }
+      }
+
+      // If we couldn't parse divs, fall back to plain text split
+      if (results.length === 0 && plainText) {
+        const lines = plainText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        for (const line of lines) {
+          results.push({ text: line, color: null });
+        }
+      }
+
+      return results.length > 0 ? results : null;
+    }
+
+    // 2. Detect HTML table (Excel, Google Sheets, etc.)
+    const tables = doc.querySelectorAll('table');
+    if (tables.length > 0) {
+      const table = tables[0];
+      const cells = table.querySelectorAll('td, th');
+      for (const cell of cells) {
+        const text = (cell.textContent || '').trim();
+        if (!text) continue;
+        let color = null;
+        const bgMatch = cell.style?.backgroundColor || cell.getAttribute('bgcolor');
+        if (bgMatch) color = bgMatch;
+        results.push({ text, color });
+      }
+      return results.length > 0 ? results : null;
+    }
+
+    // 3. Detect tab-separated data (spreadsheet copy)
+    if (plainText && plainText.includes('\t')) {
+      const cells = plainText.split(/[\t\n]/).map(c => c.trim()).filter(c => c.length > 0);
+      if (cells.length > 1) {
+        for (const cell of cells) {
+          results.push({ text: cell, color: null });
+        }
+        return results;
+      }
+    }
+
+    // 4. Generic HTML with multiple block elements (paragraphs, list items, etc.)
+    const blocks = doc.querySelectorAll('p, li, h1, h2, h3, h4, h5, h6');
+    if (blocks.length > 1) {
+      for (const block of blocks) {
+        const text = (block.textContent || '').trim();
+        if (!text) continue;
+        results.push({ text, color: null });
+      }
+      return results.length > 1 ? results : null;
+    }
+
+    return null;
   }
 
   initCursorTimeout() {
