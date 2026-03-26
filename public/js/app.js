@@ -2583,7 +2583,7 @@ class DarkBoardApp {
         ${hit.type === 'list' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editList">✏️ Modifier la liste</div>` : ''}
         ${hit.type === 'connector' ? `
         <div class="context-menu-separator"></div>
-        <div class="context-menu-item" data-action="connStraight">${hit.lineType !== 'orthogonal' && hit.lineType !== 'curved' ? '✓ ' : ''}Ligne droite</div>
+        <div class="context-menu-item" data-action="connStraight">${hit.lineType !== 'orthogonal' && hit.lineType !== 'curve' ? '✓ ' : ''}Ligne droite</div>
         <div class="context-menu-item" data-action="connOrthogonal">${hit.lineType === 'orthogonal' ? '✓ ' : ''}Ligne orthogonale</div>
         <div class="context-menu-item" data-action="connCurved">${hit.lineType === 'curve' ? '✓ ' : ''}Ligne courbee</div>
         ` : ''}
