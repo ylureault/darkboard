@@ -171,6 +171,38 @@ class CanvasRenderer {
       if (hoverEl) this.drawHoverAnchors(ctx, hoverEl);
     }
 
+    // Group display: subtle background for grouped elements
+    const drawnGroups = new Set();
+    for (const id of this.selectedIds) {
+      const el = this.elements.get(id);
+      if (el && el.groupId && !drawnGroups.has(el.groupId)) {
+        drawnGroups.add(el.groupId);
+        // Find all elements in this group
+        let gMinX = Infinity, gMinY = Infinity, gMaxX = -Infinity, gMaxY = -Infinity;
+        for (const [, ge] of this.elements) {
+          if (ge.groupId === el.groupId) {
+            const b = getElementBounds(ge);
+            if (b.x < gMinX) gMinX = b.x;
+            if (b.y < gMinY) gMinY = b.y;
+            if (b.x + b.w > gMaxX) gMaxX = b.x + b.w;
+            if (b.y + b.h > gMaxY) gMaxY = b.y + b.h;
+          }
+        }
+        if (isFinite(gMinX)) {
+          const gPad = 12 / this.camera.zoom;
+          ctx.fillStyle = 'rgba(74, 158, 255, 0.06)';
+          ctx.strokeStyle = 'rgba(74, 158, 255, 0.25)';
+          ctx.lineWidth = 1.5 / this.camera.zoom;
+          ctx.setLineDash([8 / this.camera.zoom, 4 / this.camera.zoom]);
+          ctx.beginPath();
+          ctx.roundRect(gMinX - gPad, gMinY - gPad, (gMaxX - gMinX) + gPad * 2, (gMaxY - gMinY) + gPad * 2, 6 / this.camera.zoom);
+          ctx.fill();
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+    }
+
     // Selection indicators
     for (const id of this.selectedIds) {
       const el = this.elements.get(id);

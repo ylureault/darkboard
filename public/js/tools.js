@@ -269,6 +269,10 @@ const Tools = {
             snapDx = snapped.x - firstOrig.x;
             snapDy = snapped.y - firstOrig.y;
           }
+          // Show snap feedback indicator
+          app.showSnapIndicator();
+        } else {
+          app.hideSnapIndicator();
         }
 
         // Compute alignment guides (Ctrl disables snap)
