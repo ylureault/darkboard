@@ -111,28 +111,59 @@ class DarkBoardApp {
 
   showNameDialog() {
     const boardId = getBoardId();
+    const dialog = document.getElementById('nameDialog');
+    const input = document.getElementById('nameInput');
+    const submit = document.getElementById('nameSubmit');
 
-    // Check if the board exists before proceeding
+    // Pre-fill with saved name if available
+    const savedName = localStorage.getItem('darkboard-name');
+    if (savedName) {
+      input.value = savedName;
+    }
+
+    // Set up event listeners immediately so the dialog is always functional
+    const joinWithName = () => {
+      if (this._joined) return; // prevent double-join
+      const name = input.value.trim() || `User ${getSessionId().slice(0, 4)}`;
+      this.userName = name;
+      localStorage.setItem('darkboard-name', name);
+      dialog.style.display = 'none';
+      this._joined = true;
+      this.sync.connect();
+    };
+
+    submit.addEventListener('click', joinWithName);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') joinWithName();
+      e.stopPropagation();
+    });
+
+    // Check if the board exists
     fetch(`/api/board/${boardId}`)
       .then(res => {
         if (res.ok) {
-          // Board exists — show name dialog or auto-join
-          this.proceedToNameDialog();
+          // Board exists — auto-join if name saved, otherwise show dialog
+          if (savedName) {
+            joinWithName();
+          } else {
+            dialog.style.display = 'flex';
+            input.focus();
+          }
         } else if (res.status === 404) {
           // Board doesn't exist — propose creation
-          this.showBoardNotFound(boardId);
+          this.showBoardNotFound(boardId, joinWithName);
         } else {
-          // Other error — try to proceed anyway
-          this.proceedToNameDialog();
+          if (savedName) { joinWithName(); }
+          else { dialog.style.display = 'flex'; input.focus(); }
         }
       })
       .catch(() => {
-        // Network error — try to proceed anyway
-        this.proceedToNameDialog();
+        if (savedName) { joinWithName(); }
+        else { dialog.style.display = 'flex'; input.focus(); }
       });
   }
 
-  showBoardNotFound(boardId) {
+  showBoardNotFound(boardId, onCreated) {
     const nameDialog = document.getElementById('nameDialog');
     const notFoundDialog = document.getElementById('boardNotFoundDialog');
     nameDialog.style.display = 'none';
@@ -149,43 +180,17 @@ class DarkBoardApp {
         .then(() => {
           notFoundDialog.style.display = 'none';
           this.showToast('Board cree !');
-          this.proceedToNameDialog();
+          const savedName = localStorage.getItem('darkboard-name');
+          if (savedName) {
+            onCreated();
+          } else {
+            nameDialog.style.display = 'flex';
+            document.getElementById('nameInput').focus();
+          }
         })
         .catch(() => {
           this.showToast('Erreur lors de la creation du board');
         });
-    });
-  }
-
-  proceedToNameDialog() {
-    const dialog = document.getElementById('nameDialog');
-    const input = document.getElementById('nameInput');
-    const submit = document.getElementById('nameSubmit');
-
-    // Check if name already saved
-    const savedName = localStorage.getItem('darkboard-name');
-    if (savedName) {
-      this.userName = savedName;
-      dialog.style.display = 'none';
-      this.sync.connect();
-      return;
-    }
-
-    dialog.style.display = 'flex';
-    input.focus();
-
-    const joinWithName = () => {
-      const name = input.value.trim() || `User ${getSessionId().slice(0, 4)}`;
-      this.userName = name;
-      localStorage.setItem('darkboard-name', name);
-      dialog.style.display = 'none';
-      this.sync.connect();
-    };
-
-    submit.addEventListener('click', joinWithName);
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') joinWithName();
-      e.stopPropagation();
     });
   }
 
@@ -323,10 +328,7 @@ class DarkBoardApp {
       }
 
       // If text pasted on canvas, create stickies
-      // Check for Miro/rich HTML data first, then fall back to plain text
-      const html = e.clipboardData.getData('text/html');
-      const text = e.clipboardData.getData('text/plain');
-
+      // html and text already read above
       if ((html || text) && this.clipboard.length === 0) {
         e.preventDefault();
         const cx = this.renderer.camera.x;
