@@ -2631,10 +2631,10 @@ class DarkBoardApp {
           if (this.workshop) this.workshop.addAnchorHere();
           break;
         case 'front':
-          this.updateSelectedElements({ zIndex: Date.now() + 1000 });
+          this.bringToFront();
           break;
         case 'back':
-          this.updateSelectedElements({ zIndex: 1 });
+          this.sendToBack();
           break;
         case 'resetView':
           this.renderer.camera = { x: 0, y: 0, zoom: 1 };
