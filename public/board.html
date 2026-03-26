@@ -309,42 +309,79 @@
     Ancres
   </button>
 
-  <!-- Zoom controls -->
-  <div class="zoom-controls">
-    <button class="zoom-btn" id="zoomOut" title="Dezoomer">-</button>
-    <span class="zoom-level" id="zoomLevel" title="Reinitialiser le zoom">100%</span>
-    <button class="zoom-btn" id="zoomIn" title="Zoomer">+</button>
-    <button class="zoom-btn" id="zoomFit" title="Adapter a l'ecran">⊞</button>
-    <div class="divider" style="height:20px;width:1px;background:var(--panel-border);margin:0 4px"></div>
-    <button class="zoom-btn" id="toggleMinimap" title="Minimap">🗺</button>
-    <button class="zoom-btn" id="toggleSnap" title="Grille magnetique">⊹</button>
+  <!-- ============ BOTTOM BAR LEFT ============ -->
+  <div class="bottom-bar bottom-bar-left">
+    <!-- Zoom -->
+    <button class="bb-btn" id="zoomOut" title="Dezoomer">-</button>
+    <span class="bb-zoom-level" id="zoomLevel" title="Reinitialiser le zoom">100%</span>
+    <button class="bb-btn" id="zoomIn" title="Zoomer">+</button>
+    <button class="bb-btn" id="zoomFit" title="Adapter a l'ecran">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+        <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/>
+      </svg>
+    </button>
+    <div class="bb-sep"></div>
+    <!-- Minimap + Snap -->
+    <button class="bb-btn" id="toggleMinimap" title="Minimap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+        <rect x="2" y="2" width="20" height="20" rx="2"/><rect x="10" y="10" width="8" height="8" rx="1" fill="currentColor" opacity="0.3"/>
+      </svg>
+    </button>
+    <button class="bb-btn" id="toggleSnap" title="Grille magnetique">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+        <path d="M3 3h4v4H3zM17 3h4v4h-4zM3 17h4v4H3zM17 17h4v4h-4z"/><path d="M10 3h4v4h-4zM10 17h4v4h-4zM3 10h4v4H3zM17 10h4v4h-4zM10 10h4v4h-4z" opacity="0.3"/>
+      </svg>
+    </button>
+    <div class="bb-sep"></div>
+    <!-- Theme + Templates + Help -->
+    <button class="bb-btn" id="themeToggle" title="Mode jour/nuit">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" id="themeIcon">
+        <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+      </svg>
+    </button>
+    <button class="bb-btn bb-btn-label" id="templateBtn" title="Modeles">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+        <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+      </svg>
+      Modeles
+    </button>
+    <button class="bb-btn" id="helpBtn" title="Aide (?)">?</button>
+    <div class="bb-sep"></div>
+    <!-- Sync indicator -->
+    <div class="bb-sync" id="syncIndicator">
+      <div class="sync-dot" id="syncDot"></div>
+      <span id="syncText">En ligne</span>
+    </div>
   </div>
 
-  <!-- Right action sidebar -->
-  <div class="action-sidebar" id="actionSidebar">
-    <button class="share-btn" id="presentBtn" title="Mode presentation (ancres)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  <!-- ============ BOTTOM BAR RIGHT ============ -->
+  <div class="bottom-bar bottom-bar-right">
+    <!-- Present + Laser -->
+    <button class="bb-btn bb-btn-label" id="presentBtn" title="Mode presentation (ancres)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
         <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
       </svg>
       Presenter
     </button>
-    <button class="share-btn" id="laserBtn" title="Pointeur laser — visible par tous les participants">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7" stroke-dasharray="3 3"/><circle cx="12" cy="12" r="10" stroke-dasharray="2 4"/>
+    <button class="bb-btn bb-btn-label" id="laserBtn" title="Pointeur laser">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+        <circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7" stroke-dasharray="3 3"/>
       </svg>
       Laser
     </button>
-    <div class="action-sidebar-sep"></div>
-    <button class="share-btn" id="exportBtn" title="Exporter le tableau en image PNG">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <div class="bb-sep"></div>
+    <!-- Export / Import -->
+    <button class="bb-btn bb-btn-label" id="exportBtn" title="Export PNG">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
         <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
         <polyline points="7,10 12,15 17,10"/>
         <line x1="12" y1="15" x2="12" y2="3"/>
       </svg>
       PNG
     </button>
-    <button class="share-btn" id="exportCSV" title="Exporter les donnees en CSV">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <button class="bb-btn bb-btn-label" id="exportCSV" title="Export CSV">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
         <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
         <polyline points="14,2 14,8 20,8"/>
         <line x1="8" y1="13" x2="16" y2="13"/>
@@ -352,25 +389,26 @@
       </svg>
       CSV
     </button>
-    <button class="share-btn" id="exportJSON" title="Exporter le tableau complet en JSON (sauvegarde / transfert)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <button class="bb-btn bb-btn-label" id="exportJSON" title="Export JSON">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
         <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
         <polyline points="14,2 14,8 20,8"/>
         <path d="M8 13l2 2 4-4"/>
       </svg>
       JSON
     </button>
-    <button class="share-btn" id="importJSON" title="Importer un fichier JSON ou Draft.io (.drft)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <button class="bb-btn bb-btn-label" id="importJSON" title="Importer (.json / .drft)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
         <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
         <polyline points="17,8 12,3 7,8"/>
         <line x1="12" y1="3" x2="12" y2="15"/>
       </svg>
       Importer
     </button>
-    <div class="action-sidebar-sep"></div>
-    <button class="share-btn" id="shareBtn" title="Copier le lien du tableau pour inviter des participants">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <div class="bb-sep"></div>
+    <!-- Share -->
+    <button class="bb-btn bb-btn-label bb-btn-accent" id="shareBtn" title="Copier le lien du tableau">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
         <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
         <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
         <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
@@ -387,21 +425,7 @@
     <button class="pres-btn" id="presExit" title="Quitter">✕</button>
   </div>
 
-  <!-- Day/night mode toggle -->
-  <button class="theme-toggle" id="themeToggle" title="Mode jour/nuit">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="themeIcon">
-      <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
-    </svg>
-  </button>
-
-  <!-- Template button -->
-  <button class="template-btn" id="templateBtn" title="Modeles">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-      <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-      <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
-    </svg>
-    Modeles
-  </button>
+  <!-- Theme and Template buttons are now in the bottom-bar-left -->
 
   <!-- Template modal -->
   <div class="modal-overlay" id="templateModal" style="display:none;" role="dialog" aria-label="Choix de modele">
@@ -414,11 +438,7 @@
     </div>
   </div>
 
-  <!-- Sync status indicator -->
-  <div class="sync-indicator" id="syncIndicator">
-    <span class="sync-dot" id="syncDot"></span>
-    <span class="sync-text" id="syncText">Connexion...</span>
-  </div>
+  <!-- Sync indicator is now in the bottom-bar-left -->
 
   <!-- Insuffle branding badge + selection count -->
   <div class="brand-badge">
@@ -495,8 +515,7 @@
     </div>
   </div>
 
-  <!-- Help button -->
-  <button class="help-btn" id="helpBtn" title="Aide et raccourcis (?)">?</button>
+  <!-- Help button is now in the bottom-bar-left -->
 
   <!-- Toast -->
   <div class="toast" id="toast" role="status" aria-live="polite"></div>

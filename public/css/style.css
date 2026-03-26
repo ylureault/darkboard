@@ -161,29 +161,116 @@ html, body {
   margin-left: 4px;
 }
 
-/* Action sidebar */
-.action-sidebar {
+/* ============================
+   BOTTOM BARS (unified toolbar)
+   ============================ */
+.bottom-bar {
   position: fixed;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  bottom: 12px;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 2px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 4px 6px;
   z-index: 100;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
 }
 
-.action-sidebar .share-btn {
-  position: relative;
-  right: auto;
-  bottom: auto;
+.bottom-bar-left {
+  left: 12px;
 }
 
-.action-sidebar-sep {
-  height: 1px;
+.bottom-bar-right {
+  right: 12px;
+}
+
+.bb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+
+.bb-btn:hover {
+  background: var(--btn-hover);
+}
+
+.bb-btn.active {
+  background: var(--accent);
+  color: white;
+}
+
+.bb-btn-label {
+  width: auto;
+  padding: 0 10px;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bb-btn-accent {
+  background: var(--accent);
+  color: white;
+}
+
+.bb-btn-accent:hover {
+  background: #3d8ae6;
+}
+
+.bb-zoom-level {
+  min-width: 46px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  padding: 4px 2px;
+  border-radius: 4px;
+}
+
+.bb-zoom-level:hover {
+  background: var(--btn-hover);
+}
+
+.bb-sep {
+  width: 1px;
+  height: 20px;
   background: var(--panel-border);
-  margin: 2px 8px;
+  margin: 0 4px;
+  flex-shrink: 0;
 }
+
+.bb-sync {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+
+.bb-sync .sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4ecdc4;
+  flex-shrink: 0;
+}
+
+/* Keep old selectors for JS compatibility */
+.action-sidebar { display: none; }
+.action-sidebar-sep { display: none; }
 
 .modal h2 {
   font-size: 22px;
@@ -936,8 +1023,8 @@ html, body {
 
 .anchor-toggle-btn {
   position: fixed;
-  bottom: 12px;
-  right: 240px;
+  bottom: 56px;
+  right: 12px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -962,19 +1049,9 @@ html, body {
 /* =========================
    ZOOM CONTROLS
    ========================= */
+/* Old zoom-controls replaced by bottom-bar-left */
 .zoom-controls {
-  position: fixed;
-  bottom: 12px;
-  right: 12px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 10px;
-  padding: 4px 8px;
-  z-index: 100;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  display: none;
 }
 
 .zoom-btn {
@@ -1069,21 +1146,9 @@ html, body {
 }
 
 /* Sync status indicator */
+/* Old sync-indicator replaced by bb-sync inside bottom-bar-left */
 .sync-indicator {
-  position: fixed;
-  bottom: 14px;
-  left: 170px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 20px;
-  padding: 4px 12px 4px 8px;
-  font-size: 11px;
-  color: var(--text-muted);
-  z-index: 200;
-  transition: all 0.3s;
+  display: none;
 }
 
 .sync-dot {
@@ -1300,22 +1365,9 @@ html, body {
 /* =========================
    DAY/NIGHT THEME TOGGLE
    ========================= */
+/* Old theme-toggle replaced by bb-btn inside bottom-bar-left */
 .theme-toggle {
-  position: fixed;
-  bottom: 56px;
-  left: 16px;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  color: var(--text);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  z-index: 100;
+  display: none;
 }
 
 .theme-toggle:hover {
@@ -1331,22 +1383,9 @@ html, body {
 /* =========================
    TEMPLATE BUTTON & MODAL
    ========================= */
+/* Old template-btn replaced by bb-btn inside bottom-bar-left */
 .template-btn {
-  position: fixed;
-  bottom: 56px;
-  left: 66px;
-  height: 40px;
-  padding: 0 14px;
-  border-radius: 20px;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  color: var(--text);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  transition: all 0.2s;
+  display: none;
   z-index: 100;
 }
 
@@ -1840,22 +1879,9 @@ html, body {
   flex-shrink: 0;
 }
 
+/* Old help-btn replaced by bb-btn inside bottom-bar-left */
 .help-btn {
-  position: fixed;
-  bottom: 56px;
-  left: 120px;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  color: var(--accent);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  font-weight: 800;
+  display: none;
   transition: all 0.2s;
   z-index: 100;
   box-shadow: 0 2px 12px rgba(0,0,0,0.3);
@@ -1902,12 +1928,9 @@ body.light-theme .toolbar,
 body.light-theme .color-panel,
 body.light-theme .users-panel,
 body.light-theme .facilitator-panel,
-body.light-theme .zoom-controls,
+body.light-theme .bottom-bar,
 body.light-theme .share-btn,
-body.light-theme .anchor-toggle-btn,
-body.light-theme .template-btn,
-body.light-theme .theme-toggle,
-body.light-theme .help-btn {
+body.light-theme .anchor-toggle-btn {
   box-shadow: 0 2px 12px rgba(0,0,0,0.08);
 }
 
