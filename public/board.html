@@ -442,7 +442,7 @@
       <h2>Choisir un modele</h2>
       <div class="template-grid" id="templateGrid"></div>
       <div class="modal-actions">
-        <button class="modal-btn modal-btn-secondary" id="templateClose">Fermer</button>
+        <button class="modal-btn modal-btn-secondary" id="templateClose" aria-label="Fermer les modeles">Fermer</button>
       </div>
     </div>
   </div>
@@ -469,57 +469,73 @@
       <div class="help-grid">
         <div class="help-section">
           <h4>Outils</h4>
-          <div class="help-row"><kbd>V</kbd> Selectionner</div>
-          <div class="help-row"><kbd>H</kbd> Main (deplacer la vue)</div>
-          <div class="help-row"><kbd>R</kbd> Rectangle</div>
-          <div class="help-row"><kbd>O</kbd> Cercle</div>
-          <div class="help-row"><kbd>L</kbd> Ligne</div>
-          <div class="help-row"><kbd>A</kbd> Fleche</div>
-          <div class="help-row"><kbd>K</kbd> Connecteur</div>
-          <div class="help-row"><kbd>D</kbd> Dessin libre</div>
-          <div class="help-row"><kbd>S</kbd> Post-it</div>
-          <div class="help-row"><kbd>T</kbd> Texte</div>
-          <div class="help-row"><kbd>F</kbd> Cadre / Zone</div>
-          <div class="help-row"><kbd>E</kbd> Gomme</div>
-          <div class="help-row"><kbd>M</kbd> Carte management</div>
-          <div class="help-row"><kbd>I</kbd> Liste</div>
-          <div class="help-row"><kbd>G</kbd> Enveloppe</div>
+          <table class="help-table" aria-label="Raccourcis outils">
+            <tbody>
+              <tr><td><kbd>V</kbd></td><td>Selectionner</td></tr>
+              <tr><td><kbd>H</kbd></td><td>Main (deplacer la vue)</td></tr>
+              <tr><td><kbd>R</kbd></td><td>Rectangle</td></tr>
+              <tr><td><kbd>O</kbd></td><td>Cercle</td></tr>
+              <tr><td><kbd>L</kbd></td><td>Ligne</td></tr>
+              <tr><td><kbd>A</kbd></td><td>Fleche</td></tr>
+              <tr><td><kbd>K</kbd></td><td>Connecteur</td></tr>
+              <tr><td><kbd>D</kbd></td><td>Dessin libre</td></tr>
+              <tr><td><kbd>S</kbd></td><td>Post-it</td></tr>
+              <tr><td><kbd>T</kbd></td><td>Texte</td></tr>
+              <tr><td><kbd>F</kbd></td><td>Cadre / Zone</td></tr>
+              <tr><td><kbd>E</kbd></td><td>Gomme</td></tr>
+              <tr><td><kbd>M</kbd></td><td>Carte management</td></tr>
+              <tr><td><kbd>I</kbd></td><td>Liste</td></tr>
+              <tr><td><kbd>G</kbd></td><td>Enveloppe</td></tr>
+            </tbody>
+          </table>
         </div>
         <div class="help-section">
           <h4>Actions</h4>
-          <div class="help-row"><kbd>Ctrl+Z</kbd> Annuler</div>
-          <div class="help-row"><kbd>Ctrl+Y</kbd> Retablir</div>
-          <div class="help-row"><kbd>Ctrl+C</kbd> Copier</div>
-          <div class="help-row"><kbd>Ctrl+X</kbd> Couper</div>
-          <div class="help-row"><kbd>Ctrl+V</kbd> Coller</div>
-          <div class="help-row"><kbd>Ctrl+A</kbd> Tout selectionner</div>
-          <div class="help-row"><kbd>Ctrl+G</kbd> Grouper</div>
-          <div class="help-row"><kbd>Ctrl+Shift+G</kbd> Degrouper</div>
-          <div class="help-row"><kbd>Ctrl+D</kbd> Dupliquer</div>
-          <div class="help-row"><kbd>Ctrl+F</kbd> Rechercher / Remplacer</div>
-          <div class="help-row"><kbd>Suppr</kbd> Supprimer</div>
-          <div class="help-row"><kbd>N</kbd> Panneau ancres</div>
-          <div class="help-row"><kbd>?</kbd> Aide (cette fenetre)</div>
+          <table class="help-table" aria-label="Raccourcis actions">
+            <tbody>
+              <tr><td><kbd>Ctrl+Z</kbd></td><td>Annuler</td></tr>
+              <tr><td><kbd>Ctrl+Y</kbd></td><td>Retablir</td></tr>
+              <tr><td><kbd>Ctrl+C</kbd></td><td>Copier</td></tr>
+              <tr><td><kbd>Ctrl+X</kbd></td><td>Couper</td></tr>
+              <tr><td><kbd>Ctrl+V</kbd></td><td>Coller</td></tr>
+              <tr><td><kbd>Ctrl+A</kbd></td><td>Tout selectionner</td></tr>
+              <tr><td><kbd>Ctrl+G</kbd></td><td>Grouper</td></tr>
+              <tr><td><kbd>Ctrl+Shift+G</kbd></td><td>Degrouper</td></tr>
+              <tr><td><kbd>Ctrl+D</kbd></td><td>Dupliquer</td></tr>
+              <tr><td><kbd>Ctrl+F</kbd></td><td>Rechercher / Remplacer</td></tr>
+              <tr><td><kbd>Suppr</kbd></td><td>Supprimer</td></tr>
+              <tr><td><kbd>N</kbd></td><td>Panneau ancres</td></tr>
+              <tr><td><kbd>?</kbd></td><td>Aide (cette fenetre)</td></tr>
+            </tbody>
+          </table>
         </div>
         <div class="help-section">
           <h4>Navigation</h4>
-          <div class="help-row"><kbd>Molette</kbd> Zoom</div>
-          <div class="help-row"><kbd>Ctrl++/-</kbd> Zoom +/-</div>
-          <div class="help-row"><kbd>Ctrl+0</kbd> Adapter a l'ecran</div>
-          <div class="help-row"><kbd>Fleches</kbd> Deplacer selection (1px)</div>
-          <div class="help-row"><kbd>Shift+Fleches</kbd> Deplacer (10px)</div>
-          <div class="help-row"><kbd>Ctrl+Fleches</kbd> Deplacer (100px)</div>
-          <div class="help-row"><kbd>Alt+Glisser</kbd> Dupliquer un element</div>
-          <div class="help-row"><kbd>Shift</kbd> Proportions contraintes</div>
-          <div class="help-row"><kbd>Espace+Glisser</kbd> Deplacer la vue</div>
+          <table class="help-table" aria-label="Raccourcis navigation">
+            <tbody>
+              <tr><td><kbd>Molette</kbd></td><td>Zoom</td></tr>
+              <tr><td><kbd>Ctrl++/-</kbd></td><td>Zoom +/-</td></tr>
+              <tr><td><kbd>Ctrl+0</kbd></td><td>Adapter a l'ecran</td></tr>
+              <tr><td><kbd>Fleches</kbd></td><td>Deplacer selection (1px)</td></tr>
+              <tr><td><kbd>Shift+Fleches</kbd></td><td>Deplacer (10px)</td></tr>
+              <tr><td><kbd>Ctrl+Fleches</kbd></td><td>Deplacer (100px)</td></tr>
+              <tr><td><kbd>Alt+Glisser</kbd></td><td>Dupliquer un element</td></tr>
+              <tr><td><kbd>Shift</kbd></td><td>Proportions contraintes</td></tr>
+              <tr><td><kbd>Espace+Glisser</kbd></td><td>Deplacer la vue</td></tr>
+            </tbody>
+          </table>
           <h4 style="margin-top:12px">Collaboration</h4>
-          <div class="help-row">Clic sur utilisateur → aller a sa position</div>
-          <div class="help-row">Laser: visible par tous en temps reel</div>
-          <div class="help-row">Animateur: timer, vote, isoloir, suivez-moi</div>
+          <table class="help-table" aria-label="Astuces collaboration">
+            <tbody>
+              <tr><td colspan="2">Clic sur utilisateur &#8594; aller a sa position</td></tr>
+              <tr><td colspan="2">Laser: visible par tous en temps reel</td></tr>
+              <tr><td colspan="2">Animateur: timer, vote, isoloir, suivez-moi</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
       <div class="modal-actions">
-        <button class="modal-btn" id="helpClose">Compris !</button>
+        <button class="modal-btn" id="helpClose" aria-label="Fermer l'aide">Compris !</button>
       </div>
     </div>
   </div>

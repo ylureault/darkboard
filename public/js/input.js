@@ -370,6 +370,7 @@ class InputHandler {
       if (e.key === 'v' && !e.shiftKey) { e.preventDefault(); this.app.paste(); return; }
       if (e.key === 'g' && e.shiftKey) { e.preventDefault(); this.app.ungroupSelected(); return; }
       if (e.key === 'g') { e.preventDefault(); this.app.groupSelected(); return; }
+      if (e.key === 'd' && e.shiftKey) { e.preventDefault(); this.app.duplicateSelectedWithOffset(); return; }
       if (e.key === 'd') { e.preventDefault(); this.app.duplicateSelected(); return; }
 
       // Ctrl+F: Search & replace
@@ -379,6 +380,12 @@ class InputHandler {
         return;
       }
 
+      // Ctrl+Shift+0: Zoom to fit selected elements
+      if (e.key === '0' && e.shiftKey) {
+        e.preventDefault();
+        this.app.zoomToSelection();
+        return;
+      }
       // Ctrl+0: Fit to screen
       if (e.key === '0') {
         e.preventDefault();
@@ -526,6 +533,17 @@ class InputHandler {
 
     // Escape — close everything in priority order
     if (e.key === 'Escape') {
+      // Close formatting toolbar
+      if (this.app.formattingToolbar) {
+        this.app.hideFormattingToolbar();
+        return;
+      }
+      // Close any color picker
+      const colorPicker = document.querySelector('.fmt-color-picker');
+      if (colorPicker) { colorPicker.remove(); return; }
+      // Close users dropdown
+      const usersDropdown = document.querySelector('.users-dropdown');
+      if (usersDropdown) { usersDropdown.remove(); return; }
       // Close help overlay
       const helpOverlay = document.getElementById('helpOverlay');
       if (helpOverlay && helpOverlay.style.display !== 'none') {
@@ -539,7 +557,7 @@ class InputHandler {
       const cardEditor = document.querySelector('.card-editor-panel');
       if (cardEditor) { cardEditor.remove(); return; }
       // Close context menu
-      if (this.app.contextMenuEl) { this.app.hideContextMenu(); return; }
+      if (this.app.contextMenu) { this.app.hideContextMenu(); return; }
       // Close search panel if open
       if (this.app.searchPanel && this.app.searchPanel.style.display !== 'none') {
         this.app.closeSearchPanel();
@@ -555,6 +573,18 @@ class InputHandler {
       const templateModal = document.getElementById('templateModal');
       if (templateModal && templateModal.style.display !== 'none') {
         templateModal.style.display = 'none';
+        return;
+      }
+      // Close name dialog
+      const nameDialog = document.getElementById('nameDialog');
+      if (nameDialog && nameDialog.style.display === 'flex' && this.app._joined) {
+        nameDialog.style.display = 'none';
+        return;
+      }
+      // Close board not found dialog
+      const notFoundDialog = document.getElementById('boardNotFoundDialog');
+      if (notFoundDialog && notFoundDialog.style.display === 'flex') {
+        notFoundDialog.style.display = 'none';
         return;
       }
       // Exit presentation mode
