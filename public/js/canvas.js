@@ -286,21 +286,37 @@ class CanvasRenderer {
     const startX = Math.floor(startWorld.x / gridSize) * gridSize;
     const startY = Math.floor(startWorld.y / gridSize) * gridSize;
 
-    ctx.strokeStyle = this.gridColor || 'rgba(255, 255, 255, 0.04)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
+    if (this.gridPattern === 'dots') {
+      // Dot grid pattern
+      const dotColor = this.gridColor || 'rgba(255, 255, 255, 0.08)';
+      const dotRadius = Math.max(1, 1.5 * zoom);
+      ctx.fillStyle = dotColor;
+      for (let x = startX; x <= endWorld.x; x += gridSize) {
+        for (let y = startY; y <= endWorld.y; y += gridSize) {
+          const s = this.worldToScreen(x, y);
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, dotRadius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    } else {
+      // Line grid (default)
+      ctx.strokeStyle = this.gridColor || 'rgba(255, 255, 255, 0.04)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
 
-    for (let x = startX; x <= endWorld.x; x += gridSize) {
-      const s = this.worldToScreen(x, 0);
-      ctx.moveTo(s.x, 0);
-      ctx.lineTo(s.x, h);
+      for (let x = startX; x <= endWorld.x; x += gridSize) {
+        const s = this.worldToScreen(x, 0);
+        ctx.moveTo(s.x, 0);
+        ctx.lineTo(s.x, h);
+      }
+      for (let y = startY; y <= endWorld.y; y += gridSize) {
+        const s = this.worldToScreen(0, y);
+        ctx.moveTo(0, s.y);
+        ctx.lineTo(w, s.y);
+      }
+      ctx.stroke();
     }
-    for (let y = startY; y <= endWorld.y; y += gridSize) {
-      const s = this.worldToScreen(0, y);
-      ctx.moveTo(0, s.y);
-      ctx.lineTo(w, s.y);
-    }
-    ctx.stroke();
   }
 
   drawSelectionBox(ctx, el) {
