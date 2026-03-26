@@ -130,6 +130,12 @@ class CanvasRenderer {
       ctx.globalAlpha = 1;
     }
 
+    // Hover anchors on non-selected element
+    if (this._hoveredElementId && !this.selectedIds.has(this._hoveredElementId)) {
+      const hoverEl = this.elements.get(this._hoveredElementId);
+      if (hoverEl) this.drawHoverAnchors(ctx, hoverEl);
+    }
+
     // Selection indicators
     for (const id of this.selectedIds) {
       const el = this.elements.get(id);
@@ -264,26 +270,46 @@ class CanvasRenderer {
     ctx.strokeRect(bounds.x - pad, bounds.y - pad, bounds.w + pad * 2, bounds.h + pad * 2);
     ctx.setLineDash([]);
 
-    // Handles
-    const handles = [
+    // Corner resize handles (squares)
+    const corners = [
       { x: bounds.x, y: bounds.y },
       { x: bounds.x + bounds.w, y: bounds.y },
       { x: bounds.x, y: bounds.y + bounds.h },
       { x: bounds.x + bounds.w, y: bounds.y + bounds.h },
-      { x: bounds.x + bounds.w / 2, y: bounds.y },
-      { x: bounds.x + bounds.w / 2, y: bounds.y + bounds.h },
-      { x: bounds.x, y: bounds.y + bounds.h / 2 },
-      { x: bounds.x + bounds.w, y: bounds.y + bounds.h / 2 },
     ];
 
     ctx.fillStyle = 'white';
     ctx.strokeStyle = '#4a9eff';
     ctx.lineWidth = 2 / this.camera.zoom;
-    for (const h of handles) {
+    for (const h of corners) {
       ctx.beginPath();
       ctx.arc(h.x, h.y, handleSize / 2, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+    }
+
+    // Connection anchor points (edge centers) — like Miro
+    if (el.type !== 'line' && el.type !== 'arrow' && el.type !== 'connector' && el.type !== 'freehand') {
+      const anchorR = 6 / this.camera.zoom;
+      const anchors = [
+        { x: bounds.x + bounds.w / 2, y: bounds.y },          // top
+        { x: bounds.x + bounds.w / 2, y: bounds.y + bounds.h }, // bottom
+        { x: bounds.x, y: bounds.y + bounds.h / 2 },           // left
+        { x: bounds.x + bounds.w, y: bounds.y + bounds.h / 2 }, // right
+      ];
+      for (const a of anchors) {
+        // Outer glow when hovered
+        const isHovered = this._hoveredAnchor &&
+          this._hoveredAnchor.elementId === el.id &&
+          Math.hypot(a.x - this._hoveredAnchor.x, a.y - this._hoveredAnchor.y) < 1;
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, isHovered ? anchorR * 1.4 : anchorR, 0, Math.PI * 2);
+        ctx.fillStyle = isHovered ? '#4ecdc4' : 'white';
+        ctx.fill();
+        ctx.strokeStyle = isHovered ? '#4ecdc4' : '#4a9eff';
+        ctx.lineWidth = 2 / this.camera.zoom;
+        ctx.stroke();
+      }
     }
 
     // Rotation handle (top center, above element)
@@ -314,6 +340,59 @@ class CanvasRenderer {
       ctx.lineWidth = 1.5 / this.camera.zoom;
       ctx.stroke();
     }
+  }
+
+  // Draw anchor points on hovered (non-selected) element
+  drawHoverAnchors(ctx, el) {
+    const bounds = getElementBounds(el);
+    if (el.type === 'line' || el.type === 'arrow' || el.type === 'connector' || el.type === 'freehand') return;
+    const anchorR = 5 / this.camera.zoom;
+    const anchors = [
+      { x: bounds.x + bounds.w / 2, y: bounds.y },
+      { x: bounds.x + bounds.w / 2, y: bounds.y + bounds.h },
+      { x: bounds.x, y: bounds.y + bounds.h / 2 },
+      { x: bounds.x + bounds.w, y: bounds.y + bounds.h / 2 },
+    ];
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+    for (const a of anchors) {
+      ctx.beginPath();
+      ctx.arc(a.x, a.y, anchorR, 0, Math.PI * 2);
+      ctx.fillStyle = 'white';
+      ctx.fill();
+      ctx.strokeStyle = '#4a9eff';
+      ctx.lineWidth = 1.5 / this.camera.zoom;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Hit test for anchor connection points on selected elements
+  hitTestAnchor(worldX, worldY) {
+    const anchorR = 10 / this.camera.zoom;
+    for (const id of this.selectedIds) {
+      const el = this.elements.get(id);
+      if (!el || el.type === 'line' || el.type === 'arrow' || el.type === 'connector' || el.type === 'freehand') continue;
+      const anchors = getAnchorPoints(el);
+      for (const a of anchors) {
+        if (Math.hypot(worldX - a.x, worldY - a.y) < anchorR) {
+          return { elementId: id, x: a.x, y: a.y, side: a.side };
+        }
+      }
+    }
+    // Also check hovered element
+    if (this._hoveredElementId) {
+      const el = this.elements.get(this._hoveredElementId);
+      if (el && el.type !== 'line' && el.type !== 'arrow' && el.type !== 'connector' && el.type !== 'freehand') {
+        const anchors = getAnchorPoints(el);
+        for (const a of anchors) {
+          if (Math.hypot(worldX - a.x, worldY - a.y) < anchorR) {
+            return { elementId: this._hoveredElementId, x: a.x, y: a.y, side: a.side };
+          }
+        }
+      }
+    }
+    return null;
   }
 
   drawRemoteCursor(ctx, user) {

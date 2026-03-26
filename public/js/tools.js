@@ -47,6 +47,21 @@ const Tools = {
         return;
       }
 
+      // Check anchor point drag → start connector creation
+      const anchorHit = app.renderer.hitTestAnchor(worldX, worldY);
+      if (anchorHit) {
+        this.dragType = 'anchor-connect';
+        this._connectorSourceId = anchorHit.elementId;
+        this._connectorStartAnchor = anchorHit;
+        app.renderer.previewElement = createElement('connector', {
+          x: anchorHit.x, y: anchorHit.y, x2: worldX, y2: worldY,
+          stroke: app.currentStroke, strokeWidth: app.currentStrokeWidth,
+          connectorStyle: 'arrow'
+        });
+        app.renderer.markDirty();
+        return;
+      }
+
       // Check resize/rotation handles first
       const handleHit = app.renderer.hitTestHandle(worldX, worldY);
       if (handleHit) {
@@ -142,14 +157,53 @@ const Tools = {
     },
 
     onPointerMove(app, worldX, worldY, e) {
+      // Handle anchor-connect drag (creating connector from anchor point)
+      if (this.dragType === 'anchor-connect') {
+        if (!app.renderer.previewElement) return;
+        const hit = app.renderer.hitTest(worldX, worldY);
+        if (hit && hit.type !== 'connector' && hit.id !== this._connectorSourceId) {
+          const anchors = getAnchorPoints(hit);
+          let best = anchors[0], bestDist = Infinity;
+          for (const a of anchors) {
+            const d = Math.hypot(a.x - worldX, a.y - worldY);
+            if (d < bestDist) { bestDist = d; best = a; }
+          }
+          app.renderer.previewElement.x2 = best.x;
+          app.renderer.previewElement.y2 = best.y;
+          app.renderer.connectorSnapTarget = hit.id;
+        } else {
+          app.renderer.previewElement.x2 = worldX;
+          app.renderer.previewElement.y2 = worldY;
+          app.renderer.connectorSnapTarget = null;
+        }
+        app.renderer.canvas.style.cursor = 'crosshair';
+        app.renderer.markDirty();
+        return;
+      }
+
       if (!this.dragStart) {
         // Hover cursor: contextual based on what's under the pointer
+        const anchorHit = app.renderer.hitTestAnchor(worldX, worldY);
+        if (anchorHit) {
+          app.renderer._hoveredAnchor = anchorHit;
+          app.renderer.canvas.style.cursor = 'crosshair';
+          app.renderer.markDirty();
+          return;
+        }
+        app.renderer._hoveredAnchor = null;
+
         const handleHit = app.renderer.hitTestHandle(worldX, worldY);
         if (handleHit) {
           const cursors = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', rotate: 'grab' };
           app.renderer.canvas.style.cursor = cursors[handleHit.handle] || 'default';
         } else {
           const hit = app.renderer.hitTest(worldX, worldY);
+          // Track hovered element for anchor display
+          const newHoverId = hit ? hit.id : null;
+          if (newHoverId !== app.renderer._hoveredElementId) {
+            app.renderer._hoveredElementId = newHoverId;
+            app.renderer.markDirty();
+          }
           if (hit) {
             app.renderer.canvas.style.cursor = hit.locked ? 'not-allowed' : 'move';
           } else {
@@ -304,6 +358,44 @@ const Tools = {
     onPointerUp(app, worldX, worldY, e) {
       // Clear alignment guides
       app.renderer.alignmentGuides = [];
+
+      // Handle anchor-connect: finalize connector creation
+      if (this.dragType === 'anchor-connect') {
+        const targetHit = app.renderer.hitTest(worldX, worldY);
+        const targetId = (targetHit && targetHit.type !== 'connector' && targetHit.id !== this._connectorSourceId) ? targetHit.id : null;
+        const sourceId = this._connectorSourceId;
+
+        // Only create if we actually connected to a different element or dragged far enough
+        const preview = app.renderer.previewElement;
+        const dist = preview ? Math.hypot(preview.x2 - preview.x, preview.y2 - preview.y) : 0;
+        if (dist > 20) {
+          const el = createConnector(sourceId, targetId, 'arrow');
+          el.stroke = app.currentStroke;
+          el.strokeWidth = app.currentStrokeWidth;
+          if (sourceId && targetId) {
+            const srcEl = app.renderer.elements.get(sourceId);
+            const tgtEl = app.renderer.elements.get(targetId);
+            if (srcEl && tgtEl) {
+              const best = getBestAnchors(srcEl, tgtEl);
+              el.x = best.src.x; el.y = best.src.y;
+              el.x2 = best.tgt.x; el.y2 = best.tgt.y;
+            }
+          } else if (preview) {
+            el.x = preview.x; el.y = preview.y;
+            el.x2 = preview.x2; el.y2 = preview.y2;
+          }
+          app.addElement(el);
+          app.renderer.selectedIds.clear();
+          app.renderer.selectedIds.add(el.id);
+        }
+        app.renderer.previewElement = null;
+        app.renderer.connectorSnapTarget = null;
+        this.dragType = null;
+        this._connectorSourceId = null;
+        this._connectorStartAnchor = null;
+        app.renderer.markDirty();
+        return;
+      }
 
       if (this.dragType === 'rotate' && this.dragStart) {
         for (const [id, orig] of this.originalElements) {
