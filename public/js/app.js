@@ -249,11 +249,19 @@ class DarkBoardApp {
 
   initClipboardPaste() {
     document.addEventListener('paste', (e) => {
-      // Don't intercept if typing in a text field
-      if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+      const isEditing = e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT' || e.target.isContentEditable;
 
+      // Check if clipboard contains an image
       const items = e.clipboardData && e.clipboardData.items;
       if (!items) return;
+
+      let hasImage = false;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) { hasImage = true; break; }
+      }
+
+      // If editing text and no image, let the browser handle the paste
+      if (isEditing && !hasImage) return;
 
       for (const item of items) {
         if (item.type.startsWith('image/')) {
@@ -2394,9 +2402,11 @@ class DarkBoardApp {
     });
 
     setTimeout(() => {
-      document.addEventListener('pointerdown', this._closeMenu = () => {
+      document.addEventListener('pointerdown', this._closeMenu = (ev) => {
+        // Don't close if clicking inside the context menu itself
+        if (this.contextMenu && this.contextMenu.contains(ev.target)) return;
         this.hideContextMenu();
-      }, { once: true });
+      });
     }, 0);
   }
 

@@ -646,25 +646,102 @@ const Tools = {
   sticky: {
     name: 'sticky',
     cursor: 'crosshair',
+    startPoint: null,
+    dragged: false,
 
     onPointerDown(app, worldX, worldY) {
-      const el = createSticky(worldX - 100, worldY - 100);
-      // Use remembered color if set
-      if (app.lastStickyColor) {
-        el.fill = app.lastStickyColor;
+      if (app.renderer.snapToGrid) {
+        const snapped = app.renderer.snapPosition(worldX, worldY);
+        worldX = snapped.x;
+        worldY = snapped.y;
       }
-      app.lastStickyColor = el.fill;
-      app.addElement(el);
-      app.renderer.selectedIds.clear();
-      app.renderer.selectedIds.add(el.id);
-      app.renderer.markDirty();
-      // Tool stays active - don't switch to select
+      this.startPoint = { x: worldX, y: worldY };
+      this.dragged = false;
+      // Show a preview element while dragging
+      const color = app.lastStickyColor || STICKY_COLORS[Math.floor(Math.random() * STICKY_COLORS.length)];
+      app.renderer.previewElement = createElement('sticky', {
+        x: worldX, y: worldY, width: 0, height: 0,
+        fill: color, stroke: 'transparent', text: '', fontSize: 16
+      });
     },
 
-    onPointerMove() {},
-    onPointerUp() {},
+    onPointerMove(app, worldX, worldY, e) {
+      if (!this.startPoint) return;
+      if (app.renderer.snapToGrid) {
+        const snapped = app.renderer.snapPosition(worldX, worldY);
+        worldX = snapped.x;
+        worldY = snapped.y;
+      }
+      let w = worldX - this.startPoint.x;
+      let h = worldY - this.startPoint.y;
+
+      // Shift = square
+      if (e.shiftKey) {
+        const size = Math.max(Math.abs(w), Math.abs(h));
+        w = w < 0 ? -size : size;
+        h = h < 0 ? -size : size;
+      }
+
+      if (Math.abs(w) > 10 || Math.abs(h) > 10) this.dragged = true;
+
+      const norm = normalizeRect(this.startPoint.x, this.startPoint.y, w, h);
+      app.renderer.previewElement.x = norm.x;
+      app.renderer.previewElement.y = norm.y;
+      app.renderer.previewElement.width = norm.w;
+      app.renderer.previewElement.height = norm.h;
+      app.renderer.markDirty();
+    },
+
+    onPointerUp(app, worldX, worldY, e) {
+      if (!this.startPoint) return;
+
+      const color = app.renderer.previewElement ? app.renderer.previewElement.fill : (app.lastStickyColor || '#FFD966');
+      app.renderer.previewElement = null;
+
+      if (this.dragged) {
+        // Dragged: use drawn dimensions
+        if (app.renderer.snapToGrid) {
+          const snapped = app.renderer.snapPosition(worldX, worldY);
+          worldX = snapped.x;
+          worldY = snapped.y;
+        }
+        let w = worldX - this.startPoint.x;
+        let h = worldY - this.startPoint.y;
+        if (e.shiftKey) {
+          const size = Math.max(Math.abs(w), Math.abs(h));
+          w = w < 0 ? -size : size;
+          h = h < 0 ? -size : size;
+        }
+        const norm = normalizeRect(this.startPoint.x, this.startPoint.y, w, h);
+        if (norm.w > 20 && norm.h > 20) {
+          const el = createSticky(norm.x, norm.y);
+          el.width = norm.w;
+          el.height = norm.h;
+          el.fill = color;
+          app.lastStickyColor = el.fill;
+          app.addElement(el);
+          app.renderer.selectedIds.clear();
+          app.renderer.selectedIds.add(el.id);
+        }
+      } else {
+        // Simple click: default 200x200 sticky
+        const el = createSticky(this.startPoint.x - 100, this.startPoint.y - 100);
+        if (app.lastStickyColor) el.fill = app.lastStickyColor;
+        app.lastStickyColor = el.fill;
+        app.addElement(el);
+        app.renderer.selectedIds.clear();
+        app.renderer.selectedIds.add(el.id);
+      }
+
+      this.startPoint = null;
+      this.dragged = false;
+      app.renderer.markDirty();
+    },
+
     onKeyDown(app, e) {
       if (e.key === 'Escape') {
+        app.renderer.previewElement = null;
+        this.startPoint = null;
         app.setTool('select');
       }
     },
