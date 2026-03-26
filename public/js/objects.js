@@ -1260,7 +1260,7 @@ function drawCard(ctx, el) {
   }
 
   if (el.cardAssignee) {
-    const initials = el.cardAssignee.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    const initials = el.cardAssignee.split(' ').filter(w => w.length > 0).map(w => w[0]).join('').toUpperCase().slice(0, 2);
     const aX = el.x + w - 34;
     const aY = el.y + 10;
     ctx.beginPath();

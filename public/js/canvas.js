@@ -295,10 +295,11 @@ class CanvasRenderer {
         this.drawMinimap();
       } else if (this._minimapCache) {
         // Re-draw the cached minimap between throttle intervals
+        const dpr = window.devicePixelRatio || 1;
         const mmW = 180, mmH = 120;
         const mmX = window.innerWidth - mmW - 16;
         const mmY = window.innerHeight - mmH - 60;
-        this.ctx.putImageData(this._minimapCache, mmX, mmY);
+        this.ctx.putImageData(this._minimapCache, mmX * dpr, mmY * dpr);
       }
     }
   }
@@ -659,8 +660,9 @@ class CanvasRenderer {
     ctx.restore();
 
     // Cache the minimap region for throttled reuse
+    const dpr = window.devicePixelRatio || 1;
     try {
-      this._minimapCache = this.ctx.getImageData(mmX, mmY, mmW, mmH);
+      this._minimapCache = this.ctx.getImageData(mmX * dpr, mmY * dpr, mmW * dpr, mmH * dpr);
     } catch (e) {
       this._minimapCache = null;
     }
