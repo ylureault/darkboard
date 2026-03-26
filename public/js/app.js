@@ -251,50 +251,74 @@ class DarkBoardApp {
     document.addEventListener('paste', (e) => {
       const isEditing = e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT' || e.target.isContentEditable;
 
-      // Check if clipboard contains an image
       const items = e.clipboardData && e.clipboardData.items;
       if (!items) return;
 
-      let hasImage = false;
-      for (const item of items) {
-        if (item.type.startsWith('image/')) { hasImage = true; break; }
-      }
+      // Read HTML and text first to detect structured data from apps like Miro
+      const html = e.clipboardData.getData('text/html');
+      const text = e.clipboardData.getData('text/plain');
 
-      // If editing text and no image, let the browser handle the paste
-      if (isEditing && !hasImage) return;
+      // Detect if this paste comes from a whiteboard/collaboration app
+      const isFromApp = html && (
+        html.includes('miro-data-v1') ||
+        html.includes('miro.com') ||
+        html.includes('mural.co') ||
+        html.includes('figjam') ||
+        html.includes('figma') ||
+        html.includes('lucidspark') ||
+        html.includes('draft.io') ||
+        html.includes('data-pm-slice')  // ProseMirror-based editors
+      );
 
-      for (const item of items) {
-        if (item.type.startsWith('image/')) {
-          e.preventDefault();
-          const blob = item.getAsFile();
-          if (!blob) continue;
-          if (blob.size > 5 * 1024 * 1024) {
-            this.showToast('Image trop grande (max 5 Mo)');
-            return;
-          }
-          const reader = new FileReader();
-          reader.onload = (ev) => {
-            const img = new Image();
-            img.onload = () => {
-              let w = img.width, h = img.height;
-              const maxSize = 600;
-              if (w > maxSize || h > maxSize) {
-                const scale = maxSize / Math.max(w, h);
-                w *= scale;
-                h *= scale;
+      // If editing text and it's not from an app, let the browser handle it
+      if (isEditing && !isFromApp) return;
+
+      // If it's from a known app, ALWAYS prefer HTML parsing over image
+      // (these apps put a screenshot image + structured HTML — we want the HTML)
+      if (!isFromApp) {
+        // Check for pure image paste (screenshots, images copied from browser)
+        for (const item of items) {
+          if (item.type.startsWith('image/')) {
+            // Only treat as image if there's no meaningful text/HTML alongside
+            const hasText = text && text.trim().length > 0;
+            const hasStructuredHTML = html && (
+              html.includes('<table') ||
+              html.includes('<li') ||
+              html.includes('<p>')
+            );
+            if (!hasText && !hasStructuredHTML) {
+              e.preventDefault();
+              const blob = item.getAsFile();
+              if (!blob) continue;
+              if (blob.size > 5 * 1024 * 1024) {
+                this.showToast('Image trop grande (max 5 Mo)');
+                return;
               }
-              const cx = this.renderer.camera.x;
-              const cy = this.renderer.camera.y;
-              const el = createImageElement(cx - w / 2, cy - h / 2, w, h, ev.target.result);
-              this.addElement(el);
-              this.renderer.selectedIds.clear();
-              this.renderer.selectedIds.add(el.id);
-              this.renderer.markDirty();
-            };
-            img.src = ev.target.result;
-          };
-          reader.readAsDataURL(blob);
-          return;
+              const reader = new FileReader();
+              reader.onload = (ev) => {
+                const img = new Image();
+                img.onload = () => {
+                  let w = img.width, h = img.height;
+                  const maxSize = 600;
+                  if (w > maxSize || h > maxSize) {
+                    const scale = maxSize / Math.max(w, h);
+                    w *= scale;
+                    h *= scale;
+                  }
+                  const cx = this.renderer.camera.x;
+                  const cy = this.renderer.camera.y;
+                  const el = createImageElement(cx - w / 2, cy - h / 2, w, h, ev.target.result);
+                  this.addElement(el);
+                  this.renderer.selectedIds.clear();
+                  this.renderer.selectedIds.add(el.id);
+                  this.renderer.markDirty();
+                };
+                img.src = ev.target.result;
+              };
+              reader.readAsDataURL(blob);
+              return;
+            }
+          }
         }
       }
 
@@ -368,7 +392,7 @@ class DarkBoardApp {
   parseClipboardHTML(html, plainText) {
     if (!html) return null;
 
-    // Miro color mapping
+    // Miro color name → hex mapping
     const MIRO_COLORS = {
       'light_yellow': '#FFD966', 'yellow': '#F5D128', 'orange': '#FF9D48',
       'light_green': '#93D275', 'green': '#4DB050', 'dark_green': '#2D8B4E',
@@ -382,49 +406,83 @@ class DarkBoardApp {
     const doc = parser.parseFromString(html, 'text/html');
     const results = [];
 
-    // 1. Detect Miro clipboard: look for miro-data-v1 marker
-    const isMiro = html.includes('miro-data-v1');
+    // ── 1. Detect Miro clipboard ──
+    const isMiro = html.includes('miro-data-v1') || html.includes('miro.com');
 
     if (isMiro) {
-      // Miro puts each sticky's content in top-level <div> blocks after the <span data-meta>
-      // The HTML structure is: <span data-meta="...">, then <div><div><div>text</div></div></div> per sticky
-      // Also look for background-color styles for color info
-
-      // Try to extract from Miro's HTML structure
-      const topDivs = doc.body.querySelectorAll(':scope > div');
-      if (topDivs.length > 0) {
-        for (const div of topDivs) {
+      // Strategy A: try to find colored blocks (Miro wraps stickies in styled divs)
+      const allDivs = doc.body.querySelectorAll('div');
+      const coloredBlocks = [];
+      for (const div of allDivs) {
+        const bg = div.style?.backgroundColor || '';
+        const hasBg = bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)';
+        if (hasBg) {
           const text = (div.textContent || '').trim();
-          if (!text) continue;
-
-          // Try to find color from background-color style
-          let color = null;
-          const bgMatch = div.outerHTML.match(/background-color:\s*([^;"]+)/i);
-          if (bgMatch) {
-            color = bgMatch[1].trim();
-          }
-          // Also check Miro fill color names in data attributes
-          const fillMatch = div.outerHTML.match(/data-fill-color="([^"]+)"/i);
-          if (fillMatch && MIRO_COLORS[fillMatch[1]]) {
-            color = MIRO_COLORS[fillMatch[1]];
-          }
-
-          results.push({ text, color });
+          if (text) coloredBlocks.push({ text, color: bg });
         }
       }
 
-      // If we couldn't parse divs, fall back to plain text split
+      if (coloredBlocks.length > 0) {
+        // Deduplicate (nested divs may repeat same text)
+        const seen = new Set();
+        for (const block of coloredBlocks) {
+          if (!seen.has(block.text)) {
+            seen.add(block.text);
+            results.push(block);
+          }
+        }
+        return results;
+      }
+
+      // Strategy B: top-level divs after the <span data-meta>
+      // Miro HTML: <span data-meta="<--(miro-data-v1)...">  <div>..text..</div>  <div>..text..</div>
+      const topDivs = doc.body.querySelectorAll(':scope > div');
+      for (const div of topDivs) {
+        const text = (div.textContent || '').trim();
+        if (!text) continue;
+        // Try to extract color from inline styles anywhere inside
+        let color = null;
+        const bgMatch = div.innerHTML.match(/background(?:-color)?:\s*([^;"]+)/i);
+        if (bgMatch) color = bgMatch[1].trim();
+        const fillMatch = div.innerHTML.match(/data-fill-color="([^"]+)"/i);
+        if (fillMatch && MIRO_COLORS[fillMatch[1]]) color = MIRO_COLORS[fillMatch[1]];
+        results.push({ text, color });
+      }
+
+      // Strategy C: use plain text — split by double newlines (each sticky is separated)
+      // Miro text/plain typically separates stickies with blank lines
       if (results.length === 0 && plainText) {
-        const lines = plainText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-        for (const line of lines) {
-          results.push({ text: line, color: null });
+        // Split by double newlines first (Miro separator between stickies)
+        let chunks = plainText.split(/\n\s*\n/).map(c => c.trim()).filter(c => c.length > 0);
+        // If only one chunk, try single newlines
+        if (chunks.length <= 1) {
+          chunks = plainText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        }
+        for (const chunk of chunks) {
+          results.push({ text: chunk, color: null });
         }
       }
 
       return results.length > 0 ? results : null;
     }
 
-    // 2. Detect HTML table (Excel, Google Sheets, etc.)
+    // ── 2. Detect other whiteboard apps (Mural, FigJam, etc.) ──
+    const isWhiteboardApp = html.includes('mural.co') || html.includes('figjam') ||
+      html.includes('figma') || html.includes('lucidspark') || html.includes('draft.io');
+
+    if (isWhiteboardApp && plainText) {
+      // Same strategy as Miro fallback: split by double newlines or single newlines
+      let chunks = plainText.split(/\n\s*\n/).map(c => c.trim()).filter(c => c.length > 0);
+      if (chunks.length <= 1) {
+        chunks = plainText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      }
+      for (const chunk of chunks) {
+        results.push({ text: chunk, color: null });
+      }
+      return results.length > 0 ? results : null;
+    }
+
+    // ── 3. Detect HTML table (Excel, Google Sheets) ──
     const tables = doc.querySelectorAll('table');
     if (tables.length > 0) {
       const table = tables[0];
@@ -433,14 +491,14 @@ class DarkBoardApp {
         const text = (cell.textContent || '').trim();
         if (!text) continue;
         let color = null;
-        const bgMatch = cell.style?.backgroundColor || cell.getAttribute('bgcolor');
-        if (bgMatch) color = bgMatch;
+        const bg = cell.style?.backgroundColor || cell.getAttribute('bgcolor');
+        if (bg) color = bg;
         results.push({ text, color });
       }
       return results.length > 0 ? results : null;
     }
 
-    // 3. Detect tab-separated data (spreadsheet copy)
+    // ── 4. Tab-separated data (spreadsheet copy) ──
     if (plainText && plainText.includes('\t')) {
       const cells = plainText.split(/[\t\n]/).map(c => c.trim()).filter(c => c.length > 0);
       if (cells.length > 1) {
@@ -451,7 +509,7 @@ class DarkBoardApp {
       }
     }
 
-    // 4. Generic HTML with multiple block elements (paragraphs, list items, etc.)
+    // ── 5. Generic HTML with multiple block elements ──
     const blocks = doc.querySelectorAll('p, li, h1, h2, h3, h4, h5, h6');
     if (blocks.length > 1) {
       for (const block of blocks) {
