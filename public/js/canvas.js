@@ -135,13 +135,47 @@ class CanvasRenderer {
       }
     }
 
+    // Draw mindmap connections (behind nodes)
+    for (const el of sorted) {
+      if (el.type === 'mindmap' && el.mindmapParent) {
+        const parent = this.elements.get(el.mindmapParent);
+        if (parent && !el.hidden && !parent.hidden) {
+          const px = parent.x + parent.width;
+          const py = parent.y + parent.height / 2;
+          const cx = el.x;
+          const cy = el.y + el.height / 2;
+          const midX = (px + cx) / 2;
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.bezierCurveTo(midX, py, midX, cy, cx, cy);
+          ctx.strokeStyle = parent.fill || '#4a9eff';
+          ctx.lineWidth = 2.5;
+          ctx.globalAlpha = 0.6;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+
+    // Tag filter dimming
+    const tagFilter = this._activeTagFilter;
+
     for (const el of sorted) {
       if (el.hidden) continue; // skip hidden elements (collapsed envelope children)
+
+      // Apply tag filter dimming
+      if (tagFilter && el.type === 'sticky') {
+        const hasTags = el.tags && el.tags.some(t => t.label === tagFilter);
+        if (!hasTags) {
+          ctx.globalAlpha = 0.15;
+        }
+      }
 
       // Viewport culling: skip elements entirely outside the visible area
       const elBounds = getElementBounds(el);
       if (elBounds.x + elBounds.w < vpLeft || elBounds.x > vpRight ||
           elBounds.y + elBounds.h < vpTop || elBounds.y > vpBottom) {
+        ctx.globalAlpha = 1;
         continue;
       }
 
@@ -156,6 +190,10 @@ class CanvasRenderer {
         ctx.restore();
       }
       renderElement(ctx, el, this.selectedIds.has(el.id), this.camera);
+      if (el.reactions && el.reactions.length > 0) {
+        renderReactionBar(ctx, el);
+      }
+      if (tagFilter) ctx.globalAlpha = 1;
     }
 
     // Preview element (being created)

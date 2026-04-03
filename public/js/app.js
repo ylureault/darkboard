@@ -70,6 +70,21 @@ class DarkBoardApp {
     // Element deep-link: update URL hash on selection
     this.initElementDeepLinks();
 
+    // Init chat
+    this.initChat();
+
+    // Init audio (WebRTC)
+    this.initAudio();
+
+    // Init floating toolbar
+    this.initFloatingToolbar();
+
+    // Init tag filter
+    this.initTagFilter();
+
+    // Init embed click handler
+    this.initEmbedHandler();
+
     // Show name dialog
     this.showNameDialog();
   }
@@ -655,6 +670,8 @@ class DarkBoardApp {
     this.renderer.markDirty();
     this.updateTitle();
     this.updateEmptyHint();
+    // Update tag filter bar
+    if (this._updateTagFilterBar) this._updateTagFilterBar();
   }
 
   deleteSelected() {
@@ -2092,11 +2109,13 @@ class DarkBoardApp {
       const text = textarea.value.trim();
       if (!text) return;
 
+      const mentions = this._detectMentions(text);
       if (existing) {
         existing.replies.push({
           text: text,
           author: this.userName || 'Anonyme',
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          mentions
         });
         this.sync.sendCommentUpdate(existing.id, { replies: [...existing.replies] });
       } else {
@@ -2108,7 +2127,8 @@ class DarkBoardApp {
           author: this.userName || 'Anonyme',
           timestamp: Date.now(),
           replies: [],
-          resolved: false
+          resolved: false,
+          mentions
         };
         this.renderer.comments.push(comment);
         this.sync.sendComment(comment);
@@ -2136,6 +2156,9 @@ class DarkBoardApp {
         overlay.remove();
       }
     });
+
+    // @mention autocomplete
+    this._setupMentionAutocomplete(textarea);
   }
 
   // Tag editor panel - supports single or multi-select
@@ -2890,6 +2913,8 @@ class DarkBoardApp {
         ${hit.type === 'sticky' || (multiSel && Array.from(this.selectedElements).some(id => { const e = this.renderer.elements.get(id); return e && e.type === 'sticky'; })) ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editTags">🏷️ Tags</div>` : ''}
         ${hit.type === 'card' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editCard">✏️ Modifier la carte</div>` : ''}
         ${hit.type === 'list' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editList">✏️ Modifier la liste</div>` : ''}
+        ${hit.type === 'mindmap' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="addMindmapChild">🧠 Ajouter un noeud enfant</div><div class="context-menu-item" data-action="layoutMindmap">📐 Re-organiser</div>` : ''}
+        ${hit.type === 'embed' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="openEmbed">▶️ Ouvrir l'embed</div><div class="context-menu-item" data-action="editEmbedUrl">🔗 Modifier l'URL</div>` : ''}
         ${hit.type === 'connector' ? `
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="connStraight">${hit.lineType !== 'orthogonal' && hit.lineType !== 'curve' ? '✓ ' : ''}Ligne droite</div>
@@ -2897,6 +2922,7 @@ class DarkBoardApp {
         <div class="context-menu-item" data-action="connCurved">${hit.lineType === 'curve' ? '✓ ' : ''}Ligne courbee</div>
         ` : ''}
         <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="react">😀 Reagir</div>
         <div class="context-menu-item" data-action="comment">💬 Commenter</div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="delete" style="color:var(--danger)">Supprimer <span class="shortcut-hint">Suppr</span></div>
@@ -3015,12 +3041,39 @@ class DarkBoardApp {
         case 'editTags':
           this.showTagEditor(hit);
           break;
+        case 'react':
+          this.showReactionPicker(hit);
+          break;
         case 'comment':
           this.addComment(hit);
           break;
         case 'addCanvasComment':
           this.addCanvasComment(worldX, worldY);
           break;
+        case 'addMindmapChild':
+          this.addMindmapChild(hit);
+          break;
+        case 'layoutMindmap': {
+          // Find root of mindmap tree
+          let root = hit;
+          while (root.mindmapParent) {
+            const parent = this.renderer.elements.get(root.mindmapParent);
+            if (!parent) break;
+            root = parent;
+          }
+          this._layoutMindmapChildren(root);
+          break;
+        }
+        case 'openEmbed':
+          this._openEmbedOverlay(hit);
+          break;
+        case 'editEmbedUrl': {
+          const newUrl = prompt('URL:', hit.embedUrl || '');
+          if (newUrl !== null) {
+            this.updateSelectedElements({ embedUrl: newUrl, text: newUrl });
+          }
+          break;
+        }
       }
       this.hideContextMenu();
     });
@@ -3250,6 +3303,717 @@ class DarkBoardApp {
       this._snapIndicator.remove();
       this._snapIndicator = null;
     }
+  }
+
+  // =====================
+  // CHAT
+  // =====================
+  initChat() {
+    this._chatBadgeCount = 0;
+    const toggle = document.getElementById('chatToggle');
+    const close = document.getElementById('chatClose');
+    const sendBtn = document.getElementById('chatSend');
+    const input = document.getElementById('chatInput');
+    if (!toggle) return;
+
+    toggle.addEventListener('click', () => {
+      const panel = document.getElementById('chatPanel');
+      if (!panel) return;
+      const visible = panel.style.display !== 'none';
+      panel.style.display = visible ? 'none' : 'flex';
+      if (!visible) {
+        this._chatBadgeCount = 0;
+        const badge = document.getElementById('chatBadge');
+        if (badge) { badge.style.display = 'none'; badge.textContent = '0'; }
+        input.focus();
+      }
+    });
+
+    if (close) close.addEventListener('click', () => {
+      const panel = document.getElementById('chatPanel');
+      if (panel) panel.style.display = 'none';
+    });
+
+    if (sendBtn) sendBtn.addEventListener('click', () => this.sendChat());
+
+    if (input) {
+      input.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') this.sendChat();
+      });
+    }
+  }
+
+  onChatMessage(msg) {
+    const container = document.getElementById('chatMessages');
+    if (!container) return;
+
+    const div = document.createElement('div');
+    div.className = 'chat-msg';
+    const time = new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    div.innerHTML = `<span class="chat-msg-name" style="color:${msg.color || 'var(--accent)'}">${this._escapeHtml(msg.name)}</span> <span class="chat-msg-time">${time}</span><div class="chat-msg-text">${this._escapeHtml(msg.text)}</div>`;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+
+    const panel = document.getElementById('chatPanel');
+    if (panel && panel.style.display === 'none' && msg.userId !== this.myUserId) {
+      this._chatBadgeCount++;
+      const badge = document.getElementById('chatBadge');
+      if (badge) {
+        badge.textContent = String(this._chatBadgeCount);
+        badge.style.display = '';
+      }
+    }
+  }
+
+  sendChat() {
+    const input = document.getElementById('chatInput');
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    this.sync.sendChat(text);
+    this.onChatMessage({
+      userId: this.myUserId,
+      name: this.userName,
+      color: this.myColor,
+      text,
+      timestamp: Date.now()
+    });
+    input.value = '';
+    input.focus();
+  }
+
+  _escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  // =====================
+  // AUDIO (WebRTC)
+  // =====================
+  initAudio() {
+    this.audioPeers = new Map();
+    this.audioStream = null;
+    this.audioEnabled = false;
+
+    const toggle = document.getElementById('audioToggle');
+    if (toggle) {
+      toggle.addEventListener('click', () => this.toggleAudio());
+    }
+  }
+
+  async toggleAudio() {
+    if (this.audioEnabled) {
+      // Turn off
+      this.audioPeers.forEach((pc) => pc.close());
+      this.audioPeers.clear();
+      if (this.audioStream) {
+        this.audioStream.getTracks().forEach(t => t.stop());
+        this.audioStream = null;
+      }
+      this.audioEnabled = false;
+      const btn = document.getElementById('audioToggle');
+      if (btn) btn.classList.remove('active');
+      this.showToast('Audio desactive');
+      return;
+    }
+
+    try {
+      this.audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    } catch (e) {
+      this.showToast('Impossible d\'acceder au micro');
+      return;
+    }
+
+    this.audioEnabled = true;
+    const btn = document.getElementById('audioToggle');
+    if (btn) btn.classList.add('active');
+    this.showToast('Audio active');
+
+    // Create peer connections with all remote users
+    this.renderer.remoteUsers.forEach((user, uid) => {
+      this._createAudioPeer(uid, true);
+    });
+  }
+
+  _createAudioPeer(targetUserId, initiator) {
+    if (this.audioPeers.has(targetUserId)) return;
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    });
+    this.audioPeers.set(targetUserId, pc);
+
+    if (this.audioStream) {
+      this.audioStream.getTracks().forEach(track => pc.addTrack(track, this.audioStream));
+    }
+
+    pc.ontrack = (event) => {
+      const audio = new Audio();
+      audio.srcObject = event.streams[0];
+      audio.play().catch(() => {});
+    };
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        this.sync.sendWebRTCSignal(targetUserId, {
+          type: 'ice-candidate',
+          candidate: event.candidate
+        });
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+        pc.close();
+        this.audioPeers.delete(targetUserId);
+      }
+    };
+
+    if (initiator) {
+      pc.createOffer().then(offer => {
+        pc.setLocalDescription(offer);
+        this.sync.sendWebRTCSignal(targetUserId, {
+          type: 'offer',
+          sdp: offer
+        });
+      }).catch(() => {});
+    }
+  }
+
+  onWebRTCSignal(msg) {
+    if (!this.audioEnabled) {
+      // If we receive an offer but audio is off, ignore
+      if (msg.signal.type === 'offer') return;
+      return;
+    }
+
+    const fromUserId = msg.userId;
+    const signal = msg.signal;
+
+    if (signal.type === 'offer') {
+      this._createAudioPeer(fromUserId, false);
+      const pc = this.audioPeers.get(fromUserId);
+      if (!pc) return;
+      pc.setRemoteDescription(new RTCSessionDescription(signal.sdp)).then(() => {
+        return pc.createAnswer();
+      }).then(answer => {
+        pc.setLocalDescription(answer);
+        this.sync.sendWebRTCSignal(fromUserId, {
+          type: 'answer',
+          sdp: answer
+        });
+      }).catch(() => {});
+    } else if (signal.type === 'answer') {
+      const pc = this.audioPeers.get(fromUserId);
+      if (pc) {
+        pc.setRemoteDescription(new RTCSessionDescription(signal.sdp)).catch(() => {});
+      }
+    } else if (signal.type === 'ice-candidate') {
+      const pc = this.audioPeers.get(fromUserId);
+      if (pc) {
+        pc.addIceCandidate(new RTCIceCandidate(signal.candidate)).catch(() => {});
+      }
+    }
+  }
+
+  // =====================
+  // REACTIONS
+  // =====================
+  onReaction(msg) {
+    const el = this.renderer.elements.get(msg.elementId);
+    if (!el) return;
+    if (!el.reactions) el.reactions = [];
+    el.reactions.push({ userId: msg.userId, emoji: msg.emoji, timestamp: msg.timestamp });
+    this.renderer.markDirty();
+  }
+
+  showReactionPicker(el) {
+    // Remove existing picker
+    const existing = document.querySelector('.reaction-picker');
+    if (existing) existing.remove();
+
+    const emojis = ['\u{1F44D}', '\u{1F44E}', '\u{2764}\u{FE0F}', '\u{1F389}', '\u{1F914}', '\u{2B50}', '\u{1F525}', '\u{1F4A1}'];
+    const picker = document.createElement('div');
+    picker.className = 'reaction-picker';
+
+    const bounds = getElementBounds(el);
+    if (!bounds) return;
+    const cam = this.renderer.camera;
+    const sx = (bounds.x + bounds.w / 2) * cam.zoom + cam.x;
+    const sy = (bounds.y + bounds.h) * cam.zoom + cam.y + 10;
+    picker.style.left = sx + 'px';
+    picker.style.top = sy + 'px';
+
+    for (const emoji of emojis) {
+      const btn = document.createElement('span');
+      btn.className = 'reaction-picker-item';
+      btn.textContent = emoji;
+      btn.addEventListener('click', () => {
+        this.sync.sendReaction(el.id, emoji);
+        this.onReaction({ elementId: el.id, userId: this.myUserId, emoji, timestamp: Date.now() });
+        picker.remove();
+      });
+      picker.appendChild(btn);
+    }
+
+    document.body.appendChild(picker);
+
+    // Close on outside click
+    setTimeout(() => {
+      const handler = (e) => {
+        if (!picker.contains(e.target)) {
+          picker.remove();
+          document.removeEventListener('pointerdown', handler);
+        }
+      };
+      document.addEventListener('pointerdown', handler);
+    }, 0);
+  }
+
+  // =====================
+  // @MENTIONS IN COMMENTS
+  // =====================
+  _setupMentionAutocomplete(textarea) {
+    const dropdown = document.createElement('div');
+    dropdown.className = 'mention-dropdown';
+    dropdown.style.display = 'none';
+    textarea.parentNode.style.position = 'relative';
+    textarea.parentNode.appendChild(dropdown);
+
+    textarea.addEventListener('input', () => {
+      const val = textarea.value;
+      const cursor = textarea.selectionStart;
+      // Look for @ before cursor
+      const textBefore = val.substring(0, cursor);
+      const atMatch = textBefore.match(/@(\w*)$/);
+
+      if (!atMatch) {
+        dropdown.style.display = 'none';
+        return;
+      }
+
+      const query = atMatch[1].toLowerCase();
+      const users = [];
+      this.renderer.remoteUsers.forEach((u, uid) => {
+        if (!query || u.name.toLowerCase().includes(query)) {
+          users.push({ userId: uid, name: u.name });
+        }
+      });
+
+      if (users.length === 0) {
+        dropdown.style.display = 'none';
+        return;
+      }
+
+      dropdown.innerHTML = '';
+      dropdown.style.display = 'block';
+      for (const u of users) {
+        const item = document.createElement('div');
+        item.className = 'mention-dropdown-item';
+        item.textContent = '@' + u.name;
+        item.addEventListener('click', () => {
+          const before = val.substring(0, cursor - atMatch[0].length);
+          const after = val.substring(cursor);
+          textarea.value = before + '@' + u.name + ' ' + after;
+          dropdown.style.display = 'none';
+          textarea.focus();
+          const newPos = before.length + u.name.length + 2;
+          textarea.setSelectionRange(newPos, newPos);
+        });
+        dropdown.appendChild(item);
+      }
+    });
+
+    textarea.addEventListener('blur', () => {
+      setTimeout(() => { dropdown.style.display = 'none'; }, 200);
+    });
+  }
+
+  _detectMentions(text) {
+    const mentions = [];
+    const regex = /@(\S+)/g;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      const mentionName = match[1];
+      this.renderer.remoteUsers.forEach((u, uid) => {
+        if (u.name === mentionName) {
+          mentions.push(uid);
+        }
+      });
+    }
+    return mentions;
+  }
+
+  // ===== MINDMAP =====
+  addMindmapChild(parentNode) {
+    const children = parentNode.mindmapChildren || [];
+    const childCount = children.length;
+    // Position child to the right, spread vertically
+    const gapX = 60;
+    const gapY = 70;
+    const totalH = childCount * gapY;
+    const startY = parentNode.y + parentNode.height / 2 - totalH / 2;
+    const childX = parentNode.x + parentNode.width + gapX;
+    const childY = startY + childCount * gapY - 25;
+
+    // Alternate colors for depth
+    const colors = ['#4a9eff', '#4ecdc4', '#ffd966', '#ff6b6b', '#dda0dd', '#96ceb4', '#f4a460', '#45b7d1'];
+    const depth = this._getMindmapDepth(parentNode);
+    const color = colors[(depth + 1) % colors.length];
+
+    const child = createMindmapNode(childX, childY, '', parentNode.id, color);
+    child.fontSize = Math.max(11, 16 - depth * 2);
+    child.width = Math.max(100, 160 - depth * 20);
+    child.height = Math.max(36, 50 - depth * 5);
+
+    // Update parent's children list
+    if (!parentNode.mindmapChildren) parentNode.mindmapChildren = [];
+    parentNode.mindmapChildren.push(child.id);
+
+    const ops = [
+      { type: 'add', elementId: child.id, element: child },
+      { type: 'update', elementId: parentNode.id, props: { mindmapChildren: [...parentNode.mindmapChildren] } }
+    ];
+    const inverseOps = [
+      { type: 'delete', elementId: child.id },
+      { type: 'update', elementId: parentNode.id, props: { mindmapChildren: parentNode.mindmapChildren.filter(id => id !== child.id) } }
+    ];
+
+    this.renderer.elements.set(child.id, child);
+    this.history.push(ops, inverseOps);
+    this.sync.sendOps(ops);
+    this.renderer.selectedIds.clear();
+    this.renderer.selectedIds.add(child.id);
+    this.renderer.markDirty();
+    if (this.ui) this.ui.updateUndoRedoButtons();
+
+    // Auto-layout siblings
+    this._layoutMindmapChildren(parentNode);
+
+    setTimeout(() => this.startTextEdit(child), 50);
+  }
+
+  _getMindmapDepth(node) {
+    let depth = 0;
+    let current = node;
+    while (current && current.mindmapParent) {
+      current = this.renderer.elements.get(current.mindmapParent);
+      depth++;
+    }
+    return depth;
+  }
+
+  _layoutMindmapChildren(parentNode) {
+    const children = (parentNode.mindmapChildren || []).map(id => this.renderer.elements.get(id)).filter(Boolean);
+    if (children.length === 0) return;
+    const gapY = 16;
+    const totalH = children.reduce((s, c) => s + c.height + gapY, -gapY);
+    const startY = parentNode.y + parentNode.height / 2 - totalH / 2;
+    const childX = parentNode.x + parentNode.width + 60;
+    let curY = startY;
+    const ops = [];
+    for (const child of children) {
+      if (Math.abs(child.x - childX) > 1 || Math.abs(child.y - curY) > 1) {
+        child.x = childX;
+        child.y = curY;
+        ops.push({ type: 'update', elementId: child.id, props: { x: childX, y: curY } });
+      }
+      curY += child.height + gapY;
+      // Recursively layout grandchildren
+      this._layoutMindmapChildren(child);
+    }
+    if (ops.length > 0) this.sync.sendOps(ops);
+    this.renderer.markDirty();
+  }
+
+  // ===== FLOATING TOOLBAR =====
+  initFloatingToolbar() {
+    this._floatingToolbar = null;
+    // Listen for selection changes
+    const checkSelection = () => {
+      if (this.renderer.selectedIds.size > 0 && !this.textEditElement) {
+        this._showFloatingToolbar();
+      } else {
+        this._hideFloatingToolbar();
+      }
+    };
+    // Check periodically (selection changes happen in many places)
+    setInterval(checkSelection, 300);
+  }
+
+  _showFloatingToolbar() {
+    if (this.textEditElement) { this._hideFloatingToolbar(); return; }
+    const ids = Array.from(this.renderer.selectedIds);
+    if (ids.length === 0) { this._hideFloatingToolbar(); return; }
+
+    // Get bounds of selection
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const id of ids) {
+      const el = this.renderer.elements.get(id);
+      if (!el) continue;
+      const b = getElementBounds(el);
+      if (b.x < minX) minX = b.x;
+      if (b.y < minY) minY = b.y;
+      if (b.x + b.w > maxX) maxX = b.x + b.w;
+      if (b.y + b.h > maxY) maxY = b.y + b.h;
+    }
+    if (!isFinite(minX)) return;
+
+    const screen = this.renderer.worldToScreen((minX + maxX) / 2, minY);
+    const topY = screen.y - 50;
+    if (topY < 60) return; // Too close to main toolbar
+
+    if (!this._floatingToolbar) {
+      const tb = document.createElement('div');
+      tb.className = 'floating-toolbar';
+      tb.innerHTML = `
+        <button class="ftb-btn" data-action="duplicate" title="Dupliquer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+          </svg>
+        </button>
+        <button class="ftb-btn" data-action="delete" title="Supprimer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>
+          </svg>
+        </button>
+        <span class="ftb-sep"></span>
+        <button class="ftb-btn" data-action="bringFront" title="Mettre devant">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <rect x="8" y="2" width="13" height="13" rx="2"/><rect x="3" y="9" width="13" height="13" rx="2" opacity="0.3"/>
+          </svg>
+        </button>
+        <button class="ftb-btn" data-action="sendBack" title="Mettre derriere">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <rect x="3" y="9" width="13" height="13" rx="2"/><rect x="8" y="2" width="13" height="13" rx="2" opacity="0.3"/>
+          </svg>
+        </button>
+        <span class="ftb-sep"></span>
+        <button class="ftb-btn" data-action="lock" title="Verrouiller">🔒</button>
+        <button class="ftb-btn" data-action="emoji" title="Emoji">😀</button>
+        <button class="ftb-btn" data-action="shadow" title="Ombre">◐</button>
+        <button class="ftb-btn" data-action="radius" title="Arrondi">◢</button>
+      `;
+      tb.addEventListener('pointerdown', (e) => e.stopPropagation());
+      tb.addEventListener('click', (e) => {
+        const btn = e.target.closest('.ftb-btn');
+        if (!btn) return;
+        const action = btn.dataset.action;
+        this._handleFloatingAction(action);
+      });
+      document.body.appendChild(tb);
+      this._floatingToolbar = tb;
+    }
+
+    this._floatingToolbar.style.left = screen.x + 'px';
+    this._floatingToolbar.style.top = topY + 'px';
+    this._floatingToolbar.style.display = 'flex';
+  }
+
+  _hideFloatingToolbar() {
+    if (this._floatingToolbar) {
+      this._floatingToolbar.style.display = 'none';
+    }
+  }
+
+  _handleFloatingAction(action) {
+    switch (action) {
+      case 'duplicate':
+        this.duplicateSelected();
+        break;
+      case 'delete':
+        this.deleteSelected();
+        break;
+      case 'bringFront':
+        this.updateSelectedElements({ zIndex: Date.now() });
+        break;
+      case 'sendBack':
+        this.updateSelectedElements({ zIndex: 1 });
+        break;
+      case 'lock': {
+        const id = this.renderer.selectedIds.values().next().value;
+        const el = id ? this.renderer.elements.get(id) : null;
+        if (el) this.updateSelectedElements({ locked: !el.locked });
+        break;
+      }
+      case 'emoji':
+        this._showEmojiPicker();
+        break;
+      case 'shadow': {
+        const id2 = this.renderer.selectedIds.values().next().value;
+        const el2 = id2 ? this.renderer.elements.get(id2) : null;
+        if (el2) this.updateSelectedElements({ shadowEnabled: !el2.shadowEnabled });
+        break;
+      }
+      case 'radius': {
+        const val = prompt('Rayon des coins (px):', '12');
+        if (val !== null) {
+          this.updateSelectedElements({ borderRadius: parseInt(val) || 0 });
+        }
+        break;
+      }
+    }
+  }
+
+  _showEmojiPicker() {
+    const existing = document.querySelector('.emoji-picker-panel');
+    if (existing) { existing.remove(); return; }
+    const emojis = ['😀','😍','🤔','👍','👎','❤️','🎉','⭐','🔥','💡','✅','❌','⚡','🚀','💪','🎯','📌','💬','🏆','🌟'];
+    const picker = document.createElement('div');
+    picker.className = 'emoji-picker-panel';
+    picker.innerHTML = emojis.map(e => `<button class="emoji-btn">${e}</button>`).join('');
+
+    // Position near floating toolbar
+    const tb = this._floatingToolbar;
+    if (tb) {
+      picker.style.left = tb.style.left;
+      picker.style.top = (parseInt(tb.style.top) - 50) + 'px';
+    }
+
+    picker.addEventListener('click', (e) => {
+      const btn = e.target.closest('.emoji-btn');
+      if (!btn) return;
+      const emoji = btn.textContent;
+      // Add emoji to selected elements' text
+      for (const id of this.renderer.selectedIds) {
+        const el = this.renderer.elements.get(id);
+        if (el) {
+          const oldText = el.text || '';
+          const newText = oldText + ' ' + emoji;
+          const ops = [{ type: 'update', elementId: el.id, props: { text: newText } }];
+          const inverseOps = [{ type: 'update', elementId: el.id, props: { text: oldText } }];
+          el.text = newText;
+          this.history.push(ops, inverseOps);
+          this.sync.sendOps(ops);
+        }
+      }
+      this.renderer.markDirty();
+      picker.remove();
+    });
+    picker.addEventListener('pointerdown', (e) => e.stopPropagation());
+    document.body.appendChild(picker);
+    setTimeout(() => {
+      document.addEventListener('pointerdown', function h(e) {
+        if (!picker.contains(e.target)) { picker.remove(); document.removeEventListener('pointerdown', h); }
+      });
+    }, 0);
+  }
+
+  // ===== TAG FILTERING =====
+  initTagFilter() {
+    const filterBar = document.getElementById('tagFilterBar');
+    if (!filterBar) return;
+
+    this._tagFilterActive = null;
+
+    filterBar.addEventListener('click', (e) => {
+      const btn = e.target.closest('.tag-filter-btn');
+      if (!btn) return;
+      const tag = btn.dataset.tag;
+      if (tag === '__clear__') {
+        this._tagFilterActive = null;
+        this.renderer._activeTagFilter = null;
+      } else {
+        this._tagFilterActive = tag;
+        this.renderer._activeTagFilter = tag;
+      }
+      this.renderer.markDirty();
+      this._updateTagFilterBar();
+    });
+  }
+
+  _updateTagFilterBar() {
+    const filterBar = document.getElementById('tagFilterBar');
+    if (!filterBar) return;
+
+    // Collect all tags from elements
+    const tagCounts = new Map();
+    for (const [, el] of this.renderer.elements) {
+      if (el.tags) {
+        for (const t of el.tags) {
+          tagCounts.set(t.label, (tagCounts.get(t.label) || 0) + 1);
+        }
+      }
+    }
+
+    if (tagCounts.size === 0) {
+      filterBar.style.display = 'none';
+      return;
+    }
+
+    filterBar.style.display = 'flex';
+    filterBar.innerHTML = `
+      <button class="tag-filter-btn ${!this._tagFilterActive ? 'active' : ''}" data-tag="__clear__">Tous</button>
+      ${Array.from(tagCounts.entries()).map(([label, count]) => {
+        const regTag = (this.tagRegistry || []).find(t => t.label === label);
+        const color = regTag ? regTag.color : '#888';
+        return `<button class="tag-filter-btn ${this._tagFilterActive === label ? 'active' : ''}" data-tag="${label}" style="--tag-color:${color}">${label} (${count})</button>`;
+      }).join('')}
+    `;
+  }
+
+  // ===== EMBED HANDLER =====
+  initEmbedHandler() {
+    this.renderer.canvas.addEventListener('dblclick', (e) => {
+      const world = this.renderer.screenToWorld(e.clientX, e.clientY);
+      const hit = this.renderer.hitTest(world.x, world.y);
+      if (hit && hit.type === 'embed' && hit.embedUrl) {
+        this._openEmbedOverlay(hit);
+      }
+    });
+  }
+
+  _openEmbedOverlay(el) {
+    const existing = document.querySelector('.embed-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'embed-overlay';
+
+    let embedHtml = '';
+    const url = el.embedUrl;
+    // YouTube
+    const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/);
+    if (ytMatch) {
+      embedHtml = `<iframe src="https://www.youtube.com/embed/${ytMatch[1]}" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen style="width:100%;height:100%"></iframe>`;
+    }
+    // Figma
+    else if (url.includes('figma.com')) {
+      embedHtml = `<iframe src="https://www.figma.com/embed?embed_host=darkboard&url=${encodeURIComponent(url)}" frameborder="0" allowfullscreen style="width:100%;height:100%"></iframe>`;
+    }
+    // Google Docs/Sheets/Slides
+    else if (url.includes('docs.google.com') || url.includes('sheets.google.com') || url.includes('slides.google.com')) {
+      const pubUrl = url.includes('/pub') ? url : url.replace(/\/edit.*/, '/pub');
+      embedHtml = `<iframe src="${pubUrl}" frameborder="0" style="width:100%;height:100%"></iframe>`;
+    }
+    // Generic
+    else {
+      embedHtml = `<iframe src="${url}" frameborder="0" style="width:100%;height:100%"></iframe>`;
+    }
+
+    overlay.innerHTML = `
+      <div class="embed-overlay-header">
+        <span>${url}</span>
+        <button class="embed-overlay-close">&times;</button>
+      </div>
+      <div class="embed-overlay-body">${embedHtml}</div>
+    `;
+
+    overlay.querySelector('.embed-overlay-close').addEventListener('click', () => overlay.remove());
+    document.body.appendChild(overlay);
+  }
+
+  // ===== AUTO TAG COLOR =====
+  getAutoTagColor(label) {
+    const colors = ['#FF6B6B', '#F4A460', '#FFD966', '#4ECDC4', '#45B7D1', '#4a9eff', '#DDA0DD', '#96CEB4', '#e94560', '#0f3460'];
+    // Deterministic color from label hash
+    let hash = 0;
+    for (let i = 0; i < label.length; i++) {
+      hash = ((hash << 5) - hash) + label.charCodeAt(i);
+      hash |= 0;
+    }
+    return colors[Math.abs(hash) % colors.length];
   }
 }
 

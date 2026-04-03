@@ -431,7 +431,8 @@ class InputHandler {
       v: 'select', h: 'hand', r: 'rect', c: 'circle', o: 'circle',
       l: 'line', a: 'arrow', d: 'draw', s: 'sticky',
       t: 'text', e: 'eraser', f: 'frame', g: 'envelope',
-      k: 'connector', m: 'card', i: 'list'
+      k: 'connector', m: 'card', i: 'list',
+      w: 'mindmap'
     };
 
     const lower = e.key.toLowerCase();

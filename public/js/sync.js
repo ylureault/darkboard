@@ -145,6 +145,8 @@ class SyncClient {
           if (msg.voting) this.app.workshop.syncVoting(msg.voting);
           if (msg.isolation) this.app.workshop.syncIsolation(msg.isolation);
           if (msg.followMode) this.app.workshop.syncFollowMode(msg.followMode, msg.facilitatorId);
+          if (msg.roundRobin) this.app.workshop.syncRoundRobin(msg.roundRobin);
+          if (msg.checkin) this.app.workshop.syncCheckin(msg.checkin);
         }
         break;
 
@@ -246,6 +248,14 @@ class SyncClient {
         if (this.app.workshop) this.app.workshop.handleFollowView(msg);
         break;
 
+      case 'round-robin-sync':
+        if (this.app.workshop) this.app.workshop.syncRoundRobin(msg);
+        break;
+
+      case 'checkin-sync':
+        if (this.app.workshop) this.app.workshop.syncCheckin(msg);
+        break;
+
       case 'goto-position':
         this.app.animateToView(msg.x, msg.y);
         break;
@@ -286,6 +296,18 @@ class SyncClient {
         this.app.tagRegistry = msg.tags;
         break;
 
+      case 'chat':
+        this.app.onChatMessage(msg);
+        break;
+
+      case 'webrtc-signal':
+        this.app.onWebRTCSignal(msg);
+        break;
+
+      case 'reaction':
+        this.app.onReaction(msg);
+        break;
+
       case 'comment-add': {
         const c = msg.comment;
         // Avoid duplicate
@@ -294,6 +316,10 @@ class SyncClient {
           this.app.renderer.comments.push(c);
         }
         this.app.renderer.markDirty();
+        // Check if current user is mentioned
+        if (c.mentions && c.mentions.includes(this.app.myUserId)) {
+          this.app.showToast(`${c.author} vous a mentionne dans un commentaire`);
+        }
         break;
       }
 
@@ -303,6 +329,13 @@ class SyncClient {
           Object.assign(this.app.renderer.comments[idx], msg.props);
         }
         this.app.renderer.markDirty();
+        // Check if a new reply mentions current user
+        if (msg.props && msg.props.replies) {
+          const lastReply = msg.props.replies[msg.props.replies.length - 1];
+          if (lastReply && lastReply.mentions && lastReply.mentions.includes(this.app.myUserId)) {
+            this.app.showToast(`${lastReply.author} vous a mentionne dans une reponse`);
+          }
+        }
         break;
       }
 
@@ -399,6 +432,32 @@ class SyncClient {
       type: 'comment-delete',
       boardId: getBoardId(),
       commentId
+    });
+  }
+
+  sendChat(text) {
+    this.send({
+      type: 'chat',
+      boardId: getBoardId(),
+      text
+    });
+  }
+
+  sendWebRTCSignal(targetUserId, signal) {
+    this.send({
+      type: 'webrtc-signal',
+      boardId: getBoardId(),
+      targetUserId,
+      signal
+    });
+  }
+
+  sendReaction(elementId, emoji) {
+    this.send({
+      type: 'reaction',
+      boardId: getBoardId(),
+      elementId,
+      emoji
     });
   }
 }

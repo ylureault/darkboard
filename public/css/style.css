@@ -2904,3 +2904,748 @@ body.tool-vote #canvas { cursor: pointer; }
 @keyframes syncSpin {
   to { transform: rotate(360deg); }
 }
+
+/* =========================
+   21. CHAT PANEL
+   ========================= */
+.chat-panel {
+  position: fixed;
+  right: 12px;
+  bottom: 60px;
+  width: 300px;
+  height: 400px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  z-index: 200;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  overflow: hidden;
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--panel-border);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.chat-header span:first-child {
+  flex: 1;
+}
+
+.chat-badge {
+  background: var(--danger);
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 1px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.chat-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.chat-close:hover {
+  color: var(--text);
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chat-msg {
+  font-size: 13px;
+}
+
+.chat-msg-name {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.chat-msg-time {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+.chat-msg-text {
+  margin-top: 2px;
+  background: var(--btn);
+  padding: 6px 10px;
+  border-radius: 8px;
+  word-wrap: break-word;
+}
+
+.chat-input-row {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.chat-input-row input {
+  flex: 1;
+  background: var(--btn);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 10px;
+  font-size: 13px;
+  outline: none;
+}
+
+.chat-input-row input:focus {
+  border-color: var(--accent);
+}
+
+.chat-send {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.chat-send:hover {
+  opacity: 0.9;
+}
+
+/* =========================
+   22. REACTION PICKER & BAR
+   ========================= */
+.reaction-picker {
+  position: fixed;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 6px 8px;
+  display: flex;
+  gap: 4px;
+  z-index: 300;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  transform: translateX(-50%);
+}
+
+.reaction-picker-item {
+  font-size: 20px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.reaction-picker-item:hover {
+  background: var(--btn-hover);
+}
+
+.reaction-bar {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+/* =========================
+   23. @MENTION DROPDOWN
+   ========================= */
+.mention-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  max-height: 150px;
+  overflow-y: auto;
+  z-index: 400;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  margin-bottom: 4px;
+}
+
+.mention-dropdown-item {
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.mention-dropdown-item:hover {
+  background: var(--btn-hover);
+}
+
+/* =========================
+   LIGHT THEME OVERRIDES FOR NEW COMPONENTS
+   ========================= */
+body.light-theme .chat-panel {
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+}
+
+body.light-theme .chat-msg-text {
+  background: #eee;
+}
+
+body.light-theme .reaction-picker {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+body.light-theme .mention-dropdown {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+/* =========================
+   WORKSHOP: ROUND ROBIN BANNER
+   ========================= */
+.round-robin-banner {
+  position: fixed;
+  top: 68px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(78, 205, 196, 0.15);
+  border: 1px solid var(--success);
+  border-radius: 10px;
+  padding: 10px 20px;
+  z-index: 110;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--success);
+  white-space: nowrap;
+}
+
+.round-robin-btn {
+  padding: 6px 14px;
+  background: var(--success);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+
+.round-robin-btn:hover {
+  opacity: 0.9;
+}
+
+.round-robin-btn-stop {
+  background: var(--btn);
+  color: var(--text);
+}
+
+/* =========================
+   WORKSHOP: SILENT BRAINSTORM
+   ========================= */
+.brainstorm-banner {
+  position: fixed;
+  top: 68px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 217, 102, 0.15);
+  border: 1px solid var(--warning);
+  border-radius: 10px;
+  padding: 10px 20px;
+  z-index: 110;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--warning);
+  white-space: nowrap;
+  animation: brainstorm-pulse 2s ease-in-out infinite;
+}
+
+@keyframes brainstorm-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 217, 102, 0.2); }
+  50% { box-shadow: 0 0 0 8px rgba(255, 217, 102, 0); }
+}
+
+/* =========================
+   WORKSHOP: CHECK-IN
+   ========================= */
+.checkin-emojis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  padding: 12px 0;
+}
+
+.checkin-emoji-btn {
+  width: 56px;
+  height: 56px;
+  font-size: 28px;
+  background: var(--btn);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkin-emoji-btn:hover {
+  background: var(--btn-hover);
+  transform: scale(1.1);
+}
+
+.checkin-emoji-btn.selected {
+  border-color: var(--accent);
+  background: rgba(74, 158, 255, 0.2);
+}
+
+.checkin-results {
+  position: fixed;
+  top: 68px;
+  right: 12px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 16px;
+  z-index: 120;
+  min-width: 260px;
+  max-width: 340px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+.checkin-results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.checkin-results-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.checkin-results-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checkin-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkin-bar-emoji {
+  font-size: 20px;
+  width: 28px;
+  text-align: center;
+}
+
+.checkin-bar-track {
+  flex: 1;
+  height: 20px;
+  background: var(--btn);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.checkin-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.checkin-bar-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 20px;
+  text-align: right;
+}
+
+.checkin-bar-names {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding-left: 36px;
+  margin-top: -4px;
+}
+
+/* =========================
+   WORKSHOP: VOTER AVATARS
+   ========================= */
+.vote-avatars {
+  display: flex;
+  gap: 2px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+
+.vote-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: white;
+  border: 1px solid rgba(0,0,0,0.2);
+}
+
+/* =========================
+   WORKSHOP: FACILITATOR SEPARATOR
+   ========================= */
+.fctl-separator {
+  height: 1px;
+  background: var(--panel-border);
+  margin: 4px 0;
+}
+
+/* =========================
+   FLOATING TOOLBAR
+   ========================= */
+.floating-toolbar {
+  position: fixed;
+  display: none;
+  align-items: center;
+  gap: 2px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 4px 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  z-index: 1000;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+.ftb-btn {
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ftb-btn:hover { background: var(--btn-hover); }
+.ftb-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--panel-border);
+  margin: 0 3px;
+}
+
+/* =========================
+   EMOJI PICKER
+   ========================= */
+.emoji-picker-panel {
+  position: fixed;
+  z-index: 1100;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  transform: translateX(-50%);
+}
+.emoji-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background 0.1s;
+}
+.emoji-btn:hover { background: var(--btn-hover); }
+
+/* =========================
+   TAG FILTER BAR
+   ========================= */
+.tag-filter-bar {
+  position: fixed;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 20px;
+  padding: 4px 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+}
+.tag-filter-btn {
+  border: none;
+  border-radius: 12px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--btn);
+  color: var(--text);
+  transition: all 0.15s;
+  position: relative;
+}
+.tag-filter-btn.active {
+  background: var(--accent);
+  color: white;
+}
+.tag-filter-btn:not(.active):hover {
+  background: var(--btn-hover);
+}
+.tag-filter-btn::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tag-color, transparent);
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.tag-filter-btn[data-tag="__clear__"]::before { display: none; }
+
+/* =========================
+   EMBED OVERLAY
+   ========================= */
+.embed-overlay {
+  position: fixed;
+  top: 60px;
+  left: 60px;
+  right: 60px;
+  bottom: 60px;
+  z-index: 10000;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.embed-overlay-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--btn);
+  border-bottom: 1px solid var(--panel-border);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.embed-overlay-close {
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.embed-overlay-body {
+  flex: 1;
+  overflow: hidden;
+}
+.embed-overlay-body iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* =========================
+   CHAT PANEL
+   ========================= */
+.chat-panel {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 320px;
+  background: var(--panel);
+  border-left: 1px solid var(--panel-border);
+  display: flex;
+  flex-direction: column;
+  z-index: 5000;
+  box-shadow: -4px 0 20px rgba(0,0,0,0.3);
+}
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--panel-border);
+  font-weight: 600;
+  color: var(--text);
+}
+.chat-badge {
+  background: var(--danger, #e94560);
+  color: white;
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 6px;
+}
+.chat-close {
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 20px;
+  cursor: pointer;
+}
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.chat-msg {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--btn);
+  font-size: 13px;
+}
+.chat-msg-name {
+  font-weight: 600;
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+.chat-msg-time {
+  font-size: 10px;
+  color: var(--text-muted);
+  float: right;
+}
+.chat-msg-text { color: var(--text); }
+.chat-msg.self {
+  background: var(--accent);
+  color: white;
+  align-self: flex-end;
+  max-width: 85%;
+}
+.chat-msg.self .chat-msg-name { color: rgba(255,255,255,0.8); }
+.chat-msg.self .chat-msg-text { color: white; }
+.chat-input-row {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--panel-border);
+}
+.chat-input-row input {
+  flex: 1;
+  background: var(--btn);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 13px;
+}
+.chat-send {
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 13px;
+}
+.chat-send:hover { filter: brightness(1.1); }
+
+/* =========================
+   REACTION BAR
+   ========================= */
+.reaction-picker {
+  position: fixed;
+  z-index: 1100;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 6px;
+  display: flex;
+  gap: 2px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+.reaction-picker button {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+}
+.reaction-picker button:hover { background: var(--btn-hover); }
+
+/* =========================
+   MENTION DROPDOWN
+   ========================= */
+.mention-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  max-height: 150px;
+  overflow-y: auto;
+  z-index: 1200;
+  min-width: 180px;
+}
+.mention-item {
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+}
+.mention-item:hover { background: var(--btn-hover); }
+
+/* =========================
+   LIGHT THEME OVERRIDES
+   ========================= */
+body.light .floating-toolbar { box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+body.light .emoji-picker-panel { box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+body.light .tag-filter-bar { box-shadow: 0 1px 8px rgba(0,0,0,0.1); }
+body.light .embed-overlay { box-shadow: 0 8px 40px rgba(0,0,0,0.15); }
+body.light .chat-panel { box-shadow: -2px 0 12px rgba(0,0,0,0.1); }
+body.light .chat-msg.self { background: var(--accent); }
+body.light .reaction-picker { box-shadow: 0 2px 12px rgba(0,0,0,0.1); }

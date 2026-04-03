@@ -374,12 +374,23 @@ class UI {
   triggerImport() {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.json,.drft,.rtb,.csv';
+    input.accept = '.json,.drft,.rtb,.csv,.md,.markdown';
     input.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
 
-      if (file.name.endsWith('.csv')) {
+      if (file.name.endsWith('.md') || file.name.endsWith('.markdown')) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            this.importMarkdown(ev.target.result);
+          } catch (err) {
+            console.error('Markdown import error:', err);
+            this.app.showToast('Erreur lors de l\'import Markdown');
+          }
+        };
+        reader.readAsText(file);
+      } else if (file.name.endsWith('.csv')) {
         const reader = new FileReader();
         reader.onload = (ev) => {
           try {
@@ -601,6 +612,72 @@ class UI {
     // Use the largest array as the source
     const [key, items] = arrays[0];
     this.importDraftIO({ items });
+  }
+
+  // ========================= MARKDOWN IMPORT =========================
+
+  importMarkdown(text) {
+    const lines = text.split('\n');
+    const ops = [];
+    let x = 100, y = 100;
+    const gap = 16;
+    let lastType = null;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      // Headers -> frames
+      if (/^#{1,3}\s/.test(trimmed)) {
+        const headerText = trimmed.replace(/^#+\s*/, '');
+        const frame = createFrame(x, y, 600, 40, headerText);
+        frame.id = generateId();
+        ops.push({ type: 'add', elementId: frame.id, element: frame });
+        y += 60;
+        lastType = 'header';
+        continue;
+      }
+
+      // List items -> stickies
+      if (/^[-*+]\s|^\d+\.\s/.test(trimmed)) {
+        const itemText = trimmed.replace(/^[-*+]\s*|^\d+\.\s*/, '');
+        const sticky = createSticky(x, y);
+        sticky.id = generateId();
+        sticky.text = itemText;
+        sticky.width = 200;
+        sticky.height = 150;
+        ops.push({ type: 'add', elementId: sticky.id, element: sticky });
+        // Grid layout for list items
+        x += 220;
+        if (x > 900) { x = 100; y += 170; }
+        lastType = 'list';
+        continue;
+      }
+
+      // Regular text -> text element
+      const textEl = createTextElement(x, y);
+      textEl.id = generateId();
+      textEl.text = trimmed;
+      textEl.width = 600;
+      ops.push({ type: 'add', elementId: textEl.id, element: textEl });
+      y += 50;
+      lastType = 'text';
+    }
+
+    if (ops.length === 0) {
+      this.app.showToast('Fichier Markdown vide');
+      return;
+    }
+
+    // Apply ops
+    for (const op of ops) {
+      this.app.renderer.elements.set(op.elementId, op.element);
+    }
+    const inverseOps = ops.map(op => ({ type: 'delete', elementId: op.elementId }));
+    this.app.history.push(ops, inverseOps);
+    this.app.sync.sendOps(ops);
+    this.app.renderer.markDirty();
+    this.app.showToast(`${ops.length} elements importes depuis Markdown`);
   }
 
   // ========================= CSV IMPORT =========================

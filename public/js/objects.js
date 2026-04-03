@@ -182,6 +182,37 @@ function createList(x, y) {
   });
 }
 
+// Mindmap node factory
+function createMindmapNode(x, y, text, parentId, color) {
+  return createElement('mindmap', {
+    x, y,
+    width: 160,
+    height: 50,
+    fill: color || '#4a9eff',
+    stroke: 'transparent',
+    text: text || '',
+    fontSize: 14,
+    mindmapParent: parentId || null,
+    mindmapChildren: [],
+    mindmapCollapsed: false,
+    borderRadius: 25
+  });
+}
+
+// Embed/iframe factory
+function createEmbed(x, y, url) {
+  return createElement('embed', {
+    x, y,
+    width: 480,
+    height: 320,
+    fill: '#1e1e1e',
+    stroke: '#333',
+    strokeWidth: 1,
+    embedUrl: url || '',
+    text: url || 'Embed'
+  });
+}
+
 function createImageElement(x, y, w, h, dataUrl) {
   return createElement('image', {
     x, y,
@@ -438,6 +469,14 @@ function renderElement(ctx, el, selected, camera) {
     ctx.globalAlpha = Math.max(0, Math.min(1, el.opacity));
   }
 
+  // Shadow support (for shapes that don't have built-in shadows)
+  if (el.shadowEnabled && el.type !== 'sticky' && el.type !== 'card' && el.type !== 'envelope') {
+    ctx.shadowColor = el.shadowColor || 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = el.shadowBlur || 12;
+    ctx.shadowOffsetX = el.shadowOffsetX || 0;
+    ctx.shadowOffsetY = el.shadowOffsetY || 4;
+  }
+
   // Lock indicator
   if (el.locked) {
     const bounds = getElementBounds(el);
@@ -499,6 +538,12 @@ function renderElement(ctx, el, selected, camera) {
     case 'list':
       drawList(ctx, el);
       break;
+    case 'mindmap':
+      drawMindmapNode(ctx, el);
+      break;
+    case 'embed':
+      drawEmbed(ctx, el);
+      break;
   }
 
   ctx.restore();
@@ -538,29 +583,84 @@ function renderVoteBadge(ctx, el, count, hasVoted) {
   ctx.restore();
 }
 
+// Render reaction bar below an element
+function renderReactionBar(ctx, el) {
+  if (!el.reactions || el.reactions.length === 0) return;
+  const bounds = getElementBounds(el);
+  if (!bounds) return;
+
+  // Aggregate reactions by emoji
+  const counts = {};
+  for (const r of el.reactions) {
+    counts[r.emoji] = (counts[r.emoji] || 0) + 1;
+  }
+
+  const entries = Object.entries(counts);
+  if (entries.length === 0) return;
+
+  ctx.save();
+
+  const startX = bounds.x;
+  const startY = bounds.y + bounds.h + 4;
+  let xOff = 0;
+
+  for (const [emoji, count] of entries) {
+    const label = emoji + (count > 1 ? count : '');
+    const w = ctx.measureText(label).width + 12;
+
+    // Background pill
+    ctx.fillStyle = 'rgba(74, 158, 255, 0.15)';
+    ctx.beginPath();
+    ctx.roundRect(startX + xOff, startY, w, 20, 10);
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = 'rgba(74, 158, 255, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Text
+    ctx.fillStyle = '#e0e0e0';
+    ctx.font = '12px sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.fillText(label, startX + xOff + 6, startY + 10);
+
+    xOff += w + 4;
+  }
+
+  ctx.restore();
+}
+
 function drawRect(ctx, el) {
-  const r = 4;
+  const r = el.borderRadius !== undefined ? el.borderRadius : 4;
   ctx.beginPath();
   ctx.roundRect(el.x, el.y, el.width, el.height, r);
   if (el.fill && el.fill !== 'transparent') {
     ctx.fillStyle = el.fill;
     ctx.fill();
   }
+  // Clear shadow after fill so stroke isn't doubled
+  if (el.shadowEnabled) { ctx.shadowColor = 'transparent'; }
   if (el.stroke && el.stroke !== 'transparent' && el.strokeWidth > 0) {
     ctx.strokeStyle = el.stroke;
     ctx.lineWidth = el.strokeWidth;
+    if (el.dashStyle) { ctx.setLineDash([8, 4]); }
     ctx.stroke();
+    if (el.dashStyle) { ctx.setLineDash([]); }
   }
   const textContent = el.richText || el.text;
   if (textContent) {
+    const textColor = el.textColor || '#e0e0e0';
     if (el.richText) {
       const segments = parseRichText(el.richText);
       const fs = el.fontSize || 16;
       const textH = segments.length * fs * 1.4;
-      renderRichText(ctx, segments, el.x + 8, el.y + (el.height - textH) / 2, el.width - 16, fs, '#e0e0e0', 'center');
+      renderRichText(ctx, segments, el.x + 8, el.y + (el.height - textH) / 2, el.width - 16, fs, textColor, 'center');
     } else {
-      ctx.fillStyle = '#e0e0e0';
-      ctx.font = `${el.fontSize || 16}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.fillStyle = textColor;
+      const fontFamily = el.fontFamily || '-apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.font = `${el.fontSize || 16}px ${fontFamily}`;
       ctx.textBaseline = 'middle';
       ctx.textAlign = 'center';
       ctx.fillText(el.text, el.x + el.width / 2, el.y + el.height / 2, el.width - 16);
@@ -578,20 +678,25 @@ function drawCircle(ctx, el) {
     ctx.fillStyle = el.fill;
     ctx.fill();
   }
+  if (el.shadowEnabled) { ctx.shadowColor = 'transparent'; }
   if (el.stroke && el.stroke !== 'transparent' && el.strokeWidth > 0) {
     ctx.strokeStyle = el.stroke;
     ctx.lineWidth = el.strokeWidth;
+    if (el.dashStyle) { ctx.setLineDash([8, 4]); }
     ctx.stroke();
+    if (el.dashStyle) { ctx.setLineDash([]); }
   }
   const textContent = el.richText || el.text;
   if (textContent) {
+    const textColor = el.textColor || '#e0e0e0';
     if (el.richText) {
       const segments = parseRichText(el.richText);
       const fs = el.fontSize || 16;
-      renderRichText(ctx, segments, el.x + 16, el.y + 16, el.width - 32, fs, '#e0e0e0', 'center');
+      renderRichText(ctx, segments, el.x + 16, el.y + 16, el.width - 32, fs, textColor, 'center');
     } else {
-      ctx.fillStyle = '#e0e0e0';
-      ctx.font = `${el.fontSize || 16}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.fillStyle = textColor;
+      const fontFamily = el.fontFamily || '-apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.font = `${el.fontSize || 16}px ${fontFamily}`;
       ctx.textBaseline = 'middle';
       ctx.textAlign = 'center';
       ctx.fillText(el.text, el.x + el.width / 2, el.y + el.height / 2, el.width - 16);
@@ -693,19 +798,21 @@ function drawSticky(ctx, el) {
         if (estLines * testLineH <= maxH) break;
         fs -= 1;
       }
-      renderRichText(ctx, segments, el.x + 14, el.y + 14, maxW, fs, '#1a1a1a', el.textAlign || 'left');
+      const stickyTextColor = el.textColor || '#1a1a1a';
+      renderRichText(ctx, segments, el.x + 14, el.y + 14, maxW, fs, stickyTextColor, el.textAlign || 'left');
     } else {
       // Auto-size for plain text
       let fs = el.fontSize || 16;
       const minFs = 10;
+      const fontFamily = el.fontFamily || '-apple-system, BlinkMacSystemFont, sans-serif';
       while (fs > minFs) {
-        ctx.font = `${fs}px -apple-system, BlinkMacSystemFont, sans-serif`;
+        ctx.font = `${fs}px ${fontFamily}`;
         const lines = estimateWrapLines(ctx, el.text, maxW);
         if (lines * fs * 1.4 <= maxH) break;
         fs -= 1;
       }
-      ctx.fillStyle = '#1a1a1a';
-      ctx.font = `${fs}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.fillStyle = el.textColor || '#1a1a1a';
+      ctx.font = `${fs}px ${fontFamily}`;
       ctx.textBaseline = 'top';
       wrapText(ctx, el.text, el.x + 14, el.y + 14, maxW, fs * 1.4);
     }
@@ -779,12 +886,14 @@ function estimateWrapLines(ctx, text, maxWidth) {
 function drawText(ctx, el) {
   const textContent = el.richText || el.text;
   if (!textContent) return;
+  const textColor = el.textColor || '#e0e0e0';
+  const fontFamily = el.fontFamily || '-apple-system, BlinkMacSystemFont, sans-serif';
   if (el.richText) {
     const segments = parseRichText(el.richText);
-    renderRichText(ctx, segments, el.x, el.y, el.width || 400, el.fontSize || 20, '#e0e0e0', el.textAlign || 'left');
+    renderRichText(ctx, segments, el.x, el.y, el.width || 400, el.fontSize || 20, textColor, el.textAlign || 'left');
   } else {
-    ctx.fillStyle = el.fill && el.fill !== 'transparent' ? el.fill : '#e0e0e0';
-    ctx.font = `${el.fontSize || 20}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    ctx.fillStyle = el.textColor || (el.fill && el.fill !== 'transparent' ? el.fill : '#e0e0e0');
+    ctx.font = `${el.fontSize || 20}px ${fontFamily}`;
     ctx.textBaseline = 'top';
     wrapText(ctx, el.text, el.x, el.y, el.width || 400, (el.fontSize || 20) * 1.4);
   }
@@ -1125,11 +1234,12 @@ function drawDiamond(ctx, el) {
     ctx.lineTo(cx, el.y + el.height);
     ctx.lineTo(el.x, cy);
     ctx.clip();
-    renderRichText(ctx, segments, el.x + padding, startY, el.width - padding * 2, fontSize, '#e0e0e0', 'center');
+    renderRichText(ctx, segments, el.x + padding, startY, el.width - padding * 2, fontSize, el.textColor || '#e0e0e0', 'center');
     ctx.restore();
   } else if (el.text) {
-    ctx.fillStyle = '#e0e0e0';
-    ctx.font = `${el.fontSize || 16}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    ctx.fillStyle = el.textColor || '#e0e0e0';
+    const fontFamily = el.fontFamily || '-apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.font = `${el.fontSize || 16}px ${fontFamily}`;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
     ctx.fillText(el.text, cx, cy, el.width - 20);
@@ -1166,11 +1276,12 @@ function drawTriangle(ctx, el) {
     ctx.lineTo(el.x + el.width, el.y + el.height);
     ctx.lineTo(el.x, el.y + el.height);
     ctx.clip();
-    renderRichText(ctx, segments, el.x + padding, textY, el.width - padding * 2, fontSize, '#e0e0e0', 'center');
+    renderRichText(ctx, segments, el.x + padding, textY, el.width - padding * 2, fontSize, el.textColor || '#e0e0e0', 'center');
     ctx.restore();
   } else if (el.text) {
-    ctx.fillStyle = '#e0e0e0';
-    ctx.font = `${el.fontSize || 16}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    ctx.fillStyle = el.textColor || '#e0e0e0';
+    const fontFamily = el.fontFamily || '-apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.font = `${el.fontSize || 16}px ${fontFamily}`;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
     ctx.fillText(el.text, cx, el.y + el.height * 0.6, el.width - 20);
@@ -1524,6 +1635,111 @@ function drawImage(ctx, el) {
   }
 }
 
+function drawMindmapNode(ctx, el) {
+  const r = el.borderRadius !== undefined ? el.borderRadius : 25;
+  const color = el.fill || '#4a9eff';
+
+  // Shadow
+  ctx.shadowColor = 'rgba(0,0,0,0.2)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 3;
+
+  // Body
+  ctx.beginPath();
+  ctx.roundRect(el.x, el.y, el.width, el.height, r);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+
+  // Text
+  const textColor = el.textColor || (isLightColor(color) ? '#1a1a1a' : '#ffffff');
+  const fontFamily = el.fontFamily || '-apple-system, BlinkMacSystemFont, sans-serif';
+  const fontSize = el.fontSize || 14;
+  ctx.fillStyle = textColor;
+  ctx.font = `600 ${fontSize}px ${fontFamily}`;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+  ctx.fillText(el.text || '', el.x + el.width / 2, el.y + el.height / 2, el.width - 20);
+  ctx.textAlign = 'left';
+
+  // Collapse indicator if has children
+  if (el.mindmapChildren && el.mindmapChildren.length > 0) {
+    const ix = el.x + el.width - 14;
+    const iy = el.y + el.height / 2;
+    ctx.beginPath();
+    ctx.arc(ix, iy, 8, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.fill();
+    ctx.fillStyle = textColor;
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(el.mindmapCollapsed ? '+' : String(el.mindmapChildren.length), ix, iy);
+    ctx.textAlign = 'left';
+  }
+}
+
+function drawEmbed(ctx, el) {
+  const r = 8;
+
+  // Shadow
+  ctx.shadowColor = 'rgba(0,0,0,0.3)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 3;
+
+  // Background
+  ctx.beginPath();
+  ctx.roundRect(el.x, el.y, el.width, el.height, r);
+  ctx.fillStyle = el.fill || '#1e1e1e';
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+
+  // Border
+  ctx.strokeStyle = el.stroke || '#333';
+  ctx.lineWidth = el.strokeWidth || 1;
+  ctx.stroke();
+
+  // Header bar
+  const headerH = 32;
+  ctx.fillStyle = '#2a2a2a';
+  ctx.beginPath();
+  ctx.roundRect(el.x, el.y, el.width, headerH, [r, r, 0, 0]);
+  ctx.fill();
+
+  // URL text in header
+  ctx.fillStyle = '#888';
+  ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.textBaseline = 'middle';
+  const urlText = el.embedUrl || 'No URL';
+  ctx.fillText(urlText.length > 50 ? urlText.substring(0, 50) + '...' : urlText, el.x + 12, el.y + headerH / 2, el.width - 24);
+
+  // Play/embed icon in center
+  const cx = el.x + el.width / 2;
+  const cy = el.y + headerH + (el.height - headerH) / 2;
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 28, 0, Math.PI * 2);
+  ctx.stroke();
+  // Play triangle
+  ctx.fillStyle = '#555';
+  ctx.beginPath();
+  ctx.moveTo(cx - 8, cy - 12);
+  ctx.lineTo(cx + 14, cy);
+  ctx.lineTo(cx - 8, cy + 12);
+  ctx.closePath();
+  ctx.fill();
+
+  // Type indicator
+  ctx.fillStyle = '#666';
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  const host = el.embedUrl ? (() => { try { return new URL(el.embedUrl).hostname; } catch(e) { return ''; } })() : '';
+  ctx.fillText(host || 'Embed', cx, cy + 36);
+  ctx.textAlign = 'left';
+}
+
 function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
   const lines = text.split('\n');
   let offsetY = 0;
@@ -1614,6 +1830,8 @@ function hitTestElement(el, worldX, worldY, threshold) {
     }
     case 'card':
     case 'list':
+    case 'mindmap':
+    case 'embed':
       return pointInRect(worldX, worldY, el.x, el.y, el.width, el.height);
     case 'connector': {
       if (el.lineType === 'orthogonal') {

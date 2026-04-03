@@ -1134,6 +1134,126 @@ const Tools = {
     onDoubleClick() {}
   },
 
+  mindmap: {
+    name: 'mindmap',
+    cursor: 'crosshair',
+
+    onPointerDown(app, worldX, worldY) {
+      // Check if clicking on an existing mindmap node to add child
+      const hit = app.renderer.hitTest(worldX, worldY);
+      if (hit && hit.type === 'mindmap') {
+        app.addMindmapChild(hit);
+        return;
+      }
+      // Create root node
+      const node = createMindmapNode(worldX - 80, worldY - 25, 'Idee centrale', null, '#4a9eff');
+      node.width = 200;
+      node.height = 60;
+      node.fontSize = 18;
+      app.addElement(node);
+      app.renderer.selectedIds.clear();
+      app.renderer.selectedIds.add(node.id);
+      app.renderer.markDirty();
+      setTimeout(() => app.startTextEdit(node), 50);
+    },
+
+    onPointerMove() {},
+    onPointerUp() {},
+    onKeyDown(app, e) {
+      if (e.key === 'Escape') app.setTool('select');
+      // Tab: add child to selected mindmap node
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const selId = app.renderer.selectedIds.values().next().value;
+        const sel = selId ? app.renderer.elements.get(selId) : null;
+        if (sel && sel.type === 'mindmap') {
+          app.addMindmapChild(sel);
+        }
+      }
+      // Enter: add sibling
+      if (e.key === 'Enter' && !app.textEditElement) {
+        e.preventDefault();
+        const selId = app.renderer.selectedIds.values().next().value;
+        const sel = selId ? app.renderer.elements.get(selId) : null;
+        if (sel && sel.type === 'mindmap' && sel.mindmapParent) {
+          const parent = app.renderer.elements.get(sel.mindmapParent);
+          if (parent) app.addMindmapChild(parent);
+        }
+      }
+    },
+    onDoubleClick() {}
+  },
+
+  zoomZone: {
+    name: 'zoomZone',
+    cursor: 'zoom-in',
+    startPoint: null,
+
+    onPointerDown(app, worldX, worldY) {
+      this.startPoint = { x: worldX, y: worldY };
+      app.renderer.selectionBox = { x: worldX, y: worldY, w: 0, h: 0 };
+    },
+
+    onPointerMove(app, worldX, worldY) {
+      if (!this.startPoint) return;
+      const w = worldX - this.startPoint.x;
+      const h = worldY - this.startPoint.y;
+      const norm = normalizeRect(this.startPoint.x, this.startPoint.y, w, h);
+      app.renderer.selectionBox = { x: norm.x, y: norm.y, w: norm.w, h: norm.h };
+      app.renderer.markDirty();
+    },
+
+    onPointerUp(app, worldX, worldY) {
+      if (!this.startPoint) return;
+      const w = worldX - this.startPoint.x;
+      const h = worldY - this.startPoint.y;
+      const norm = normalizeRect(this.startPoint.x, this.startPoint.y, w, h);
+
+      if (norm.w > 20 && norm.h > 20) {
+        const cx = norm.x + norm.w / 2;
+        const cy = norm.y + norm.h / 2;
+        const zoom = Math.min(window.innerWidth / norm.w, window.innerHeight / norm.h, 5);
+        app.animateToView(cx, cy, zoom);
+      }
+
+      app.renderer.selectionBox = null;
+      this.startPoint = null;
+      app.setTool('select');
+      app.renderer.markDirty();
+    },
+
+    onKeyDown(app, e) {
+      if (e.key === 'Escape') {
+        app.renderer.selectionBox = null;
+        this.startPoint = null;
+        app.setTool('select');
+        app.renderer.markDirty();
+      }
+    },
+    onDoubleClick() {}
+  },
+
+  embed: {
+    name: 'embed',
+    cursor: 'crosshair',
+
+    onPointerDown(app, worldX, worldY) {
+      const url = prompt('URL a integrer (YouTube, Figma, Google Docs, etc.):');
+      if (!url) { app.setTool('select'); return; }
+      const el = createEmbed(worldX - 240, worldY - 160, url);
+      app.addElement(el);
+      app.renderer.selectedIds.clear();
+      app.renderer.selectedIds.add(el.id);
+      app.setTool('select');
+      app.renderer.markDirty();
+    },
+
+    onPointerMove() {},
+    onPointerUp() {},
+    onKeyDown(app, e) { if (e.key === 'Escape') app.setTool('select'); },
+    onDoubleClick() {}
+  },
+
   eraser: {
     name: 'eraser',
     cursor: 'crosshair',

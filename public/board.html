@@ -198,6 +198,24 @@
       </svg>
       <span class="shortcut">F</span>
     </button>
+    <button class="tool-btn" data-tool="mindmap" title="Mind Map (W)" aria-label="Mind Map, raccourci W">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="4"/><circle cx="4" cy="6" r="2"/><circle cx="4" cy="18" r="2"/><circle cx="20" cy="8" r="2"/><circle cx="20" cy="16" r="2"/>
+        <line x1="8" y1="10" x2="6" y2="7"/><line x1="8" y1="14" x2="6" y2="17"/><line x1="16" y1="10" x2="18" y2="9"/><line x1="16" y1="14" x2="18" y2="15"/>
+      </svg>
+      <span class="shortcut">W</span>
+    </button>
+    <button class="tool-btn" data-tool="embed" title="Integrer (YouTube, Figma...)" aria-label="Integrer un contenu externe">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="16,18 22,12 16,6"/><polyline points="8,6 2,12 8,18"/>
+      </svg>
+    </button>
+    <div class="divider"></div>
+    <button class="tool-btn" data-tool="zoomZone" title="Zoom zone" aria-label="Zoom sur zone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+      </svg>
+    </button>
     <div class="divider"></div>
     <button class="tool-btn" data-tool="eraser" title="Gomme — Effacer des elements (E)" aria-label="Gomme, raccourci E">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -214,6 +232,9 @@
       </div>
     </button>
   </div>
+
+  <!-- Tag filter bar -->
+  <div class="tag-filter-bar" id="tagFilterBar" style="display:none"></div>
 
   <!-- Color panel (collapsible) -->
   <div class="color-panel" id="colorPanel" style="display:none" role="toolbar" aria-label="Panneau couleurs et epaisseur">
@@ -271,6 +292,39 @@
           <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
         </svg>
         Suivez-moi
+      </button>
+      <div class="fctl-separator"></div>
+      <button class="fctl-btn" id="btnBrainstorm" title="Brainstorm silencieux — Isoloir + timer" aria-label="Brainstorm silencieux">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+        </svg>
+        Brainstorm
+      </button>
+      <button class="fctl-btn" id="btnRoundRobin" title="Tour de table — Discussion en tour par tour" aria-label="Tour de table">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 3"/>
+        </svg>
+        Tour de table
+      </button>
+      <button class="fctl-btn" id="btnCheckin" title="Check-in — Sondage d'humeur" aria-label="Check-in">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>
+        </svg>
+        Check-in
+      </button>
+      <button class="fctl-btn" id="btnMatrix" title="Matrice de priorisation — Apres un vote" aria-label="Matrice de priorisation">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/>
+          <rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/>
+        </svg>
+        Matrice
+      </button>
+      <button class="fctl-btn" id="btnAutoCluster" title="Auto-regroupement — Regrouper les post-its par theme" aria-label="Auto-regroupement">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><circle cx="12" cy="16" r="3"/>
+          <path d="M10.5 9.5L12 14M13.5 9.5L12 14" opacity="0.5"/>
+        </svg>
+        Clusters
       </button>
     </div>
   </div>
@@ -439,6 +493,13 @@
       </svg>
       Laser
     </button>
+    <button class="bb-btn bb-btn-label" id="audioToggle" title="Audio">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+        <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+        <path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+      </svg>
+      Audio
+    </button>
     <div class="bb-sep"></div>
     <!-- Export / Import -->
     <button class="bb-btn bb-btn-label" id="exportBtn" title="Export PNG" aria-label="Exporter en PNG">
@@ -473,6 +534,12 @@
         <line x1="12" y1="3" x2="12" y2="15"/>
       </svg>
       Importer
+    </button>
+    <button class="bb-btn bb-btn-label" id="chatToggle" title="Chat">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+      </svg>
+      Chat
     </button>
     <div class="bb-sep"></div>
     <!-- Share -->
@@ -640,6 +707,72 @@
   </div>
 
   <!-- Help button is now in the bottom-bar-left -->
+
+  <!-- Chat panel -->
+  <div class="chat-panel" id="chatPanel" style="display:none">
+    <div class="chat-header">
+      <span>Chat</span>
+      <span class="chat-badge" id="chatBadge" style="display:none">0</span>
+      <button class="chat-close" id="chatClose">&times;</button>
+    </div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-input-row">
+      <input type="text" id="chatInput" placeholder="Message..." maxlength="500" />
+      <button class="chat-send" id="chatSend">Envoyer</button>
+    </div>
+  </div>
+
+  <!-- Round Robin banner -->
+  <div class="round-robin-banner" id="roundRobinBanner" style="display:none;">
+    <span id="roundRobinText">Tour de table</span>
+    <button class="round-robin-btn" id="roundRobinNext" style="display:none;" aria-label="Passer au participant suivant">Suivant</button>
+    <button class="round-robin-btn round-robin-btn-stop" id="roundRobinStop" style="display:none;" aria-label="Arreter le tour de table">Arreter</button>
+  </div>
+
+  <!-- Silent brainstorm modal -->
+  <div class="modal-overlay" id="brainstormModal" style="display:none;" role="dialog" aria-label="Configuration du brainstorm silencieux">
+    <div class="modal">
+      <h2>Brainstorm silencieux</h2>
+      <p style="color:var(--text-muted);margin-bottom:16px">Mode isoloir + minuteur automatique</p>
+      <div class="timer-setup">
+        <input type="number" id="brainstormMinutes" value="5" min="1" max="30" /> minutes
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn" id="brainstormStart" aria-label="Demarrer le brainstorm">Demarrer</button>
+        <button class="modal-btn modal-btn-secondary" id="brainstormCancel" aria-label="Annuler">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Check-in modal -->
+  <div class="modal-overlay" id="checkinModal" style="display:none;" role="dialog" aria-label="Check-in">
+    <div class="modal">
+      <h2>Check-in</h2>
+      <p style="color:var(--text-muted);margin-bottom:16px">Comment vous sentez-vous ?</p>
+      <div class="checkin-emojis" id="checkinEmojis">
+        <button class="checkin-emoji-btn" data-emoji="😊">😊</button>
+        <button class="checkin-emoji-btn" data-emoji="😐">😐</button>
+        <button class="checkin-emoji-btn" data-emoji="😕">😕</button>
+        <button class="checkin-emoji-btn" data-emoji="😫">😫</button>
+        <button class="checkin-emoji-btn" data-emoji="🔥">🔥</button>
+        <button class="checkin-emoji-btn" data-emoji="💪">💪</button>
+        <button class="checkin-emoji-btn" data-emoji="🤔">🤔</button>
+        <button class="checkin-emoji-btn" data-emoji="😴">😴</button>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn-secondary" id="checkinClose" aria-label="Fermer">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Check-in results overlay -->
+  <div class="checkin-results" id="checkinResults" style="display:none;">
+    <div class="checkin-results-header">
+      <span>Resultats Check-in</span>
+      <button class="checkin-results-close" id="checkinResultsClose">&times;</button>
+    </div>
+    <div class="checkin-results-body" id="checkinResultsBody"></div>
+  </div>
 
   <!-- Toast -->
   <div class="toast" id="toast" role="status" aria-live="polite"></div>

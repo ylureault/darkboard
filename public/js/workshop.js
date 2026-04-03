@@ -1,4 +1,5 @@
-// Workshop features: Timer, Voting, Isolation, Follow Mode, Anchors
+// Workshop features: Timer, Voting, Isolation, Follow Mode, Anchors,
+// Prioritization Matrix, Round Robin, Enhanced Voting, Silent Brainstorm, Auto Clusters, Check-in
 
 class Workshop {
   constructor(app) {
@@ -14,6 +15,7 @@ class Workshop {
     this.voting = null;
     this.myVotes = [];
     this.voteResults = {};
+    this.voterDetails = {}; // elementId -> [{name, color}]
 
     // Isolation state
     this.isolation = null;
@@ -26,6 +28,17 @@ class Workshop {
     this.anchors = new Map();
     this.anchorsVisible = false;
     this.anchorSearchOpen = false;
+
+    // Round Robin state
+    this.roundRobin = null;
+
+    // Silent Brainstorm state
+    this.silentBrainstorm = false;
+    this.brainstormTimerCallback = null;
+
+    // Check-in state
+    this.checkin = null;
+    this.myCheckinVote = null;
 
     this.initUI();
   }
@@ -69,6 +82,37 @@ class Workshop {
     document.getElementById('anchorToggle').addEventListener('click', () => this.toggleAnchorsPanel());
     document.getElementById('anchorsClose').addEventListener('click', () => this.toggleAnchorsPanel());
     document.getElementById('anchorsAdd').addEventListener('click', () => this.addAnchorHere());
+
+    // New workshop features
+    // Brainstorm
+    document.getElementById('btnBrainstorm').addEventListener('click', () => this.showBrainstormModal());
+    document.getElementById('brainstormStart').addEventListener('click', () => this.startSilentBrainstorm());
+    document.getElementById('brainstormCancel').addEventListener('click', () => {
+      document.getElementById('brainstormModal').style.display = 'none';
+    });
+
+    // Round Robin
+    document.getElementById('btnRoundRobin').addEventListener('click', () => this.startRoundRobin());
+    document.getElementById('roundRobinNext').addEventListener('click', () => this.nextRoundRobin());
+    document.getElementById('roundRobinStop').addEventListener('click', () => this.stopRoundRobin());
+
+    // Check-in
+    document.getElementById('btnCheckin').addEventListener('click', () => this.startCheckin());
+    document.querySelectorAll('.checkin-emoji-btn').forEach(btn => {
+      btn.addEventListener('click', () => this.castCheckinVote(btn.dataset.emoji));
+    });
+    document.getElementById('checkinClose').addEventListener('click', () => {
+      document.getElementById('checkinModal').style.display = 'none';
+    });
+    document.getElementById('checkinResultsClose').addEventListener('click', () => {
+      document.getElementById('checkinResults').style.display = 'none';
+    });
+
+    // Prioritization Matrix
+    document.getElementById('btnMatrix').addEventListener('click', () => this.showPrioritizationMatrix());
+
+    // Auto Clusters
+    document.getElementById('btnAutoCluster').addEventListener('click', () => this.autoCluster());
   }
 
   setFacilitator(isFacilitator, facilitatorId) {
@@ -324,6 +368,7 @@ class Workshop {
 
   handleVoteReveal(msg) {
     if (msg.votes) this.voteResults = msg.votes;
+    if (msg.voterDetails) this.voterDetails = msg.voterDetails;
     if (this.voting) this.voting.hideResults = false;
     document.getElementById('voteReveal').style.display = 'none';
     this.app.renderer.markDirty();
@@ -332,6 +377,7 @@ class Workshop {
 
   handleVoteEnd(msg) {
     if (msg.results) this.voteResults = msg.results;
+    if (msg.voterDetails) this.voterDetails = msg.voterDetails;
     this.voting = null;
     document.getElementById('voteBar').style.display = 'none';
     if (this.isFacilitator) {
@@ -340,12 +386,16 @@ class Workshop {
     // Keep results visible briefly
     this.app.renderer.markDirty();
     this.app.showToast('Vote termine !');
-    // Clear results after 10 seconds
+    // Store last vote results for matrix feature
+    this._lastVoteResults = Object.assign({}, this.voteResults);
+    this._lastVoterDetails = Object.assign({}, this.voterDetails);
+    // Clear results after 30 seconds (longer to allow matrix usage)
     setTimeout(() => {
       this.voteResults = {};
+      this.voterDetails = {};
       this.myVotes = [];
       this.app.renderer.markDirty();
-    }, 10000);
+    }, 30000);
   }
 
   revealVotes() {
@@ -366,6 +416,10 @@ class Workshop {
 
   isVotingActive() {
     return this.voting && this.voting.active;
+  }
+
+  getVoterDetails(elementId) {
+    return this.voterDetails[elementId] || [];
   }
 
   // =====================
@@ -665,6 +719,514 @@ class Workshop {
         }
       });
     }, 0);
+  }
+
+  // =====================
+  // PRIORITIZATION MATRIX (#40)
+  // =====================
+  showPrioritizationMatrix() {
+    if (!this.isFacilitator) return;
+
+    // Use current vote results or last saved results
+    const results = (Object.keys(this.voteResults).length > 0)
+      ? this.voteResults
+      : (this._lastVoteResults || {});
+
+    // Get elements that received votes
+    const votedElements = [];
+    for (const [elementId, count] of Object.entries(results)) {
+      if (count > 0) {
+        const el = this.app.renderer.elements.get(elementId);
+        if (el) votedElements.push({ id: elementId, count, element: el });
+      }
+    }
+
+    if (votedElements.length === 0) {
+      this.app.showToast('Aucun element avec des votes. Lancez d\'abord un vote.');
+      return;
+    }
+
+    // Sort by vote count descending
+    votedElements.sort((a, b) => b.count - a.count);
+
+    // Split into impact fort (top 50%) and impact faible (bottom 50%)
+    const mid = Math.ceil(votedElements.length / 2);
+    const impactFort = votedElements.slice(0, mid);
+    const impactFaible = votedElements.slice(mid);
+
+    // Matrix dimensions
+    const matrixW = 1200;
+    const matrixH = 800;
+    const headerH = 40;
+    const padding = 20;
+    const quadW = (matrixW - padding * 3) / 2;
+    const quadH = (matrixH - headerH - padding * 3) / 2;
+
+    // Position matrix at center of current view
+    const cam = this.app.renderer.camera;
+    const matrixX = cam.x - matrixW / 2;
+    const matrixY = cam.y - matrixH / 2;
+
+    const ops = [];
+    const frameId = generateId();
+
+    // Create the frame
+    ops.push({
+      type: 'add',
+      element: {
+        id: frameId,
+        type: 'frame',
+        x: matrixX,
+        y: matrixY,
+        w: matrixW,
+        h: matrixH,
+        label: 'Matrice de priorisation',
+        fill: 'rgba(30,30,30,0.5)',
+        stroke: '#555',
+        strokeWidth: 2
+      }
+    });
+
+    // Quadrant labels as text elements
+    const quadrants = [
+      { label: 'Impact fort / Effort faible', color: '#4ecdc4', x: matrixX + padding, y: matrixY + headerH + padding, items: [] },
+      { label: 'Impact fort / Effort fort', color: '#ff9f43', x: matrixX + padding * 2 + quadW, y: matrixY + headerH + padding, items: [] },
+      { label: 'Impact faible / Effort faible', color: '#4a9eff', x: matrixX + padding, y: matrixY + headerH + padding * 2 + quadH, items: [] },
+      { label: 'Impact faible / Effort fort', color: '#e94560', x: matrixX + padding * 2 + quadW, y: matrixY + headerH + padding * 2 + quadH, items: [] }
+    ];
+
+    // Distribute: impact fort row
+    const midFort = Math.ceil(impactFort.length / 2);
+    quadrants[0].items = impactFort.slice(0, midFort); // effort faible
+    quadrants[1].items = impactFort.slice(midFort);     // effort fort
+
+    // Impact faible row
+    const midFaible = Math.ceil(impactFaible.length / 2);
+    quadrants[2].items = impactFaible.slice(0, midFaible); // effort faible
+    quadrants[3].items = impactFaible.slice(midFaible);     // effort fort
+
+    // Create quadrant labels and position elements
+    for (const q of quadrants) {
+      // Add label text
+      ops.push({
+        type: 'add',
+        element: {
+          id: generateId(),
+          type: 'text',
+          x: q.x + 8,
+          y: q.y + 4,
+          w: quadW - 16,
+          h: 24,
+          text: q.label,
+          fontSize: 13,
+          fontWeight: 'bold',
+          fill: q.color,
+          stroke: 'none'
+        }
+      });
+
+      // Add quadrant background
+      ops.push({
+        type: 'add',
+        element: {
+          id: generateId(),
+          type: 'rect',
+          x: q.x,
+          y: q.y,
+          w: quadW,
+          h: quadH,
+          fill: q.color + '10',
+          stroke: q.color + '40',
+          strokeWidth: 1,
+          rx: 8
+        }
+      });
+
+      // Position items in grid within quadrant
+      const itemPadding = 30;
+      const cols = Math.max(1, Math.ceil(Math.sqrt(q.items.length)));
+      const cellW = (quadW - itemPadding * 2) / cols;
+      const cellH = (quadH - itemPadding * 2 - 24) / Math.max(1, Math.ceil(q.items.length / cols));
+
+      q.items.forEach((item, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const newX = q.x + itemPadding + col * cellW + cellW / 2 - (item.element.w || 140) / 2;
+        const newY = q.y + itemPadding + 24 + row * cellH + cellH / 2 - (item.element.h || 140) / 2;
+        ops.push({
+          type: 'update',
+          id: item.id,
+          props: { x: newX, y: newY }
+        });
+      });
+    }
+
+    // Send all ops
+    this.app.applyOps(ops);
+    this.app.sync.sendOps(ops);
+    this.app.showToast('Matrice de priorisation creee !');
+  }
+
+  // =====================
+  // ROUND ROBIN (#41)
+  // =====================
+  startRoundRobin() {
+    if (!this.isFacilitator) return;
+    if (this.roundRobin && this.roundRobin.active) {
+      this.stopRoundRobin();
+      return;
+    }
+    this.app.sync.send({ type: 'round-robin', action: 'start' });
+  }
+
+  nextRoundRobin() {
+    if (!this.isFacilitator) return;
+    this.app.sync.send({ type: 'round-robin', action: 'next' });
+  }
+
+  stopRoundRobin() {
+    if (!this.isFacilitator) return;
+    this.app.sync.send({ type: 'round-robin', action: 'stop' });
+  }
+
+  syncRoundRobin(msg) {
+    this.roundRobin = msg;
+    const banner = document.getElementById('roundRobinBanner');
+
+    if (!msg || !msg.active) {
+      banner.style.display = 'none';
+      if (this.isFacilitator) {
+        document.getElementById('btnRoundRobin').classList.remove('active');
+      }
+      if (msg && msg.index === -1) {
+        this.app.showToast('Tour de table termine !');
+      }
+      return;
+    }
+
+    banner.style.display = '';
+    const progress = msg.order ? `(${msg.index + 1}/${msg.order.length})` : '';
+    document.getElementById('roundRobinText').textContent =
+      `Tour de table ${progress} — ${msg.currentName || '?'}`;
+
+    if (this.isFacilitator) {
+      document.getElementById('btnRoundRobin').classList.add('active');
+      document.getElementById('roundRobinNext').style.display = '';
+      document.getElementById('roundRobinStop').style.display = '';
+    } else {
+      document.getElementById('roundRobinNext').style.display = 'none';
+      document.getElementById('roundRobinStop').style.display = 'none';
+    }
+
+    // Highlight if it's the current user's turn
+    if (msg.currentUserId === this.app.myUserId) {
+      banner.style.borderColor = 'var(--warning)';
+      banner.style.color = 'var(--warning)';
+    } else {
+      banner.style.borderColor = 'var(--success)';
+      banner.style.color = 'var(--success)';
+    }
+  }
+
+  // =====================
+  // SILENT BRAINSTORM (#44)
+  // =====================
+  showBrainstormModal() {
+    if (!this.isFacilitator) return;
+    document.getElementById('brainstormModal').style.display = '';
+  }
+
+  startSilentBrainstorm() {
+    const minutes = parseInt(document.getElementById('brainstormMinutes').value) || 5;
+    document.getElementById('brainstormModal').style.display = 'none';
+
+    // Start isolation mode
+    this.app.sync.send({ type: 'isolation-start' });
+
+    // Start timer
+    const duration = minutes * 60;
+    this.app.sync.send({ type: 'timer-start', duration });
+
+    this.silentBrainstorm = true;
+    this.app.showToast('Brainstorm silencieux lance pour ' + minutes + ' minutes');
+
+    // Monitor timer to auto-reveal when done
+    this._brainstormCheckInterval = setInterval(() => {
+      if (!this.timer || !this.silentBrainstorm) {
+        clearInterval(this._brainstormCheckInterval);
+        return;
+      }
+      let remaining;
+      if (this.timer.running) {
+        const elapsed = (Date.now() - this.timer.startedAt) / 1000;
+        remaining = Math.max(0, this.timer.duration - elapsed);
+      } else {
+        remaining = this.timer.remaining || 0;
+      }
+
+      if (remaining <= 0 && this.silentBrainstorm && this.isFacilitator) {
+        this.silentBrainstorm = false;
+        clearInterval(this._brainstormCheckInterval);
+        // Auto-reveal isolation
+        this.app.sync.send({ type: 'isolation-reveal' });
+        this.app.sync.send({ type: 'timer-clear' });
+        this.app.showToast('Brainstorm termine ! Contributions revelees.');
+      }
+    }, 500);
+  }
+
+  // =====================
+  // AUTO CLUSTERS (#45)
+  // =====================
+  autoCluster() {
+    if (!this.isFacilitator) return;
+
+    // Get all visible stickies
+    const stickies = [];
+    for (const [id, el] of this.app.renderer.elements) {
+      if (el.type === 'sticky' || el.type === 'card') {
+        stickies.push({ id, element: el });
+      }
+    }
+
+    if (stickies.length === 0) {
+      this.app.showToast('Aucun post-it a regrouper.');
+      return;
+    }
+
+    // Group by tags first
+    const tagGroups = {};
+    const untagged = [];
+    for (const s of stickies) {
+      const tags = s.element.tags || [];
+      if (tags.length > 0) {
+        const tagKey = tags.sort().join('|');
+        if (!tagGroups[tagKey]) tagGroups[tagKey] = [];
+        tagGroups[tagKey].push(s);
+      } else {
+        untagged.push(s);
+      }
+    }
+
+    // For untagged, do simple text similarity (Jaccard on words)
+    const textClusters = [];
+    const assigned = new Set();
+
+    const getWords = (el) => {
+      const text = (el.text || el.label || '').toLowerCase();
+      return text.split(/\s+/).filter(w => w.length > 2);
+    };
+
+    const jaccard = (a, b) => {
+      const setA = new Set(a);
+      const setB = new Set(b);
+      const intersection = new Set([...setA].filter(x => setB.has(x)));
+      const union = new Set([...setA, ...setB]);
+      return union.size === 0 ? 0 : intersection.size / union.size;
+    };
+
+    for (let i = 0; i < untagged.length; i++) {
+      if (assigned.has(i)) continue;
+      const cluster = [untagged[i]];
+      assigned.add(i);
+      const wordsI = getWords(untagged[i].element);
+      for (let j = i + 1; j < untagged.length; j++) {
+        if (assigned.has(j)) continue;
+        const wordsJ = getWords(untagged[j].element);
+        if (jaccard(wordsI, wordsJ) > 0.2) {
+          cluster.push(untagged[j]);
+          assigned.add(j);
+        }
+      }
+      textClusters.push(cluster);
+    }
+
+    // Merge all clusters
+    const allClusters = [
+      ...Object.entries(tagGroups).map(([key, items]) => ({ label: key.replace(/\|/g, ', '), items })),
+      ...textClusters.map((items, i) => ({ label: 'Groupe ' + (i + 1), items }))
+    ];
+
+    if (allClusters.length === 0) {
+      this.app.showToast('Pas de groupes detectes.');
+      return;
+    }
+
+    // Arrange clusters in a grid
+    const cam = this.app.renderer.camera;
+    const startX = cam.x - 600;
+    const startY = cam.y - 400;
+    const clusterW = 400;
+    const clusterH = 400;
+    const gap = 40;
+    const cols = Math.max(1, Math.ceil(Math.sqrt(allClusters.length)));
+
+    const ops = [];
+
+    allClusters.forEach((cluster, ci) => {
+      const col = ci % cols;
+      const row = Math.floor(ci / cols);
+      const frameX = startX + col * (clusterW + gap);
+      const frameY = startY + row * (clusterH + gap);
+
+      // Create frame
+      ops.push({
+        type: 'add',
+        element: {
+          id: generateId(),
+          type: 'frame',
+          x: frameX,
+          y: frameY,
+          w: clusterW,
+          h: clusterH,
+          label: cluster.label,
+          fill: 'rgba(74,158,255,0.05)',
+          stroke: 'rgba(74,158,255,0.3)',
+          strokeWidth: 1
+        }
+      });
+
+      // Position items within frame
+      const itemCols = Math.max(1, Math.ceil(Math.sqrt(cluster.items.length)));
+      const itemPad = 20;
+      const cellW = (clusterW - itemPad * 2) / itemCols;
+      const cellH = (clusterH - itemPad * 2 - 30) / Math.max(1, Math.ceil(cluster.items.length / itemCols));
+
+      cluster.items.forEach((item, ii) => {
+        const c = ii % itemCols;
+        const r = Math.floor(ii / itemCols);
+        const elW = item.element.w || 140;
+        const elH = item.element.h || 140;
+        ops.push({
+          type: 'update',
+          id: item.id,
+          props: {
+            x: frameX + itemPad + c * cellW + cellW / 2 - elW / 2,
+            y: frameY + itemPad + 30 + r * cellH + cellH / 2 - elH / 2
+          }
+        });
+      });
+    });
+
+    this.app.applyOps(ops);
+    this.app.sync.sendOps(ops);
+    this.app.showToast(allClusters.length + ' clusters crees !');
+  }
+
+  // =====================
+  // CHECK-IN / CHECK-OUT (#49)
+  // =====================
+  startCheckin() {
+    if (!this.isFacilitator) return;
+    this.app.sync.send({ type: 'checkin-start' });
+  }
+
+  castCheckinVote(emoji) {
+    if (!this.checkin || !this.checkin.active) return;
+
+    this.myCheckinVote = emoji;
+    this.app.sync.send({ type: 'checkin-vote', emoji });
+
+    // Highlight selected
+    document.querySelectorAll('.checkin-emoji-btn').forEach(btn => {
+      btn.classList.toggle('selected', btn.dataset.emoji === emoji);
+    });
+
+    this.app.showToast('Vote enregistre !');
+  }
+
+  syncCheckin(msg) {
+    this.checkin = msg;
+
+    if (!msg || !msg.active) {
+      document.getElementById('checkinModal').style.display = 'none';
+      document.getElementById('checkinResults').style.display = 'none';
+      if (this.isFacilitator) {
+        document.getElementById('btnCheckin').classList.remove('active');
+      }
+      return;
+    }
+
+    if (this.isFacilitator) {
+      document.getElementById('btnCheckin').classList.add('active');
+    }
+
+    // Show modal for participants who haven't voted
+    const myResponse = msg.responses && msg.responses[this.app.myUserId];
+    if (!myResponse) {
+      document.getElementById('checkinModal').style.display = '';
+      // Reset selection
+      document.querySelectorAll('.checkin-emoji-btn').forEach(btn => {
+        btn.classList.remove('selected');
+      });
+    } else {
+      document.getElementById('checkinModal').style.display = 'none';
+    }
+
+    // Show results to facilitator (always) and to all after voting
+    if (this.isFacilitator || myResponse) {
+      this.renderCheckinResults(msg.responses || {});
+    }
+  }
+
+  renderCheckinResults(responses) {
+    const container = document.getElementById('checkinResults');
+    const body = document.getElementById('checkinResultsBody');
+    container.style.display = '';
+
+    const emojis = ['😊', '😐', '😕', '😫', '🔥', '💪', '🤔', '😴'];
+    const counts = {};
+    const names = {};
+    let total = 0;
+
+    for (const [uid, resp] of Object.entries(responses)) {
+      counts[resp.emoji] = (counts[resp.emoji] || 0) + 1;
+      if (!names[resp.emoji]) names[resp.emoji] = [];
+      names[resp.emoji].push(resp.name);
+      total++;
+    }
+
+    body.innerHTML = '';
+    const maxCount = Math.max(1, ...Object.values(counts));
+
+    for (const emoji of emojis) {
+      const count = counts[emoji] || 0;
+      if (count === 0 && total > 0) continue; // Only show emojis with votes when there are votes
+
+      const row = document.createElement('div');
+      row.className = 'checkin-bar-row';
+
+      const emojiEl = document.createElement('span');
+      emojiEl.className = 'checkin-bar-emoji';
+      emojiEl.textContent = emoji;
+
+      const track = document.createElement('div');
+      track.className = 'checkin-bar-track';
+      const fill = document.createElement('div');
+      fill.className = 'checkin-bar-fill';
+      fill.style.width = (total > 0 ? (count / maxCount) * 100 : 0) + '%';
+      track.appendChild(fill);
+
+      const countEl = document.createElement('span');
+      countEl.className = 'checkin-bar-count';
+      countEl.textContent = count;
+
+      row.appendChild(emojiEl);
+      row.appendChild(track);
+      row.appendChild(countEl);
+      body.appendChild(row);
+
+      if (names[emoji] && names[emoji].length > 0 && this.isFacilitator) {
+        const namesEl = document.createElement('div');
+        namesEl.className = 'checkin-bar-names';
+        namesEl.textContent = names[emoji].join(', ');
+        body.appendChild(namesEl);
+      }
+    }
+
+    if (total === 0) {
+      body.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:12px;">En attente des reponses...</div>';
+    }
   }
 
   escapeHtml(str) {
