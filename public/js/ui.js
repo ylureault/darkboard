@@ -19,6 +19,7 @@ class UI {
     this.initLaserPointer();
     this.initPresentationMode();
     this.initHelpOverlay();
+    this.initViewModes();
   }
 
   initToolbar() {
@@ -1282,5 +1283,377 @@ class UI {
   hideHelp() {
     const overlay = document.getElementById('helpOverlay');
     if (overlay) overlay.style.display = 'none';
+  }
+
+  // ========================= VIEW MODES =========================
+
+  initViewModes() {
+    // Table view
+    document.getElementById('tableViewBtn')?.addEventListener('click', () => this.openTableView());
+    document.getElementById('tableViewClose')?.addEventListener('click', () => this.closeTableView());
+    document.getElementById('tableSearch')?.addEventListener('input', () => this.renderTableRows());
+    document.getElementById('tableTagFilter')?.addEventListener('change', () => this.renderTableRows());
+
+    // Kanban view
+    document.getElementById('kanbanViewBtn')?.addEventListener('click', () => this.openKanbanView());
+    document.getElementById('kanbanViewClose')?.addEventListener('click', () => this.closeKanbanView());
+    document.getElementById('kanbanSearch')?.addEventListener('input', () => this.renderKanbanCards());
+
+    // Escape to close
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (document.getElementById('tableViewOverlay')?.style.display !== 'none') this.closeTableView();
+        if (document.getElementById('kanbanViewOverlay')?.style.display !== 'none') this.closeKanbanView();
+      }
+    });
+  }
+
+  // Collect all unique tags across stickies
+  getAllTags() {
+    const tagMap = new Map(); // label -> color
+    for (const [, el] of this.app.renderer.elements) {
+      if (el.tags && el.tags.length > 0) {
+        for (const t of el.tags) {
+          if (!tagMap.has(t.label)) tagMap.set(t.label, t.color);
+        }
+      }
+    }
+    return tagMap;
+  }
+
+  // Get stickies (filtered)
+  getStickies(search, tagFilter) {
+    const results = [];
+    for (const [, el] of this.app.renderer.elements) {
+      if (el.type !== 'sticky') continue;
+      if (search) {
+        const s = search.toLowerCase();
+        const text = (el.text || '').toLowerCase();
+        const tagLabels = (el.tags || []).map(t => t.label.toLowerCase()).join(' ');
+        if (!text.includes(s) && !tagLabels.includes(s)) continue;
+      }
+      if (tagFilter) {
+        if (!el.tags || !el.tags.some(t => t.label === tagFilter)) continue;
+      }
+      results.push(el);
+    }
+    return results;
+  }
+
+  // ---- TABLE VIEW ----
+
+  openTableView() {
+    const overlay = document.getElementById('tableViewOverlay');
+    overlay.style.display = 'flex';
+    this.populateTagFilter();
+    this.renderTableRows();
+  }
+
+  closeTableView() {
+    document.getElementById('tableViewOverlay').style.display = 'none';
+  }
+
+  populateTagFilter() {
+    const select = document.getElementById('tableTagFilter');
+    const tags = this.getAllTags();
+    // Keep first option
+    select.innerHTML = '<option value="">Tous les tags</option>';
+    for (const [label, color] of tags) {
+      const opt = document.createElement('option');
+      opt.value = label;
+      opt.textContent = label;
+      select.appendChild(opt);
+    }
+  }
+
+  renderTableRows() {
+    const body = document.getElementById('tableViewBody');
+    const search = document.getElementById('tableSearch')?.value || '';
+    const tagFilter = document.getElementById('tableTagFilter')?.value || '';
+    const stickies = this.getStickies(search, tagFilter);
+
+    // Sort state
+    if (!this._tableSortCol) this._tableSortCol = 'text';
+    if (!this._tableSortDir) this._tableSortDir = 'asc';
+
+    const col = this._tableSortCol;
+    const dir = this._tableSortDir === 'asc' ? 1 : -1;
+
+    stickies.sort((a, b) => {
+      let va, vb;
+      if (col === 'text') {
+        va = (a.text || '').toLowerCase();
+        vb = (b.text || '').toLowerCase();
+      } else if (col === 'tags') {
+        va = (a.tags || []).map(t => t.label).join(', ').toLowerCase();
+        vb = (b.tags || []).map(t => t.label).join(', ').toLowerCase();
+      } else if (col === 'color') {
+        va = a.fill || '';
+        vb = b.fill || '';
+      }
+      if (va < vb) return -1 * dir;
+      if (va > vb) return 1 * dir;
+      return 0;
+    });
+
+    const arrow = (c) => c === col ? `<span class="sort-arrow">${dir === 1 ? '▲' : '▼'}</span>` : '';
+
+    body.innerHTML = `
+      <table class="view-table">
+        <thead>
+          <tr>
+            <th class="td-color" data-col="color">Couleur ${arrow('color')}</th>
+            <th data-col="text" class="${col === 'text' ? 'sorted' : ''}">Contenu ${arrow('text')}</th>
+            <th data-col="tags" class="${col === 'tags' ? 'sorted' : ''}">Tags ${arrow('tags')}</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${stickies.length === 0 ? '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:40px">Aucun post-it trouve</td></tr>' :
+            stickies.map(el => `
+              <tr data-id="${el.id}">
+                <td class="td-color"><span class="color-dot" style="background:${el.fill || '#FFD966'}"></span></td>
+                <td class="td-text">${this.escapeHtml(el.text || '(vide)')}</td>
+                <td class="td-tags">${(el.tags || []).map(t =>
+                  `<span class="tag-mini" style="background:${t.color || '#888'}; color:${isLightColor(t.color || '#888') ? '#1a1a1a' : '#fff'}">${this.escapeHtml(t.label)}</span>`
+                ).join('')}</td>
+                <td class="td-actions">
+                  <button data-goto="${el.id}">Voir</button>
+                  <button data-edittags="${el.id}">Tags</button>
+                </td>
+              </tr>
+            `).join('')}
+        </tbody>
+      </table>
+    `;
+
+    // Sort handlers
+    body.querySelectorAll('thead th[data-col]').forEach(th => {
+      th.addEventListener('click', () => {
+        const c = th.dataset.col;
+        if (this._tableSortCol === c) {
+          this._tableSortDir = this._tableSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          this._tableSortCol = c;
+          this._tableSortDir = 'asc';
+        }
+        this.renderTableRows();
+      });
+    });
+
+    // Row actions
+    body.querySelectorAll('[data-goto]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const el = this.app.renderer.elements.get(btn.dataset.goto);
+        if (el) {
+          this.closeTableView();
+          this.app.renderer.camera.x = el.x + (el.width || 200) / 2;
+          this.app.renderer.camera.y = el.y + (el.height || 200) / 2;
+          this.app.renderer.selectedIds.clear();
+          this.app.renderer.selectedIds.add(el.id);
+          this.app.renderer.markDirty();
+          this.app.updateZoomDisplay();
+        }
+      });
+    });
+
+    body.querySelectorAll('[data-edittags]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const el = this.app.renderer.elements.get(btn.dataset.edittags);
+        if (el) {
+          this.closeTableView();
+          this.app.showTagEditor(el);
+        }
+      });
+    });
+
+    // Click row to select
+    body.querySelectorAll('tbody tr[data-id]').forEach(tr => {
+      tr.addEventListener('click', () => {
+        const el = this.app.renderer.elements.get(tr.dataset.id);
+        if (el) {
+          this.closeTableView();
+          this.app.renderer.camera.x = el.x + (el.width || 200) / 2;
+          this.app.renderer.camera.y = el.y + (el.height || 200) / 2;
+          this.app.renderer.selectedIds.clear();
+          this.app.renderer.selectedIds.add(el.id);
+          this.app.renderer.markDirty();
+          this.app.updateZoomDisplay();
+        }
+      });
+    });
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // ---- KANBAN VIEW ----
+
+  openKanbanView() {
+    const overlay = document.getElementById('kanbanViewOverlay');
+    overlay.style.display = 'flex';
+    this.renderKanbanCards();
+  }
+
+  closeKanbanView() {
+    document.getElementById('kanbanViewOverlay').style.display = 'none';
+  }
+
+  renderKanbanCards() {
+    const body = document.getElementById('kanbanViewBody');
+    const search = document.getElementById('kanbanSearch')?.value || '';
+    const allTags = this.getAllTags();
+    const stickies = this.getStickies(search, '');
+
+    // Build columns: one per unique tag + "Sans tag"
+    const columns = new Map();
+    columns.set('__none__', { label: 'Sans tag', color: '#888888', items: [] });
+    for (const [label, color] of allTags) {
+      columns.set(label, { label, color, items: [] });
+    }
+
+    // Assign stickies to columns (a sticky appears in each of its tag columns)
+    for (const el of stickies) {
+      if (!el.tags || el.tags.length === 0) {
+        columns.get('__none__').items.push(el);
+      } else {
+        for (const t of el.tags) {
+          if (columns.has(t.label)) {
+            columns.get(t.label).items.push(el);
+          }
+        }
+      }
+    }
+
+    // Remove empty "Sans tag" if all stickies have tags
+    if (columns.get('__none__').items.length === 0 && columns.size > 1) {
+      columns.delete('__none__');
+    }
+
+    body.innerHTML = '';
+
+    for (const [colKey, col] of columns) {
+      const colDiv = document.createElement('div');
+      colDiv.className = 'kanban-column';
+      colDiv.dataset.tag = colKey;
+
+      const textColor = isLightColor(col.color) ? '#1a1a1a' : '#fff';
+
+      colDiv.innerHTML = `
+        <div class="kanban-column-header">
+          <span class="col-tag" style="background:${col.color}; color:${textColor}">${this.escapeHtml(col.label)}</span>
+          <span class="col-count">${col.items.length}</span>
+        </div>
+        <div class="kanban-column-cards" data-tag="${colKey}">
+          ${col.items.map(el => `
+            <div class="kanban-card" draggable="true" data-id="${el.id}">
+              <div class="kanban-card-color" style="background:${el.fill || '#FFD966'}"></div>
+              <div class="kanban-card-text">${this.escapeHtml(el.text || '(vide)')}</div>
+              ${el.tags && el.tags.length > 0 ? `
+                <div class="kanban-card-tags">
+                  ${el.tags.map(t => `<span class="kanban-card-tag" style="background:${t.color || '#888'}; color:${isLightColor(t.color || '#888') ? '#1a1a1a' : '#fff'}">${this.escapeHtml(t.label)}</span>`).join('')}
+                </div>
+              ` : ''}
+              <button class="kanban-card-goto" data-goto="${el.id}">Voir</button>
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      body.appendChild(colDiv);
+    }
+
+    // Drag & drop between columns
+    this.initKanbanDragDrop(body);
+
+    // Goto buttons
+    body.querySelectorAll('[data-goto]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const el = this.app.renderer.elements.get(btn.dataset.goto);
+        if (el) {
+          this.closeKanbanView();
+          this.app.renderer.camera.x = el.x + (el.width || 200) / 2;
+          this.app.renderer.camera.y = el.y + (el.height || 200) / 2;
+          this.app.renderer.selectedIds.clear();
+          this.app.renderer.selectedIds.add(el.id);
+          this.app.renderer.markDirty();
+          this.app.updateZoomDisplay();
+        }
+      });
+    });
+  }
+
+  initKanbanDragDrop(container) {
+    let draggedId = null;
+    let draggedFromTag = null;
+
+    container.querySelectorAll('.kanban-card').forEach(card => {
+      card.addEventListener('dragstart', (e) => {
+        draggedId = card.dataset.id;
+        draggedFromTag = card.closest('.kanban-column-cards')?.dataset.tag;
+        card.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        container.querySelectorAll('.kanban-column-cards').forEach(c => c.classList.remove('drag-over'));
+      });
+    });
+
+    container.querySelectorAll('.kanban-column-cards').forEach(col => {
+      col.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        col.classList.add('drag-over');
+      });
+      col.addEventListener('dragleave', () => {
+        col.classList.remove('drag-over');
+      });
+      col.addEventListener('drop', (e) => {
+        e.preventDefault();
+        col.classList.remove('drag-over');
+        if (!draggedId) return;
+
+        const targetTag = col.dataset.tag;
+        if (targetTag === draggedFromTag) return;
+
+        const el = this.app.renderer.elements.get(draggedId);
+        if (!el) return;
+
+        const oldTags = [...(el.tags || [])];
+
+        // Remove old tag (the column it was dragged from)
+        if (draggedFromTag && draggedFromTag !== '__none__') {
+          el.tags = (el.tags || []).filter(t => t.label !== draggedFromTag);
+        }
+
+        // Add new tag (the column it was dropped on)
+        if (targetTag !== '__none__') {
+          if (!(el.tags || []).some(t => t.label === targetTag)) {
+            if (!el.tags) el.tags = [];
+            const allTags = this.getAllTags();
+            const color = allTags.get(targetTag) || '#888888';
+            el.tags.push({ label: targetTag, color });
+          }
+        }
+
+        // Sync
+        const ops = [{ type: 'update', elementId: el.id, props: { tags: [...el.tags] } }];
+        const inverseOps = [{ type: 'update', elementId: el.id, props: { tags: oldTags } }];
+        this.app.history.push(ops, inverseOps);
+        this.app.sync.sendOps(ops);
+        this.app.renderer.markDirty();
+        if (this.app.ui) this.app.ui.updateUndoRedoButtons();
+
+        // Re-render kanban
+        this.renderKanbanCards();
+      });
+    });
   }
 }
