@@ -2050,6 +2050,13 @@ body.light-theme .kanban-card { background: white; }
   margin-bottom: 6px;
 }
 
+.tag-preset-row {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 3px 4px 0;
+  position: relative;
+}
+
 .tag-preset-btn {
   border: none;
   border-radius: 10px;
@@ -2057,13 +2064,35 @@ body.light-theme .kanban-card { background: white; }
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  margin: 0 3px 4px 0;
+  margin: 0;
   transition: transform 0.1s, box-shadow 0.1s;
 }
 
 .tag-preset-btn:hover {
   transform: scale(1.05);
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.tag-registry-delete {
+  display: none;
+  position: absolute;
+  right: -6px;
+  top: -6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: none;
+  background: var(--danger, #e94560);
+  color: #fff;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  padding: 0;
+  cursor: pointer;
+}
+
+.tag-preset-row:hover .tag-registry-delete {
+  display: block;
 }
 
 .tag-editor-custom {

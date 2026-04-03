@@ -133,6 +133,10 @@ class SyncClient {
         if (msg.comments) {
           this.app.renderer.comments = msg.comments;
         }
+        // Load tag registry
+        if (msg.tagRegistry) {
+          this.app.tagRegistry = msg.tagRegistry;
+        }
 
         if (this.app.workshop) {
           this.app.workshop.setFacilitator(msg.isFacilitator, msg.facilitatorId);
@@ -278,6 +282,10 @@ class SyncClient {
         break;
 
       // Comments
+      case 'tag-registry-update':
+        this.app.tagRegistry = msg.tags;
+        break;
+
       case 'comment-add': {
         const c = msg.comment;
         // Avoid duplicate
@@ -375,6 +383,14 @@ class SyncClient {
       boardId: getBoardId(),
       commentId,
       props
+    });
+  }
+
+  sendTagRegistryUpdate(tags) {
+    this.send({
+      type: 'tag-registry-update',
+      boardId: getBoardId(),
+      tags
     });
   }
 

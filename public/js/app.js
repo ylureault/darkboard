@@ -2138,58 +2138,146 @@ class DarkBoardApp {
     });
   }
 
-  // Card editor panel
+  // Tag editor panel - supports single or multi-select
   showTagEditor(el) {
     const existing = document.querySelector('.tag-editor-panel');
     if (existing) existing.remove();
 
-    const tags = el.tags || [];
+    // Gather target elements (multi-select support)
+    const targets = [];
+    if (this.selectedElements.size > 1) {
+      for (const id of this.selectedElements) {
+        const e = this.renderer.elements.get(id);
+        if (e && e.type === 'sticky') targets.push(e);
+      }
+    }
+    if (targets.length === 0) targets.push(el);
+
     const screen = this.renderer.worldToScreen(el.x + el.width + 10, el.y);
 
-    const TAG_PRESETS = [
-      { label: 'Urgent', color: '#FF6B6B' },
-      { label: 'Important', color: '#F4A460' },
-      { label: 'Idee', color: '#FFD966' },
-      { label: 'A faire', color: '#4a9eff' },
-      { label: 'En cours', color: '#45B7D1' },
-      { label: 'Fait', color: '#4ECDC4' },
-      { label: 'Question', color: '#DDA0DD' },
-      { label: 'Bloquant', color: '#e94560' },
-    ];
+    const TAG_COLORS = ['#FF6B6B', '#F4A460', '#FFD966', '#4ECDC4', '#45B7D1', '#4a9eff', '#DDA0DD', '#96CEB4', '#e94560', '#333333'];
 
-    const TAG_COLORS = ['#FF6B6B', '#F4A460', '#FFD966', '#4ECDC4', '#45B7D1', '#4a9eff', '#DDA0DD', '#96CEB4', '#888888', '#333333'];
+    // Ensure tag registry exists with defaults
+    if (!this.tagRegistry || this.tagRegistry.length === 0) {
+      this.tagRegistry = [
+        { label: 'Urgent', color: '#FF6B6B' },
+        { label: 'Important', color: '#F4A460' },
+        { label: 'Idee', color: '#FFD966' },
+        { label: 'A faire', color: '#4a9eff' },
+        { label: 'En cours', color: '#45B7D1' },
+        { label: 'Fait', color: '#4ECDC4' },
+        { label: 'Question', color: '#DDA0DD' },
+        { label: 'Bloquant', color: '#e94560' },
+      ];
+      this.sync.sendTagRegistryUpdate(this.tagRegistry);
+    }
 
     const panel = document.createElement('div');
     panel.className = 'tag-editor-panel';
     panel.style.left = Math.min(screen.x, window.innerWidth - 280) + 'px';
     panel.style.top = Math.min(screen.y, window.innerHeight - 400) + 'px';
 
+    const isMulti = targets.length > 1;
+
+    // Helper: add tag to targets
+    const addTagToTargets = (tag) => {
+      const ops = [];
+      const inverseOps = [];
+      for (const t of targets) {
+        const oldTags = [...(t.tags || [])];
+        if (oldTags.some(x => x.label === tag.label)) continue;
+        if (!t.tags) t.tags = [];
+        t.tags.push({ label: tag.label, color: tag.color });
+        ops.push({ type: 'update', elementId: t.id, props: { tags: [...t.tags] } });
+        inverseOps.push({ type: 'update', elementId: t.id, props: { tags: oldTags } });
+      }
+      if (ops.length > 0) {
+        this.history.push(ops, inverseOps);
+        this.sync.sendOps(ops);
+        this.renderer.markDirty();
+        if (this.ui) this.ui.updateUndoRedoButtons();
+      }
+      renderPanel();
+    };
+
+    // Helper: remove tag from targets by label
+    const removeTagFromTargets = (label) => {
+      const ops = [];
+      const inverseOps = [];
+      for (const t of targets) {
+        const oldTags = [...(t.tags || [])];
+        const idx = (t.tags || []).findIndex(x => x.label === label);
+        if (idx === -1) continue;
+        t.tags.splice(idx, 1);
+        ops.push({ type: 'update', elementId: t.id, props: { tags: [...t.tags] } });
+        inverseOps.push({ type: 'update', elementId: t.id, props: { tags: oldTags } });
+      }
+      if (ops.length > 0) {
+        this.history.push(ops, inverseOps);
+        this.sync.sendOps(ops);
+        this.renderer.markDirty();
+        if (this.ui) this.ui.updateUndoRedoButtons();
+      }
+      renderPanel();
+    };
+
+    // Helper: register tag in registry
+    const registerTag = (tag) => {
+      if (!this.tagRegistry.some(t => t.label === tag.label)) {
+        this.tagRegistry.push({ label: tag.label, color: tag.color });
+        this.sync.sendTagRegistryUpdate(this.tagRegistry);
+      }
+    };
+
+    // Helper: delete tag from registry
+    const deleteTagFromRegistry = (label) => {
+      this.tagRegistry = this.tagRegistry.filter(t => t.label !== label);
+      this.sync.sendTagRegistryUpdate(this.tagRegistry);
+      renderPanel();
+    };
+
     const renderPanel = () => {
-      const currentTags = el.tags || [];
+      // For multi-select, show common tags (present on ALL targets)
+      const commonTags = [];
+      if (isMulti) {
+        const first = targets[0].tags || [];
+        for (const tag of first) {
+          if (targets.every(t => (t.tags || []).some(x => x.label === tag.label))) {
+            commonTags.push(tag);
+          }
+        }
+      } else {
+        commonTags.push(...(targets[0].tags || []));
+      }
+
       panel.innerHTML = `
         <div class="tag-editor-header">
-          <span>Tags</span>
+          <span>Tags${isMulti ? ` (${targets.length} post-its)` : ''}</span>
           <button class="tag-editor-close">&times;</button>
         </div>
         <div class="tag-editor-current">
-          ${currentTags.length === 0 ? '<span class="tag-editor-empty">Aucun tag</span>' :
-            currentTags.map((t, i) => `
+          ${commonTags.length === 0 ? '<span class="tag-editor-empty">Aucun tag</span>' :
+            commonTags.map(t => `
               <span class="tag-pill" style="background:${t.color || '#888'}; color:${isLightColor(t.color || '#888') ? '#1a1a1a' : '#fff'}">
                 ${t.label}
-                <button class="tag-remove" data-idx="${i}">&times;</button>
+                <button class="tag-remove" data-label="${t.label}">&times;</button>
               </span>
             `).join('')}
         </div>
         <div class="tag-editor-presets">
-          <span class="tag-editor-label">Ajouter :</span>
-          ${TAG_PRESETS.filter(p => !currentTags.some(t => t.label === p.label)).map(p => `
-            <button class="tag-preset-btn" data-label="${p.label}" data-color="${p.color}" style="background:${p.color}; color:${isLightColor(p.color) ? '#1a1a1a' : '#fff'}">
-              ${p.label}
-            </button>
+          <span class="tag-editor-label">Registre :</span>
+          ${this.tagRegistry.filter(p => !commonTags.some(t => t.label === p.label)).map(p => `
+            <div class="tag-preset-row">
+              <button class="tag-preset-btn" data-label="${p.label}" data-color="${p.color}" style="background:${p.color}; color:${isLightColor(p.color) ? '#1a1a1a' : '#fff'}">
+                ${p.label}
+              </button>
+              <button class="tag-registry-delete" data-label="${p.label}" title="Supprimer du registre">&times;</button>
+            </div>
           `).join('')}
+          ${this.tagRegistry.filter(p => !commonTags.some(t => t.label === p.label)).length === 0 ? '<span class="tag-editor-empty">Tous attribues</span>' : ''}
         </div>
         <div class="tag-editor-custom">
-          <input type="text" class="tag-custom-input" placeholder="Tag personnalise..." maxlength="20" />
+          <input type="text" class="tag-custom-input" placeholder="Nouveau tag..." maxlength="20" />
           <div class="tag-color-row">
             ${TAG_COLORS.map(c => `<span class="tag-color-swatch${c === '#4a9eff' ? ' active' : ''}" data-color="${c}" style="background:${c}"></span>`).join('')}
           </div>
@@ -2201,32 +2289,19 @@ class DarkBoardApp {
       panel.querySelector('.tag-editor-close').addEventListener('click', () => panel.remove());
 
       panel.querySelectorAll('.tag-remove').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const idx = parseInt(btn.dataset.idx);
-          const oldTags = [...(el.tags || [])];
-          el.tags.splice(idx, 1);
-          const ops = [{ type: 'update', elementId: el.id, props: { tags: [...el.tags] } }];
-          const inverseOps = [{ type: 'update', elementId: el.id, props: { tags: oldTags } }];
-          this.history.push(ops, inverseOps);
-          this.sync.sendOps(ops);
-          this.renderer.markDirty();
-          if (this.ui) this.ui.updateUndoRedoButtons();
-          renderPanel();
-        });
+        btn.addEventListener('click', () => removeTagFromTargets(btn.dataset.label));
       });
 
       panel.querySelectorAll('.tag-preset-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-          const oldTags = [...(el.tags || [])];
-          if (!el.tags) el.tags = [];
-          el.tags.push({ label: btn.dataset.label, color: btn.dataset.color });
-          const ops = [{ type: 'update', elementId: el.id, props: { tags: [...el.tags] } }];
-          const inverseOps = [{ type: 'update', elementId: el.id, props: { tags: oldTags } }];
-          this.history.push(ops, inverseOps);
-          this.sync.sendOps(ops);
-          this.renderer.markDirty();
-          if (this.ui) this.ui.updateUndoRedoButtons();
-          renderPanel();
+          addTagToTargets({ label: btn.dataset.label, color: btn.dataset.color });
+        });
+      });
+
+      panel.querySelectorAll('.tag-registry-delete').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteTagFromRegistry(btn.dataset.label);
         });
       });
 
@@ -2243,20 +2318,9 @@ class DarkBoardApp {
         const input = panel.querySelector('.tag-custom-input');
         const label = input.value.trim();
         if (!label) return;
-        if ((el.tags || []).some(t => t.label === label)) {
-          this.showToast('Ce tag existe deja');
-          return;
-        }
-        const oldTags = [...(el.tags || [])];
-        if (!el.tags) el.tags = [];
-        el.tags.push({ label, color: selectedColor });
-        const ops = [{ type: 'update', elementId: el.id, props: { tags: [...el.tags] } }];
-        const inverseOps = [{ type: 'update', elementId: el.id, props: { tags: oldTags } }];
-        this.history.push(ops, inverseOps);
-        this.sync.sendOps(ops);
-        this.renderer.markDirty();
-        if (this.ui) this.ui.updateUndoRedoButtons();
-        renderPanel();
+        const tag = { label, color: selectedColor };
+        registerTag(tag);
+        addTagToTargets(tag);
       };
 
       const addBtn = panel.querySelector('.tag-add-btn');
@@ -2823,7 +2887,7 @@ class DarkBoardApp {
         <div class="context-menu-item" data-action="toggleCollapse">${hit.collapsed ? '▼ Etendre' : '▶ Reduire'}</div>
         <div class="context-menu-item" data-action="deleteWithContent" style="color:var(--danger)">Supprimer avec le contenu</div>
         ` : ''}
-        ${hit.type === 'sticky' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editTags">🏷️ Tags</div>` : ''}
+        ${hit.type === 'sticky' || (multiSel && Array.from(this.selectedElements).some(id => { const e = this.renderer.elements.get(id); return e && e.type === 'sticky'; })) ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editTags">🏷️ Tags</div>` : ''}
         ${hit.type === 'card' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editCard">✏️ Modifier la carte</div>` : ''}
         ${hit.type === 'list' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editList">✏️ Modifier la liste</div>` : ''}
         ${hit.type === 'connector' ? `

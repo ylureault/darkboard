@@ -1178,6 +1178,66 @@ class UI {
         icon: '🚶',
         desc: 'Parcours utilisateur en 5 etapes',
         generate: (cx, cy) => this.generateUserJourney(cx, cy)
+      },
+      {
+        name: 'Carte d\'empathie',
+        icon: '🧠',
+        desc: 'Comprendre les pensees, emotions et comportements d\'un utilisateur',
+        generate: (cx, cy) => this.generateEmpathyMap(cx, cy)
+      },
+      {
+        name: 'Value Proposition',
+        icon: '💎',
+        desc: 'Aligner votre offre avec les besoins de vos clients',
+        generate: (cx, cy) => this.generateValueProposition(cx, cy)
+      },
+      {
+        name: 'Business Model Canvas',
+        icon: '📈',
+        desc: 'Les 9 blocs cles de votre modele economique',
+        generate: (cx, cy) => this.generateBusinessModelCanvas(cx, cy)
+      },
+      {
+        name: 'Lean Canvas',
+        icon: '🚀',
+        desc: 'Modele d\'affaires pour les startups',
+        generate: (cx, cy) => this.generateLeanCanvas(cx, cy)
+      },
+      {
+        name: 'Speed Boat',
+        icon: '⛵',
+        desc: 'Moteurs, ancres, objectif — retrospective ludique',
+        generate: (cx, cy) => this.generateSpeedBoat(cx, cy)
+      },
+      {
+        name: 'Starfish',
+        icon: '⭐',
+        desc: 'Plus, Moins, Commencer, Arreter, Continuer',
+        generate: (cx, cy) => this.generateStarfish(cx, cy)
+      },
+      {
+        name: 'Impact / Effort',
+        icon: '⚖️',
+        desc: 'Prioriser les actions par impact et effort',
+        generate: (cx, cy) => this.generateImpactEffort(cx, cy)
+      },
+      {
+        name: 'Retrospective 4L',
+        icon: '❤️',
+        desc: 'Liked, Learned, Lacked, Longed for',
+        generate: (cx, cy) => this.generateRetro4L(cx, cy)
+      },
+      {
+        name: 'Product Vision Board',
+        icon: '🔭',
+        desc: 'Vision, public cible, besoins, produit, objectifs',
+        generate: (cx, cy) => this.generateProductVisionBoard(cx, cy)
+      },
+      {
+        name: 'Stakeholder Map',
+        icon: '🎯',
+        desc: 'Cartographier les parties prenantes par influence et interet',
+        generate: (cx, cy) => this.generateStakeholderMap(cx, cy)
       }
     ];
 
@@ -1377,6 +1437,361 @@ class UI {
         this.app.addElement(arrow);
       }
     }
+  }
+
+  generateEmpathyMap(cx, cy) {
+    // Title
+    const title = createTextElement(cx - 100, cy - 420);
+    title.text = 'Carte d\'empathie';
+    title.fontSize = 28;
+    title.width = 200;
+    this.app.addElement(title);
+
+    // Persona circle in center
+    const persona = createElement('circle', {
+      x: cx - 60, y: cy - 60, width: 120, height: 120,
+      fill: '#4a9eff', stroke: '#4a9eff', text: 'Persona'
+    });
+    this.app.addElement(persona);
+
+    // 6 zones
+    const zones = [
+      { label: 'Pense & Ressent', x: cx - 400, y: cy - 380, w: 380, h: 300, color: '#FF6B6B' },
+      { label: 'Voit', x: cx + 20, y: cy - 380, w: 380, h: 300, color: '#FFD966' },
+      { label: 'Dit & Fait', x: cx - 400, y: cy - 60, w: 380, h: 300, color: '#4ECDC4' },
+      { label: 'Entend', x: cx + 20, y: cy - 60, w: 380, h: 300, color: '#45B7D1' },
+      { label: 'Douleurs (Pains)', x: cx - 400, y: cy + 260, w: 380, h: 200, color: '#e94560' },
+      { label: 'Gains', x: cx + 20, y: cy + 260, w: 380, h: 200, color: '#4ecdc4' },
+    ];
+
+    for (const z of zones) {
+      const f = createFrame(z.x, z.y, z.w, z.h, z.label);
+      f.stroke = z.color;
+      f.fill = z.color + '10';
+      this.app.addElement(f);
+
+      // Add an empty sticky inside
+      const s = createSticky(z.x + 10, z.y + 40);
+      s.width = 160;
+      s.height = 120;
+      s.fill = z.color + '40';
+      s.text = '';
+      this.app.addElement(s);
+    }
+  }
+
+  generateValueProposition(cx, cy) {
+    const title = createTextElement(cx - 150, cy - 420);
+    title.text = 'Value Proposition Canvas';
+    title.fontSize = 28;
+    title.width = 300;
+    this.app.addElement(title);
+
+    // Right side: Customer Profile (circle shape using frame)
+    const custTitle = createTextElement(cx + 180, cy - 360);
+    custTitle.text = 'Profil Client';
+    custTitle.fontSize = 20;
+    custTitle.width = 200;
+    this.app.addElement(custTitle);
+
+    const custZones = [
+      { label: 'Jobs-to-be-Done', x: cx + 100, y: cy - 320, w: 280, h: 200, color: '#45B7D1' },
+      { label: 'Pains (Douleurs)', x: cx + 100, y: cy - 100, w: 280, h: 200, color: '#FF6B6B' },
+      { label: 'Gains', x: cx + 100, y: cy + 120, w: 280, h: 200, color: '#4ECDC4' },
+    ];
+
+    for (const z of custZones) {
+      const f = createFrame(z.x, z.y, z.w, z.h, z.label);
+      f.stroke = z.color;
+      f.fill = z.color + '10';
+      this.app.addElement(f);
+    }
+
+    // Left side: Value Map
+    const valTitle = createTextElement(cx - 380, cy - 360);
+    valTitle.text = 'Proposition de Valeur';
+    valTitle.fontSize = 20;
+    valTitle.width = 250;
+    this.app.addElement(valTitle);
+
+    const valZones = [
+      { label: 'Produits & Services', x: cx - 400, y: cy - 320, w: 280, h: 200, color: '#4a9eff' },
+      { label: 'Pain Relievers', x: cx - 400, y: cy - 100, w: 280, h: 200, color: '#F4A460' },
+      { label: 'Gain Creators', x: cx - 400, y: cy + 120, w: 280, h: 200, color: '#96CEB4' },
+    ];
+
+    for (const z of valZones) {
+      const f = createFrame(z.x, z.y, z.w, z.h, z.label);
+      f.stroke = z.color;
+      f.fill = z.color + '10';
+      this.app.addElement(f);
+    }
+
+    // Arrow connecting both
+    const arrow = createElement('arrow', {
+      x: cx + 80, y: cy, x2: cx - 100, y2: cy,
+      stroke: '#888', strokeWidth: 3
+    });
+    this.app.addElement(arrow);
+  }
+
+  generateBusinessModelCanvas(cx, cy) {
+    const title = createTextElement(cx - 200, cy - 480);
+    title.text = 'Business Model Canvas';
+    title.fontSize = 28;
+    title.width = 400;
+    this.app.addElement(title);
+
+    const colW = 200;
+    const rowH = 250;
+    const startX = cx - 500;
+    const startY = cy - 420;
+
+    // 9 blocks of the BMC
+    const blocks = [
+      { label: 'Partenaires Cles', x: startX, y: startY, w: colW, h: rowH * 2, color: '#DDA0DD' },
+      { label: 'Activites Cles', x: startX + colW, y: startY, w: colW, h: rowH, color: '#45B7D1' },
+      { label: 'Ressources Cles', x: startX + colW, y: startY + rowH, w: colW, h: rowH, color: '#45B7D1' },
+      { label: 'Propositions de Valeur', x: startX + colW * 2, y: startY, w: colW, h: rowH * 2, color: '#FFD966' },
+      { label: 'Relations Clients', x: startX + colW * 3, y: startY, w: colW, h: rowH, color: '#4ECDC4' },
+      { label: 'Canaux', x: startX + colW * 3, y: startY + rowH, w: colW, h: rowH, color: '#4ECDC4' },
+      { label: 'Segments Clients', x: startX + colW * 4, y: startY, w: colW, h: rowH * 2, color: '#FF6B6B' },
+      { label: 'Structure de Couts', x: startX, y: startY + rowH * 2, w: colW * 2.5, h: rowH, color: '#F4A460' },
+      { label: 'Sources de Revenus', x: startX + colW * 2.5, y: startY + rowH * 2, w: colW * 2.5, h: rowH, color: '#96CEB4' },
+    ];
+
+    for (const b of blocks) {
+      const f = createFrame(b.x, b.y, b.w, b.h, b.label);
+      f.stroke = b.color;
+      f.fill = b.color + '10';
+      this.app.addElement(f);
+    }
+  }
+
+  generateLeanCanvas(cx, cy) {
+    const title = createTextElement(cx - 100, cy - 480);
+    title.text = 'Lean Canvas';
+    title.fontSize = 28;
+    title.width = 200;
+    this.app.addElement(title);
+
+    const colW = 200;
+    const rowH = 250;
+    const startX = cx - 500;
+    const startY = cy - 420;
+
+    const blocks = [
+      { label: 'Probleme', x: startX, y: startY, w: colW, h: rowH, color: '#FF6B6B' },
+      { label: 'Alternatives existantes', x: startX, y: startY + rowH, w: colW, h: rowH, color: '#FF6B6B' },
+      { label: 'Solution', x: startX + colW, y: startY, w: colW, h: rowH, color: '#4ECDC4' },
+      { label: 'Metriques cles', x: startX + colW, y: startY + rowH, w: colW, h: rowH, color: '#45B7D1' },
+      { label: 'Proposition de Valeur Unique', x: startX + colW * 2, y: startY, w: colW, h: rowH * 2, color: '#FFD966' },
+      { label: 'Avantage Competitif', x: startX + colW * 3, y: startY, w: colW, h: rowH, color: '#DDA0DD' },
+      { label: 'Canaux', x: startX + colW * 3, y: startY + rowH, w: colW, h: rowH, color: '#96CEB4' },
+      { label: 'Segments Clients', x: startX + colW * 4, y: startY, w: colW, h: rowH, color: '#F4A460' },
+      { label: 'Early Adopters', x: startX + colW * 4, y: startY + rowH, w: colW, h: rowH, color: '#F4A460' },
+      { label: 'Structure de Couts', x: startX, y: startY + rowH * 2, w: colW * 2.5, h: 200, color: '#e94560' },
+      { label: 'Sources de Revenus', x: startX + colW * 2.5, y: startY + rowH * 2, w: colW * 2.5, h: 200, color: '#4a9eff' },
+    ];
+
+    for (const b of blocks) {
+      const f = createFrame(b.x, b.y, b.w, b.h, b.label);
+      f.stroke = b.color;
+      f.fill = b.color + '10';
+      this.app.addElement(f);
+    }
+  }
+
+  generateSpeedBoat(cx, cy) {
+    const title = createTextElement(cx - 100, cy - 400);
+    title.text = 'Speed Boat';
+    title.fontSize = 28;
+    title.width = 200;
+    this.app.addElement(title);
+
+    // Destination (right)
+    const dest = createFrame(cx + 300, cy - 200, 250, 300, 'Objectif / Ile');
+    dest.stroke = '#4ECDC4';
+    dest.fill = '#4ECDC4' + '10';
+    this.app.addElement(dest);
+
+    // Wind (top - motors)
+    const wind = createFrame(cx - 200, cy - 350, 400, 200, 'Vent (Moteurs)');
+    wind.stroke = '#4a9eff';
+    wind.fill = '#4a9eff' + '10';
+    this.app.addElement(wind);
+
+    // Anchors (bottom)
+    const anchors = createFrame(cx - 200, cy + 50, 400, 200, 'Ancres (Freins)');
+    anchors.stroke = '#FF6B6B';
+    anchors.fill = '#FF6B6B' + '10';
+    this.app.addElement(anchors);
+
+    // Boat (center)
+    const boat = createSticky(cx - 60, cy - 80);
+    boat.width = 120;
+    boat.height = 120;
+    boat.fill = '#FFD966';
+    boat.text = 'Notre equipe';
+    boat.fontSize = 14;
+    this.app.addElement(boat);
+
+    // Rocks
+    const rocks = createFrame(cx - 200, cy + 280, 400, 150, 'Rochers (Risques)');
+    rocks.stroke = '#e94560';
+    rocks.fill = '#e94560' + '10';
+    this.app.addElement(rocks);
+  }
+
+  generateStarfish(cx, cy) {
+    const title = createTextElement(cx - 80, cy - 420);
+    title.text = 'Starfish';
+    title.fontSize = 28;
+    title.width = 160;
+    this.app.addElement(title);
+
+    const zones = [
+      { label: 'Continuer', color: '#4ECDC4' },
+      { label: 'Plus de', color: '#96CEB4' },
+      { label: 'Commencer', color: '#4a9eff' },
+      { label: 'Moins de', color: '#FFD966' },
+      { label: 'Arreter', color: '#FF6B6B' },
+    ];
+
+    const radius = 300;
+    for (let i = 0; i < zones.length; i++) {
+      const angle = (i * 2 * Math.PI / zones.length) - Math.PI / 2;
+      const x = cx + Math.cos(angle) * radius - 130;
+      const y = cy + Math.sin(angle) * radius - 130;
+      const f = createFrame(x, y, 260, 260, zones[i].label);
+      f.stroke = zones[i].color;
+      f.fill = zones[i].color + '10';
+      this.app.addElement(f);
+    }
+  }
+
+  generateImpactEffort(cx, cy) {
+    const title = createTextElement(cx - 100, cy - 460);
+    title.text = 'Impact / Effort';
+    title.fontSize = 28;
+    title.width = 200;
+    this.app.addElement(title);
+
+    const size = 400;
+    // Quadrants
+    const quads = [
+      { label: 'Quick Wins', desc: 'Fort impact, faible effort', x: cx - size, y: cy - size, color: '#4ECDC4' },
+      { label: 'Projets majeurs', desc: 'Fort impact, fort effort', x: cx, y: cy - size, color: '#FFD966' },
+      { label: 'Petites taches', desc: 'Faible impact, faible effort', x: cx - size, y: cy, color: '#96CEB4' },
+      { label: 'Ingrat', desc: 'Faible impact, fort effort', x: cx, y: cy, color: '#FF6B6B' },
+    ];
+
+    for (const q of quads) {
+      const f = createFrame(q.x, q.y, size, size, q.label);
+      f.stroke = q.color;
+      f.fill = q.color + '10';
+      this.app.addElement(f);
+    }
+
+    // Axis labels
+    const yLabel = createTextElement(cx - size - 80, cy - 20);
+    yLabel.text = 'IMPACT ↑';
+    yLabel.fontSize = 16;
+    yLabel.width = 70;
+    this.app.addElement(yLabel);
+
+    const xLabel = createTextElement(cx - 20, cy + size + 20);
+    xLabel.text = 'EFFORT →';
+    xLabel.fontSize = 16;
+    xLabel.width = 80;
+    this.app.addElement(xLabel);
+  }
+
+  generateRetro4L(cx, cy) {
+    const title = createTextElement(cx - 60, cy - 420);
+    title.text = 'Retro 4L';
+    title.fontSize = 28;
+    title.width = 120;
+    this.app.addElement(title);
+
+    const size = 380;
+    const quads = [
+      { label: 'Liked (Aime)', x: cx - size, y: cy - size, color: '#4ECDC4' },
+      { label: 'Learned (Appris)', x: cx + 20, y: cy - size, color: '#4a9eff' },
+      { label: 'Lacked (Manque)', x: cx - size, y: cy + 20, color: '#FF6B6B' },
+      { label: 'Longed for (Souhaite)', x: cx + 20, y: cy + 20, color: '#FFD966' },
+    ];
+
+    for (const q of quads) {
+      const f = createFrame(q.x, q.y, size, size, q.label);
+      f.stroke = q.color;
+      f.fill = q.color + '10';
+      this.app.addElement(f);
+    }
+  }
+
+  generateProductVisionBoard(cx, cy) {
+    const title = createTextElement(cx - 150, cy - 420);
+    title.text = 'Product Vision Board';
+    title.fontSize = 28;
+    title.width = 300;
+    this.app.addElement(title);
+
+    const w = 900;
+    const rowH = 150;
+    const startX = cx - w / 2;
+    const startY = cy - 350;
+
+    const rows = [
+      { label: 'Vision', color: '#4a9eff' },
+      { label: 'Public Cible', color: '#45B7D1' },
+      { label: 'Besoins', color: '#FF6B6B' },
+      { label: 'Produit', color: '#4ECDC4' },
+      { label: 'Objectifs Business', color: '#FFD966' },
+    ];
+
+    for (let i = 0; i < rows.length; i++) {
+      const f = createFrame(startX, startY + i * (rowH + 10), w, rowH, rows[i].label);
+      f.stroke = rows[i].color;
+      f.fill = rows[i].color + '10';
+      this.app.addElement(f);
+    }
+  }
+
+  generateStakeholderMap(cx, cy) {
+    const title = createTextElement(cx - 120, cy - 460);
+    title.text = 'Stakeholder Map';
+    title.fontSize = 28;
+    title.width = 240;
+    this.app.addElement(title);
+
+    const size = 400;
+    const quads = [
+      { label: 'Gerer de pres', desc: 'Fort pouvoir, fort interet', x: cx - size, y: cy - size, color: '#FF6B6B' },
+      { label: 'Satisfaire', desc: 'Fort pouvoir, faible interet', x: cx, y: cy - size, color: '#FFD966' },
+      { label: 'Informer', desc: 'Faible pouvoir, fort interet', x: cx - size, y: cy, color: '#4ECDC4' },
+      { label: 'Surveiller', desc: 'Faible pouvoir, faible interet', x: cx, y: cy, color: '#96CEB4' },
+    ];
+
+    for (const q of quads) {
+      const f = createFrame(q.x, q.y, size, size, q.label);
+      f.stroke = q.color;
+      f.fill = q.color + '10';
+      this.app.addElement(f);
+    }
+
+    // Axis labels
+    const yLabel = createTextElement(cx - size - 80, cy - 20);
+    yLabel.text = 'POUVOIR ↑';
+    yLabel.fontSize = 16;
+    yLabel.width = 80;
+    this.app.addElement(yLabel);
+
+    const xLabel = createTextElement(cx - 20, cy + size + 20);
+    xLabel.text = 'INTERET →';
+    xLabel.fontSize = 16;
+    xLabel.width = 80;
+    this.app.addElement(xLabel);
   }
 
   initShareButton() {
