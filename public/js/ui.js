@@ -374,12 +374,23 @@ class UI {
   triggerImport() {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.json,.drft,.rtb';
+    input.accept = '.json,.drft,.rtb,.csv';
     input.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
 
-      if (file.name.endsWith('.rtb')) {
+      if (file.name.endsWith('.csv')) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            this.importCSV(ev.target.result, file.name);
+          } catch (err) {
+            console.error('CSV import error:', err);
+            this.app.showToast('Erreur lors de l\'import CSV');
+          }
+        };
+        reader.readAsText(file);
+      } else if (file.name.endsWith('.rtb')) {
         // .rtb files are ZIP archives - read as ArrayBuffer
         const reader = new FileReader();
         reader.onload = (ev) => {
@@ -590,6 +601,266 @@ class UI {
     // Use the largest array as the source
     const [key, items] = arrays[0];
     this.importDraftIO({ items });
+  }
+
+  // ========================= CSV IMPORT =========================
+
+  importCSV(text, filename) {
+    const rows = this.parseCSVRows(text);
+    if (rows.length < 2) {
+      this.app.showToast('Fichier CSV vide ou invalide');
+      return;
+    }
+
+    // Header row
+    const headers = rows[0].map(h => h.trim().toLowerCase());
+    const dataRows = rows.slice(1).filter(r => r.length >= 2);
+
+    if (dataRows.length === 0) {
+      this.app.showToast('Aucune donnee dans le CSV');
+      return;
+    }
+
+    // Build column index map
+    const col = (name) => {
+      // Try exact match first, then fuzzy
+      let idx = headers.indexOf(name);
+      if (idx !== -1) return idx;
+      // Fuzzy matching for common column names
+      const aliases = {
+        'type': ['type', 'element_type', 'kind'],
+        'text': ['text', 'title', 'content', 'label', 'name', 'description', 'texte', 'titre', 'contenu'],
+        'x': ['x', 'posx', 'pos_x', 'left', 'position_x'],
+        'y': ['y', 'posy', 'pos_y', 'top', 'position_y'],
+        'width': ['width', 'w', 'largeur'],
+        'height': ['height', 'h', 'hauteur'],
+        'color': ['color', 'fill', 'couleur', 'background', 'bg', 'backgroundcolor', 'fill_color'],
+        'stroke': ['stroke', 'border', 'bordercolor', 'stroke_color', 'contour'],
+        'tags': ['tags', 'tag', 'etiquettes', 'etiquette', 'labels', 'label', 'categories', 'category'],
+        'id': ['id', 'database_id', 'element_id', 'uid'],
+        'fontsize': ['fontsize', 'font_size', 'size', 'taille'],
+        'rotation': ['rotation', 'angle', 'rotate'],
+        'status': ['status', 'statut', 'cardstatus', 'card_status'],
+        'priority': ['priority', 'priorite', 'cardpriority'],
+        'assignee': ['assignee', 'assigné', 'responsable', 'owner'],
+      };
+      const aliasList = aliases[name] || [name];
+      for (const alias of aliasList) {
+        idx = headers.indexOf(alias);
+        if (idx !== -1) return idx;
+      }
+      return -1;
+    };
+
+    const getVal = (row, name) => {
+      const idx = col(name);
+      return idx !== -1 && idx < row.length ? row[idx].trim() : '';
+    };
+
+    const getNum = (row, name, def) => {
+      const v = getVal(row, name);
+      const n = parseFloat(v);
+      return isNaN(n) ? def : n;
+    };
+
+    const elements = [];
+
+    // Type column detection
+    const hasType = col('type') !== -1;
+    const hasX = col('x') !== -1;
+    const hasY = col('y') !== -1;
+
+    // Default spacing when no coordinates
+    const spacing = 220;
+    const perRow = 5;
+
+    for (let i = 0; i < dataRows.length; i++) {
+      const row = dataRows[i];
+      const rawType = getVal(row, 'type').toLowerCase();
+      const text = getVal(row, 'text');
+
+      // Skip completely empty rows
+      if (!text && !rawType) continue;
+
+      // Map CSV type to DarkBoard type
+      let dbType = 'sticky';
+      if (rawType === 'textbox' || rawType === 'text' || rawType === 'label') dbType = 'text';
+      else if (rawType === 'chunk' || rawType === 'frame' || rawType === 'section' || rawType === 'zone') dbType = 'frame';
+      else if (rawType === 'rect' || rawType === 'rectangle' || rawType === 'shape') dbType = 'rect';
+      else if (rawType === 'circle' || rawType === 'ellipse') dbType = 'circle';
+      else if (rawType === 'diamond' || rawType === 'losange') dbType = 'diamond';
+      else if (rawType === 'card' || rawType === 'carte') dbType = 'card';
+      else if (rawType === 'sticky' || rawType === 'postit' || rawType === 'post-it' || rawType === 'note') dbType = 'sticky';
+      else if (rawType === 'connector' || rawType === 'line' || rawType === 'arrow' || rawType === 'fleche') dbType = 'connector';
+      else if (rawType === 'envelope' || rawType === 'enveloppe') dbType = 'envelope';
+      else if (rawType === 'list' || rawType === 'liste') dbType = 'list';
+
+      // Position: use CSV values or auto-layout in grid
+      const autoCol = i % perRow;
+      const autoRow = Math.floor(i / perRow);
+      const x = hasX ? getNum(row, 'x', autoCol * spacing) : autoCol * spacing;
+      const y = hasY ? getNum(row, 'y', autoRow * spacing) : autoRow * spacing;
+      const width = getNum(row, 'width', dbType === 'frame' ? 500 : dbType === 'card' ? 280 : 200);
+      const height = getNum(row, 'height', dbType === 'frame' ? 500 : dbType === 'card' ? 180 : 200);
+
+      // Color
+      let color = getVal(row, 'color') || '';
+      if (color === 'transparent' || color === '') {
+        if (dbType === 'sticky') color = STICKY_COLORS[i % STICKY_COLORS.length];
+        else if (dbType === 'frame') color = 'transparent';
+        else if (dbType === 'text') color = 'transparent';
+        else color = 'transparent';
+      }
+
+      const stroke = getVal(row, 'stroke') || (dbType === 'sticky' ? 'transparent' : '#888888');
+      const fontSize = getNum(row, 'fontsize', dbType === 'text' ? 20 : 16);
+      const rotation = getNum(row, 'rotation', 0);
+
+      const el = {
+        id: generateId(),
+        type: dbType,
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+        fill: color,
+        stroke: stroke,
+        strokeWidth: 2,
+        text: text,
+        fontSize: fontSize,
+        zIndex: Date.now() + i,
+        rotation: rotation,
+        locked: false,
+        groupId: null,
+        tags: []
+      };
+
+      // Parse tags
+      const tagsStr = getVal(row, 'tags');
+      if (tagsStr) {
+        const TAG_COLORS = ['#FF6B6B', '#F4A460', '#FFD966', '#4ECDC4', '#45B7D1', '#4a9eff', '#DDA0DD', '#96CEB4'];
+        const tagLabels = tagsStr.split(';').map(t => t.trim()).filter(t => t);
+        el.tags = tagLabels.map((label, j) => ({
+          label,
+          color: TAG_COLORS[j % TAG_COLORS.length]
+        }));
+      }
+
+      // Card-specific fields
+      if (dbType === 'card') {
+        el.cardTitle = text;
+        el.cardDescription = getVal(row, 'text') || '';
+        el.cardStatus = getVal(row, 'status') || 'A faire';
+        el.cardPriority = getVal(row, 'priority') || 'Moyenne';
+        el.cardAssignee = getVal(row, 'assignee') || '';
+        el.fill = color || '#4a9eff';
+      }
+
+      // Frame-specific
+      if (dbType === 'frame') {
+        el.stroke = color !== 'transparent' ? color : '#4a9eff';
+        el.fill = 'transparent';
+        el.children = [];
+      }
+
+      // Text-specific
+      if (dbType === 'text') {
+        el.fill = 'transparent';
+        el.stroke = 'transparent';
+        el.fontSize = fontSize || 20;
+      }
+
+      elements.push(el);
+    }
+
+    if (elements.length === 0) {
+      this.app.showToast('Aucun element trouve dans le CSV');
+      return;
+    }
+
+    // Place near camera
+    const camX = this.app.renderer.camera.x;
+    const camY = this.app.renderer.camera.y;
+    let minX = Infinity, minY = Infinity;
+    for (const el of elements) {
+      if (el.x < minX) minX = el.x;
+      if (el.y < minY) minY = el.y;
+    }
+    const offsetX = camX - minX;
+    const offsetY = camY - minY;
+
+    for (const el of elements) {
+      el.x += offsetX;
+      el.y += offsetY;
+      if (el.x2 !== undefined) { el.x2 += offsetX; el.y2 += offsetY; }
+      this.app.addElement(el);
+    }
+
+    this.app.renderer.markDirty();
+    this.app.showToast(`${elements.length} elements importes depuis CSV !`);
+  }
+
+  parseCSVRows(text) {
+    // Auto-detect separator: tab, semicolon, or comma
+    const firstLine = text.split(/\r?\n/)[0] || '';
+    let sep = ',';
+    if (firstLine.includes('\t') && firstLine.split('\t').length > firstLine.split(',').length) {
+      sep = '\t';
+    } else if (firstLine.includes(';') && !firstLine.includes(',')) {
+      sep = ';';
+    }
+
+    // RFC 4180 compliant parser - handles quoted fields, newlines in quotes, escaped quotes
+    const rows = [];
+    let row = [];
+    let field = '';
+    let inQuotes = false;
+    let i = 0;
+
+    while (i < text.length) {
+      const ch = text[i];
+
+      if (inQuotes) {
+        if (ch === '"') {
+          if (i + 1 < text.length && text[i + 1] === '"') {
+            field += '"';
+            i += 2;
+          } else {
+            inQuotes = false;
+            i++;
+          }
+        } else {
+          field += ch;
+          i++;
+        }
+      } else {
+        if (ch === '"') {
+          inQuotes = true;
+          i++;
+        } else if (ch === sep) {
+          row.push(field);
+          field = '';
+          i++;
+        } else if (ch === '\n' || ch === '\r') {
+          row.push(field);
+          field = '';
+          rows.push(row);
+          row = [];
+          if (ch === '\r' && i + 1 < text.length && text[i + 1] === '\n') i++;
+          i++;
+        } else {
+          field += ch;
+          i++;
+        }
+      }
+    }
+
+    if (field || row.length > 0) {
+      row.push(field);
+      rows.push(row);
+    }
+
+    return rows;
   }
 
   importRTB(buffer, filename) {
