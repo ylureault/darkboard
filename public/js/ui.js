@@ -301,7 +301,7 @@ class UI {
       return;
     }
 
-    const headers = ['id', 'type', 'x', 'y', 'width', 'height', 'text', 'fill', 'stroke', 'children'];
+    const headers = ['id', 'type', 'x', 'y', 'width', 'height', 'text', 'fill', 'stroke', 'tags', 'children'];
     const rows = [headers.join(',')];
 
     for (const el of elements) {
@@ -315,6 +315,7 @@ class UI {
         '"' + (el.text || '').replace(/"/g, '""') + '"',
         el.fill || '',
         el.stroke || '',
+        el.tags ? el.tags.map(t => t.label).join(';') : '',
         el.children ? el.children.join(';') : ''
       ];
       rows.push(row.join(','));

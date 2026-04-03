@@ -2135,6 +2135,150 @@ class DarkBoardApp {
   }
 
   // Card editor panel
+  showTagEditor(el) {
+    const existing = document.querySelector('.tag-editor-panel');
+    if (existing) existing.remove();
+
+    const tags = el.tags || [];
+    const screen = this.renderer.worldToScreen(el.x + el.width + 10, el.y);
+
+    const TAG_PRESETS = [
+      { label: 'Urgent', color: '#FF6B6B' },
+      { label: 'Important', color: '#F4A460' },
+      { label: 'Idee', color: '#FFD966' },
+      { label: 'A faire', color: '#4a9eff' },
+      { label: 'En cours', color: '#45B7D1' },
+      { label: 'Fait', color: '#4ECDC4' },
+      { label: 'Question', color: '#DDA0DD' },
+      { label: 'Bloquant', color: '#e94560' },
+    ];
+
+    const TAG_COLORS = ['#FF6B6B', '#F4A460', '#FFD966', '#4ECDC4', '#45B7D1', '#4a9eff', '#DDA0DD', '#96CEB4', '#888888', '#333333'];
+
+    const panel = document.createElement('div');
+    panel.className = 'tag-editor-panel';
+    panel.style.left = Math.min(screen.x, window.innerWidth - 280) + 'px';
+    panel.style.top = Math.min(screen.y, window.innerHeight - 400) + 'px';
+
+    const renderPanel = () => {
+      const currentTags = el.tags || [];
+      panel.innerHTML = `
+        <div class="tag-editor-header">
+          <span>Tags</span>
+          <button class="tag-editor-close">&times;</button>
+        </div>
+        <div class="tag-editor-current">
+          ${currentTags.length === 0 ? '<span class="tag-editor-empty">Aucun tag</span>' :
+            currentTags.map((t, i) => `
+              <span class="tag-pill" style="background:${t.color || '#888'}; color:${isLightColor(t.color || '#888') ? '#1a1a1a' : '#fff'}">
+                ${t.label}
+                <button class="tag-remove" data-idx="${i}">&times;</button>
+              </span>
+            `).join('')}
+        </div>
+        <div class="tag-editor-presets">
+          <span class="tag-editor-label">Ajouter :</span>
+          ${TAG_PRESETS.filter(p => !currentTags.some(t => t.label === p.label)).map(p => `
+            <button class="tag-preset-btn" data-label="${p.label}" data-color="${p.color}" style="background:${p.color}; color:${isLightColor(p.color) ? '#1a1a1a' : '#fff'}">
+              ${p.label}
+            </button>
+          `).join('')}
+        </div>
+        <div class="tag-editor-custom">
+          <input type="text" class="tag-custom-input" placeholder="Tag personnalise..." maxlength="20" />
+          <div class="tag-color-row">
+            ${TAG_COLORS.map(c => `<span class="tag-color-swatch${c === '#4a9eff' ? ' active' : ''}" data-color="${c}" style="background:${c}"></span>`).join('')}
+          </div>
+          <button class="tag-add-btn">Ajouter</button>
+        </div>
+      `;
+
+      // Event handlers
+      panel.querySelector('.tag-editor-close').addEventListener('click', () => panel.remove());
+
+      panel.querySelectorAll('.tag-remove').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.dataset.idx);
+          const oldTags = [...(el.tags || [])];
+          el.tags.splice(idx, 1);
+          const ops = [{ type: 'update', elementId: el.id, props: { tags: [...el.tags] } }];
+          const inverseOps = [{ type: 'update', elementId: el.id, props: { tags: oldTags } }];
+          this.history.push(ops, inverseOps);
+          this.sync.sendOps(ops);
+          this.renderer.markDirty();
+          if (this.ui) this.ui.updateUndoRedoButtons();
+          renderPanel();
+        });
+      });
+
+      panel.querySelectorAll('.tag-preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const oldTags = [...(el.tags || [])];
+          if (!el.tags) el.tags = [];
+          el.tags.push({ label: btn.dataset.label, color: btn.dataset.color });
+          const ops = [{ type: 'update', elementId: el.id, props: { tags: [...el.tags] } }];
+          const inverseOps = [{ type: 'update', elementId: el.id, props: { tags: oldTags } }];
+          this.history.push(ops, inverseOps);
+          this.sync.sendOps(ops);
+          this.renderer.markDirty();
+          if (this.ui) this.ui.updateUndoRedoButtons();
+          renderPanel();
+        });
+      });
+
+      let selectedColor = '#4a9eff';
+      panel.querySelectorAll('.tag-color-swatch').forEach(sw => {
+        sw.addEventListener('click', () => {
+          panel.querySelectorAll('.tag-color-swatch').forEach(s => s.classList.remove('active'));
+          sw.classList.add('active');
+          selectedColor = sw.dataset.color;
+        });
+      });
+
+      const addCustomTag = () => {
+        const input = panel.querySelector('.tag-custom-input');
+        const label = input.value.trim();
+        if (!label) return;
+        if ((el.tags || []).some(t => t.label === label)) {
+          this.showToast('Ce tag existe deja');
+          return;
+        }
+        const oldTags = [...(el.tags || [])];
+        if (!el.tags) el.tags = [];
+        el.tags.push({ label, color: selectedColor });
+        const ops = [{ type: 'update', elementId: el.id, props: { tags: [...el.tags] } }];
+        const inverseOps = [{ type: 'update', elementId: el.id, props: { tags: oldTags } }];
+        this.history.push(ops, inverseOps);
+        this.sync.sendOps(ops);
+        this.renderer.markDirty();
+        if (this.ui) this.ui.updateUndoRedoButtons();
+        renderPanel();
+      };
+
+      const addBtn = panel.querySelector('.tag-add-btn');
+      if (addBtn) addBtn.addEventListener('click', addCustomTag);
+      const input = panel.querySelector('.tag-custom-input');
+      if (input) input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') addCustomTag();
+        e.stopPropagation();
+      });
+    };
+
+    renderPanel();
+    document.body.appendChild(panel);
+
+    // Close on click outside
+    setTimeout(() => {
+      const closeHandler = (e) => {
+        if (!panel.contains(e.target)) {
+          panel.remove();
+          document.removeEventListener('pointerdown', closeHandler);
+        }
+      };
+      document.addEventListener('pointerdown', closeHandler);
+    }, 0);
+  }
+
   showCardEditor(el) {
     const existing = document.querySelector('.card-editor-panel');
     if (existing) existing.remove();
@@ -2614,6 +2758,7 @@ class DarkBoardApp {
         <div class="context-menu-item" data-action="toggleCollapse">${hit.collapsed ? '▼ Etendre' : '▶ Reduire'}</div>
         <div class="context-menu-item" data-action="deleteWithContent" style="color:var(--danger)">Supprimer avec le contenu</div>
         ` : ''}
+        ${hit.type === 'sticky' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editTags">🏷️ Tags</div>` : ''}
         ${hit.type === 'card' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editCard">✏️ Modifier la carte</div>` : ''}
         ${hit.type === 'list' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editList">✏️ Modifier la liste</div>` : ''}
         ${hit.type === 'connector' ? `
@@ -2737,6 +2882,9 @@ class DarkBoardApp {
           break;
         case 'connCurved':
           this.updateSelectedElements({ lineType: 'curve' });
+          break;
+        case 'editTags':
+          this.showTagEditor(hit);
           break;
         case 'comment':
           this.addComment(hit);

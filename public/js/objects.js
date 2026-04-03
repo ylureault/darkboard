@@ -36,7 +36,8 @@ function createSticky(x, y) {
     fill: color,
     stroke: 'transparent',
     text: '',
-    fontSize: 16
+    fontSize: 16,
+    tags: []
   });
 }
 
@@ -709,6 +710,49 @@ function drawSticky(ctx, el) {
       wrapText(ctx, el.text, el.x + 14, el.y + 14, maxW, fs * 1.4);
     }
   }
+
+  // Draw tags at the bottom
+  if (el.tags && el.tags.length > 0) {
+    const tagH = 18;
+    const tagPad = 6;
+    const tagGap = 4;
+    const tagFs = 10;
+    const tagY = el.y + el.height - tagH - 8;
+    let tagX = el.x + 10;
+    const maxTagX = el.x + el.width - 10;
+
+    ctx.font = `600 ${tagFs}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    ctx.textBaseline = 'middle';
+
+    for (const tag of el.tags) {
+      const tw = ctx.measureText(tag.label).width + tagPad * 2;
+      if (tagX + tw > maxTagX) break; // No overflow
+
+      // Tag pill background
+      ctx.beginPath();
+      ctx.roundRect(tagX, tagY, tw, tagH, tagH / 2);
+      ctx.fillStyle = tag.color || 'rgba(0,0,0,0.15)';
+      ctx.fill();
+
+      // Tag text
+      ctx.fillStyle = isLightColor(tag.color || '#888') ? '#1a1a1a' : '#ffffff';
+      ctx.textAlign = 'left';
+      ctx.fillText(tag.label, tagX + tagPad, tagY + tagH / 2);
+
+      tagX += tw + tagGap;
+    }
+  }
+}
+
+// Check if a color is light (for tag text contrast)
+function isLightColor(hex) {
+  if (!hex || hex === 'transparent') return true;
+  const c = hex.replace('#', '');
+  if (c.length < 6) return true;
+  const r = parseInt(c.substring(0, 2), 16);
+  const g = parseInt(c.substring(2, 4), 16);
+  const b = parseInt(c.substring(4, 6), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 > 140;
 }
 
 // Estimate number of wrapped lines for plain text
