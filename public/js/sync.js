@@ -129,6 +129,11 @@ class SyncClient {
         this.app.updateEmptyHint();
 
         // Init workshop state
+        // Load comments from server
+        if (msg.comments) {
+          this.app.renderer.comments = msg.comments;
+        }
+
         if (this.app.workshop) {
           this.app.workshop.setFacilitator(msg.isFacilitator, msg.facilitatorId);
           if (msg.anchors) this.app.workshop.loadAnchors(msg.anchors);
@@ -271,6 +276,36 @@ class SyncClient {
       case 'anchor-delete':
         if (this.app.workshop) this.app.workshop.handleAnchorDelete(msg);
         break;
+
+      // Comments
+      case 'comment-add': {
+        const c = msg.comment;
+        // Avoid duplicate
+        const existing = this.app.renderer.comments.findIndex(x => x.id === c.id);
+        if (existing === -1) {
+          this.app.renderer.comments.push(c);
+        }
+        this.app.renderer.markDirty();
+        break;
+      }
+
+      case 'comment-update': {
+        const idx = this.app.renderer.comments.findIndex(c => c.id === msg.commentId);
+        if (idx !== -1) {
+          Object.assign(this.app.renderer.comments[idx], msg.props);
+        }
+        this.app.renderer.markDirty();
+        break;
+      }
+
+      case 'comment-delete': {
+        const idx = this.app.renderer.comments.findIndex(c => c.id === msg.commentId);
+        if (idx !== -1) {
+          this.app.renderer.comments.splice(idx, 1);
+        }
+        this.app.renderer.markDirty();
+        break;
+      }
     }
   }
 
@@ -324,5 +359,30 @@ class SyncClient {
 
   sendName(name) {
     this.send({ type: 'set-name', name });
+  }
+
+  sendComment(comment) {
+    this.send({
+      type: 'comment-add',
+      boardId: getBoardId(),
+      comment
+    });
+  }
+
+  sendCommentUpdate(commentId, props) {
+    this.send({
+      type: 'comment-update',
+      boardId: getBoardId(),
+      commentId,
+      props
+    });
+  }
+
+  sendCommentDelete(commentId) {
+    this.send({
+      type: 'comment-delete',
+      boardId: getBoardId(),
+      commentId
+    });
   }
 }

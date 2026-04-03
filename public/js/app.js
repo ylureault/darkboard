@@ -2075,6 +2075,7 @@ class DarkBoardApp {
       resolveBtn.textContent = existing.resolved ? 'Reouvrir' : 'Resoudre';
       resolveBtn.addEventListener('click', () => {
         existing.resolved = !existing.resolved;
+        this.sync.sendCommentUpdate(existing.id, { resolved: existing.resolved });
         this.renderer.markDirty();
         overlay.remove();
         this.showToast(existing.resolved ? 'Commentaire resolu' : 'Commentaire rouvert');
@@ -2097,8 +2098,9 @@ class DarkBoardApp {
           author: this.userName || 'Anonyme',
           timestamp: Date.now()
         });
+        this.sync.sendCommentUpdate(existing.id, { replies: [...existing.replies] });
       } else {
-        this.renderer.comments.push({
+        const comment = {
           id: generateId(),
           x: x, y: y,
           elementId: elementId,
@@ -2107,7 +2109,9 @@ class DarkBoardApp {
           timestamp: Date.now(),
           replies: [],
           resolved: false
-        });
+        };
+        this.renderer.comments.push(comment);
+        this.sync.sendComment(comment);
       }
       this.renderer.markDirty();
       overlay.remove();
@@ -2581,80 +2585,141 @@ class DarkBoardApp {
   }
 
   updateUsersPanel() {
-    const panel = document.getElementById('usersPanel');
+    const avatarsEl = document.getElementById('usersAvatars');
+    const countEl = document.getElementById('usersCount');
     const count = this.renderer.remoteUsers.size + 1;
-    let html = '';
+    const maxVisible = 5;
+
+    let avatarsHtml = '';
 
     // My avatar
     const myFac = this.isFacilitator ? ' facilitator' : '';
-    html += `<div class="user-avatar${myFac}" style="background:${this.myColor}" title="${this.userName} (Vous)">${(this.userName || '').slice(0, 2).toUpperCase()}</div>`;
+    avatarsHtml += `<div class="user-avatar${myFac}" style="background:${this.myColor}" title="${this.userName} (Vous)">${(this.userName || '').slice(0, 2).toUpperCase()}<span class="user-avatar-dot"></span></div>`;
 
-    // Remote users
+    // Remote user avatars (max 5 visible)
+    let shown = 1;
     for (const [userId, user] of this.renderer.remoteUsers) {
+      if (shown >= maxVisible) break;
       const fac = user.isFacilitator ? ' facilitator' : '';
-      html += `<div class="user-avatar${fac}" style="background:${user.color}" title="${user.name}">${(user.name || '').slice(0, 2).toUpperCase()}</div>`;
+      const isActive = user.lastActivity && (Date.now() - user.lastActivity < 10000);
+      const dotHtml = isActive ? '<span class="user-avatar-dot"></span>' : '';
+      avatarsHtml += `<div class="user-avatar${fac}" style="background:${user.color}" title="${user.name}">${(user.name || '').slice(0, 2).toUpperCase()}${dotHtml}</div>`;
+      shown++;
     }
 
-    html += `<span class="users-count">${count} en ligne</span>`;
-    panel.innerHTML = html;
+    // Overflow indicator
+    const overflow = count - maxVisible;
+    if (overflow > 0) {
+      avatarsHtml += `<div class="user-avatar" style="background:var(--btn, #333)" title="${overflow} autres utilisateurs">+${overflow}</div>`;
+    }
 
-    // Click on users panel to show dropdown
-    panel.onclick = () => this.showUsersDropdown();
+    avatarsEl.innerHTML = avatarsHtml;
+    countEl.textContent = `${count} en ligne`;
+
+    // Click on avatars area toggles dropdown
+    avatarsEl.onclick = (e) => {
+      e.stopPropagation();
+      this.toggleUsersDropdown();
+    };
+
+    // Also update dropdown if it's currently visible
+    const dropdown = document.getElementById('usersDropdown');
+    if (dropdown && dropdown.style.display !== 'none') {
+      this._renderUsersDropdownList();
+    }
   }
 
-  showUsersDropdown() {
-    // Remove existing
-    const existing = document.querySelector('.users-dropdown');
-    if (existing) { existing.remove(); return; }
+  toggleUsersDropdown() {
+    const dropdown = document.getElementById('usersDropdown');
+    if (dropdown.style.display === 'none') {
+      this._renderUsersDropdownList();
+      dropdown.style.display = 'block';
+      // Close when clicking outside
+      setTimeout(() => {
+        this._usersDropdownHandler = (e) => {
+          const panel = document.getElementById('usersPanel');
+          if (!panel.contains(e.target)) {
+            dropdown.style.display = 'none';
+            document.removeEventListener('pointerdown', this._usersDropdownHandler);
+            this._usersDropdownHandler = null;
+          }
+        };
+        document.addEventListener('pointerdown', this._usersDropdownHandler);
+      }, 0);
+    } else {
+      dropdown.style.display = 'none';
+      if (this._usersDropdownHandler) {
+        document.removeEventListener('pointerdown', this._usersDropdownHandler);
+        this._usersDropdownHandler = null;
+      }
+    }
+  }
 
-    const dropdown = document.createElement('div');
-    dropdown.className = 'users-dropdown';
+  _renderUsersDropdownList() {
+    const listEl = document.getElementById('usersDropdownList');
+    let html = '';
 
     // Me
-    const myItem = document.createElement('div');
-    myItem.className = 'users-dropdown-item';
-    myItem.innerHTML = `<span class="user-dot" style="background:${this.myColor}"></span>${this.userName} (Vous)${this.isFacilitator ? '<span class="user-role">Animateur</span>' : ''}`;
-    dropdown.appendChild(myItem);
+    const myInitials = (this.userName || '').slice(0, 2).toUpperCase();
+    html += `<div class="users-dropdown-item">
+      <div class="user-avatar-sm" style="background:${this.myColor}">${myInitials}</div>
+      <span class="user-name">${this.userName} (Vous)</span>
+      ${this.isFacilitator ? '<span class="user-role">Animateur</span>' : ''}
+    </div>`;
 
     // Remote users
     for (const [userId, user] of this.renderer.remoteUsers) {
-      const item = document.createElement('div');
-      item.className = 'users-dropdown-item';
-      item.innerHTML = `<span class="user-dot" style="background:${user.color}"></span>${user.name || userId}${user.isFacilitator ? '<span class="user-role">Animateur</span>' : ''}`;
-      item.addEventListener('click', () => {
-        this.sync.send({ type: 'goto-user', targetUserId: userId });
-        dropdown.remove();
-      });
-      dropdown.appendChild(item);
+      const initials = (user.name || '').slice(0, 2).toUpperCase();
+      const roleHtml = user.isFacilitator ? '<span class="user-role">Animateur</span>' : '';
+      html += `<div class="users-dropdown-item" data-userid="${userId}">
+        <div class="user-avatar-sm" style="background:${user.color}">${initials}</div>
+        <span class="user-name">${user.name || userId}</span>
+        ${roleHtml}
+        <button class="goto-user-btn" data-goto="${userId}">Voir</button>
+      </div>`;
     }
 
     // Claim facilitator option
     if (!this.isFacilitator) {
-      const sep = document.createElement('div');
-      sep.style.cssText = 'height:1px;background:var(--panel-border);margin:4px 0;';
-      dropdown.appendChild(sep);
-
-      const claimBtn = document.createElement('div');
-      claimBtn.className = 'users-dropdown-item';
-      claimBtn.style.color = 'var(--warning)';
-      claimBtn.textContent = 'Devenir animateur';
-      claimBtn.addEventListener('click', () => {
-        this.sync.send({ type: 'claim-facilitator' });
-        dropdown.remove();
-      });
-      dropdown.appendChild(claimBtn);
+      html += '<div style="height:1px;background:var(--panel-border);margin:4px 0;"></div>';
+      html += '<div class="users-dropdown-item" id="claimFacilitatorBtn" style="color:var(--warning);cursor:pointer;">Devenir animateur</div>';
     }
 
-    document.body.appendChild(dropdown);
+    listEl.innerHTML = html;
 
-    setTimeout(() => {
-      document.addEventListener('pointerdown', function handler(e) {
-        if (!dropdown.contains(e.target)) {
-          dropdown.remove();
-          document.removeEventListener('pointerdown', handler);
+    // Bind "Voir" buttons to navigate to user cursor position
+    listEl.querySelectorAll('.goto-user-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const targetId = btn.dataset.goto;
+        const user = this.renderer.remoteUsers.get(targetId);
+        if (user && user.x !== undefined && user.y !== undefined) {
+          // Pan camera to user's cursor position
+          const canvas = this.renderer.canvas;
+          this.renderer.camera.x = user.x - (canvas.width / 2) / this.renderer.camera.zoom;
+          this.renderer.camera.y = user.y - (canvas.height / 2) / this.renderer.camera.zoom;
+          this.renderer.draw();
+        }
+        document.getElementById('usersDropdown').style.display = 'none';
+        if (this._usersDropdownHandler) {
+          document.removeEventListener('pointerdown', this._usersDropdownHandler);
+          this._usersDropdownHandler = null;
         }
       });
-    }, 0);
+    });
+
+    // Bind claim facilitator
+    const claimBtn = document.getElementById('claimFacilitatorBtn');
+    if (claimBtn) {
+      claimBtn.addEventListener('click', () => {
+        this.sync.send({ type: 'claim-facilitator' });
+        document.getElementById('usersDropdown').style.display = 'none';
+        if (this._usersDropdownHandler) {
+          document.removeEventListener('pointerdown', this._usersDropdownHandler);
+          this._usersDropdownHandler = null;
+        }
+      });
+    }
   }
 
   showToast(message) {

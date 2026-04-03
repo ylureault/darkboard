@@ -520,8 +520,33 @@ class CanvasRenderer {
     const x = user.x;
     const y = user.y;
 
-    // Cursor arrow
     ctx.save();
+
+    // Fade effect for inactive users
+    const timeSinceActivity = user.lastActivity ? Date.now() - user.lastActivity : 0;
+    if (timeSinceActivity > 10000) {
+      ctx.globalAlpha = 0.3;
+    } else if (timeSinceActivity > 5000) {
+      // Interpolate from 1.0 to 0.3 between 5000-10000ms
+      const t = (timeSinceActivity - 5000) / 5000;
+      ctx.globalAlpha = 1.0 - t * 0.7;
+    }
+
+    // Pulsing glow ring for active cursors (within 2 seconds)
+    if (timeSinceActivity < 2000) {
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 300);
+      const glowRadius = 12 + pulse * 6;
+      const glowAlpha = 0.15 + pulse * 0.1;
+      ctx.beginPath();
+      ctx.arc(x, y, glowRadius, 0, Math.PI * 2);
+      ctx.fillStyle = user.color;
+      const savedAlpha = ctx.globalAlpha;
+      ctx.globalAlpha = savedAlpha * glowAlpha;
+      ctx.fill();
+      ctx.globalAlpha = savedAlpha;
+    }
+
+    // Cursor arrow
     ctx.translate(x, y);
     ctx.fillStyle = user.color;
     ctx.beginPath();
