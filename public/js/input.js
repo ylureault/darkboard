@@ -464,6 +464,13 @@ class InputHandler {
       return;
     }
 
+    // #148 - Home key: center on board
+    if (e.key === 'Home') {
+      e.preventDefault();
+      if (this.app.centerOnBoard) this.app.centerOnBoard();
+      return;
+    }
+
     // Tool shortcuts (match toolbar labels)
     const toolMap = {
       v: 'select', h: 'hand', r: 'rect', c: 'circle', o: 'circle',

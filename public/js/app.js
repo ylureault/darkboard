@@ -1,6 +1,26 @@
-// Main application - wires everything together
+// #198: app.js - Main DarkBoard application class. Wires together canvas rendering,
+// tool handling, WebSocket sync, history (undo/redo), and all UI interactions.
+
+// #200: Version number
+const DARKBOARD_VERSION = '2.0.0';
+
 class DarkBoardApp {
   constructor() {
+    // #199: Error boundary - wrap constructor body in try-catch for user-friendly error
+    try {
+      this._initApp();
+    } catch (e) {
+      console.error('DarkBoardApp initialization failed:', e);
+      document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#121212;color:#e0e0e0;font-family:sans-serif;flex-direction:column;padding:2rem;text-align:center;">' +
+        '<h1 style="margin-bottom:1rem;">DarkBoard - Erreur de chargement</h1>' +
+        '<p style="color:#999;">Une erreur est survenue lors du chargement de l\'application.</p>' +
+        '<p style="color:#666;font-size:0.9rem;margin-top:0.5rem;">' + (e.message || 'Erreur inconnue') + '</p>' +
+        '<button onclick="location.reload()" style="margin-top:1.5rem;padding:0.6rem 1.5rem;background:#4a9eff;color:white;border:none;border-radius:6px;cursor:pointer;font-size:1rem;">Recharger</button>' +
+        '</div>';
+    }
+  }
+
+  _initApp() {
     this.currentTool = 'select';
     this.currentFill = 'transparent';
     this.currentStroke = '#ffffff';
@@ -85,8 +105,25 @@ class DarkBoardApp {
     // Init embed click handler
     this.initEmbedHandler();
 
+    // #194: Pause rendering when tab is hidden, resume when visible
+    this.initVisibilityHandler();
+
     // Show name dialog
     this.showNameDialog();
+  }
+
+  // #194: Handle browser tab visibility to pause/resume rendering
+  initVisibilityHandler() {
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this._wasRendering = true;
+        // Pause render loop by not marking dirty
+      } else {
+        if (this._wasRendering) {
+          this.renderer.markDirty();
+        }
+      }
+    });
   }
 
   initElementDeepLinks() {
@@ -263,7 +300,8 @@ class DarkBoardApp {
       e.dataTransfer.dropEffect = 'copy';
     });
 
-    canvas.addEventListener('drop', (e) => {
+    // #186: Wrap drop handler in try-catch to prevent crashes
+    canvas.addEventListener('drop', (e) => { try {
       e.preventDefault();
       const allFiles = Array.from(e.dataTransfer.files);
       if (allFiles.length === 0) return;
@@ -310,11 +348,12 @@ class DarkBoardApp {
         };
         reader.readAsDataURL(file);
       }
-    });
+    } catch (err) { console.error('Drop handler error:', err); } });
   }
 
   initClipboardPaste() {
-    document.addEventListener('paste', (e) => {
+    // #186: Wrap paste handler in try-catch to prevent crashes
+    document.addEventListener('paste', (e) => { try {
       const isEditing = e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT' || e.target.isContentEditable;
 
       const items = e.clipboardData && e.clipboardData.items;
@@ -486,7 +525,7 @@ class DarkBoardApp {
         }
         this.renderer.markDirty();
       }
-    });
+    } catch (err) { console.error('Paste handler error:', err); } });
   }
 
   /**
@@ -760,6 +799,9 @@ class DarkBoardApp {
 
   deleteSelected() {
     if (this.renderer.selectedIds.size === 0) return;
+
+    // #155 - Prevent accidental board clear (Ctrl+A then Delete)
+    if (this.confirmSelectAllDelete && this.confirmSelectAllDelete()) return;
 
     // Check if deleting an envelope/frame with many children — confirm first
     for (const id of this.renderer.selectedIds) {

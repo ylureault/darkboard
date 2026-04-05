@@ -393,7 +393,7 @@ class UI {
     link.href = URL.createObjectURL(blob);
     link.click();
     URL.revokeObjectURL(link.href);
-    this.app.showToast('Export JSON termine !');
+    this.app.showToast('Export JSON termine!', 'success');
   }
 
   initJSONImport() {
@@ -2052,6 +2052,17 @@ class UI {
     const helpBtn = document.getElementById('helpBtn');
     const helpClose = document.getElementById('helpClose');
     if (!overlay || !helpBtn) return;
+
+    // #200: Display version number in help overlay
+    const versionEl = overlay.querySelector('.help-version') || (() => {
+      const v = document.createElement('div');
+      v.className = 'help-version';
+      v.style.cssText = 'text-align:center;color:#666;font-size:0.8rem;margin-top:1rem;';
+      v.textContent = 'DarkBoard v' + (typeof DARKBOARD_VERSION !== 'undefined' ? DARKBOARD_VERSION : '2.0.0');
+      const content = overlay.querySelector('.help-content') || overlay.firstElementChild;
+      if (content) content.appendChild(v);
+      return v;
+    })();
 
     const show = () => { overlay.style.display = 'flex'; };
     const hide = () => { overlay.style.display = 'none'; };

@@ -1,11 +1,20 @@
-// UUID generation
+// #198: utils.js - Core utility functions for DarkBoard.
+// Provides ID generation, session management, geometry helpers, bounding box calculations, and math utilities.
+
+/**
+ * Generate a random 12-character hexadecimal ID.
+ * @returns {string} A unique identifier string
+ */
 function generateId() {
   return 'xxxxxxxxxxxx'.replace(/x/g, () =>
     Math.floor(Math.random() * 16).toString(16)
   );
 }
 
-// Session ID (persisted per tab)
+/**
+ * Get or create a persistent session ID for the current browser tab.
+ * @returns {string} The session ID stored in sessionStorage
+ */
 function getSessionId() {
   let id = sessionStorage.getItem('darkboard-session');
   if (!id) {
@@ -15,23 +24,54 @@ function getSessionId() {
   return id;
 }
 
-// Board ID from URL
+/**
+ * Extract the board ID from the current URL path.
+ * @returns {string} The board ID (last segment of the URL path)
+ */
 function getBoardId() {
   const parts = window.location.pathname.split('/');
   return parts[parts.length - 1];
 }
 
-// Geometry helpers
+/**
+ * Test if a point (px, py) is inside a rectangle defined by (x, y, w, h).
+ * @param {number} px - Point X
+ * @param {number} py - Point Y
+ * @param {number} x - Rectangle left
+ * @param {number} y - Rectangle top
+ * @param {number} w - Rectangle width
+ * @param {number} h - Rectangle height
+ * @returns {boolean} True if point is inside the rectangle
+ */
 function pointInRect(px, py, x, y, w, h) {
   return px >= x && px <= x + w && py >= y && py <= y + h;
 }
 
+/**
+ * Test if a point (px, py) is inside a circle with center (cx, cy) and radius r.
+ * @param {number} px - Point X
+ * @param {number} py - Point Y
+ * @param {number} cx - Circle center X
+ * @param {number} cy - Circle center Y
+ * @param {number} r - Circle radius
+ * @returns {boolean} True if point is inside the circle
+ */
 function pointInCircle(px, py, cx, cy, r) {
   const dx = px - cx;
   const dy = py - cy;
   return dx * dx + dy * dy <= r * r;
 }
 
+/**
+ * Compute the minimum distance from point (px, py) to a line segment (x1,y1)-(x2,y2).
+ * @param {number} px - Point X
+ * @param {number} py - Point Y
+ * @param {number} x1 - Segment start X
+ * @param {number} y1 - Segment start Y
+ * @param {number} x2 - Segment end X
+ * @param {number} y2 - Segment end Y
+ * @returns {number} The shortest distance from the point to the segment
+ */
 function distanceToSegment(px, py, x1, y1, x2, y2) {
   const dx = x2 - x1;
   const dy = y2 - y1;
@@ -42,6 +82,13 @@ function distanceToSegment(px, py, x1, y1, x2, y2) {
   return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
 }
 
+/**
+ * Compute the minimum distance from a point to a polyline (array of {x,y} points).
+ * @param {number} px - Point X
+ * @param {number} py - Point Y
+ * @param {Array<{x:number, y:number}>} points - Polyline vertices
+ * @returns {number} The shortest distance from the point to any segment of the polyline
+ */
 function distanceToPolyline(px, py, points) {
   let minDist = Infinity;
   for (let i = 0; i < points.length - 1; i++) {
@@ -51,7 +98,11 @@ function distanceToPolyline(px, py, points) {
   return minDist;
 }
 
-// Bounding box of element
+/**
+ * Get the axis-aligned bounding box of an element in world coordinates.
+ * @param {Object} el - The element object
+ * @returns {{x:number, y:number, w:number, h:number}} Bounding box with x, y, w, h
+ */
 function getElementBounds(el) {
   switch (el.type) {
     case 'rect':
@@ -92,22 +143,46 @@ function getElementBounds(el) {
   }
 }
 
-// Clamp
+/**
+ * Clamp a value between a minimum and maximum.
+ * @param {number} val - The value to clamp
+ * @param {number} min - Minimum allowed value
+ * @param {number} max - Maximum allowed value
+ * @returns {number} The clamped value
+ */
 function clamp(val, min, max) {
   return Math.max(min, Math.min(max, val));
 }
 
-// Lerp
+/**
+ * Linear interpolation between two values.
+ * @param {number} a - Start value
+ * @param {number} b - End value
+ * @param {number} t - Interpolation factor (0 to 1)
+ * @returns {number} The interpolated value
+ */
 function lerp(a, b, t) {
   return a + (b - a) * t;
 }
 
-// Deep clone simple objects
+/**
+ * Deep clone a JSON-serializable object.
+ * @param {Object} obj - The object to clone
+ * @returns {Object} A deep copy of the input
+ */
 function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
 
-// Normalize rect (handle negative w/h from drag)
+/**
+ * Normalize a rectangle that may have negative width/height (from right-to-left drag).
+ * Ensures the returned rect has positive w and h, with x/y adjusted accordingly.
+ * @param {number} x - Original X
+ * @param {number} y - Original Y
+ * @param {number} w - Width (may be negative)
+ * @param {number} h - Height (may be negative)
+ * @returns {{x:number, y:number, w:number, h:number}} Normalized rectangle
+ */
 function normalizeRect(x, y, w, h) {
   return {
     x: w < 0 ? x + w : x,
