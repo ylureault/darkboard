@@ -1418,9 +1418,12 @@ function createShapeTool(type) {
 
       const norm = normalizeRect(this.startPoint.x, this.startPoint.y, w, h);
 
+      // #189: enforce minimum 10x10 element size
+      const finalW = Math.max(norm.w, 10);
+      const finalH = Math.max(norm.h, 10);
       if (norm.w > 5 && norm.h > 5) {
         const el = createElement(type, {
-          x: norm.x, y: norm.y, width: norm.w, height: norm.h,
+          x: norm.x, y: norm.y, width: finalW, height: finalH,
           fill: app.currentFill, stroke: app.currentStroke,
           strokeWidth: app.currentStrokeWidth
         });

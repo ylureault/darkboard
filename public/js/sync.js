@@ -1,4 +1,6 @@
-// WebSocket sync client
+// #198: sync.js - WebSocket synchronization client for real-time collaboration.
+// Manages connection lifecycle, message sending/receiving, reconnection, and offline queueing.
+
 class SyncClient {
   constructor(app) {
     this.app = app;
@@ -10,6 +12,9 @@ class SyncClient {
     this.reconnectAttempts = 0;
     this.offlineQueue = [];
     this.onlineUserCount = 0;
+    this._opBatchQueue = []; // #180: batch operations during rapid updates
+    this._opBatchTimer = null;
+    this._maxMessageSize = 500 * 1024; // #195: 500KB warning threshold
   }
 
   connect() {
