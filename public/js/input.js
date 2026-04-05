@@ -1,4 +1,5 @@
-// Input handler - mouse, touch, keyboard
+// #198: input.js - Input handling for mouse, touch, and keyboard events.
+// Manages pointer interactions, pinch zoom, keyboard shortcuts, context menus, and panning.
 class InputHandler {
   constructor(app) {
     this.app = app;

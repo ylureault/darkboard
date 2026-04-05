@@ -1,4 +1,5 @@
-// Undo/Redo with command pattern
+// #198: history.js - Undo/redo system using command pattern.
+// Manages undo/redo stacks of operations and their inverses for all board modifications.
 class History {
   constructor() {
     this.undoStack = [];

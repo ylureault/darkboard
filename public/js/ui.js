@@ -1,4 +1,5 @@
-// UI initialization and management
+// #198: ui.js - UI initialization and management for DarkBoard.
+// Handles toolbar, property panel, help overlay, search, themes, views (table/kanban), and all UI interactions.
 class UI {
   constructor(app) {
     this.app = app;

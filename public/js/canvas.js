@@ -1,4 +1,5 @@
-// Canvas renderer with camera/zoom
+// #198: canvas.js - Canvas rendering engine with camera/zoom, viewport culling, minimap,
+// grid drawing, selection visuals, remote cursors, and spatial indexing for large boards.
 class CanvasRenderer {
   constructor(canvasEl) {
     this.canvas = canvasEl;
