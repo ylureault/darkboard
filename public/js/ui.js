@@ -74,6 +74,24 @@ class UI {
     const fillRow = document.getElementById('fillColors');
     const strokeRow = document.getElementById('strokeColors');
 
+    // #143 - Recent colors row
+    const recentColors = this.app.getRecentColors ? this.app.getRecentColors() : [];
+    if (recentColors.length > 0) {
+      const recentLabel = document.createElement('span');
+      recentLabel.className = 'color-recent-label';
+      recentLabel.textContent = 'Recents';
+      const recentRow = document.createElement('div');
+      recentRow.className = 'color-recent-row';
+      recentRow.id = 'recentFillColors';
+      recentColors.forEach(color => {
+        const swatch = this.createSwatch(color, 'fill');
+        recentRow.appendChild(swatch);
+      });
+      const fillSection = fillRow.parentElement;
+      fillSection.insertBefore(recentRow, fillRow);
+      fillSection.insertBefore(recentLabel, recentRow);
+    }
+
     fillColors.forEach(color => {
       const swatch = this.createSwatch(color, 'fill');
       if (color === this.app.currentFill) swatch.classList.add('active');

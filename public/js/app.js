@@ -4237,3 +4237,525 @@ window.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => loadingOverlay.remove(), 300);
   }
 });
+
+// =============================================
+// IMPROVEMENTS 121-160 - Patch into DarkBoardApp prototype
+// =============================================
+
+// #123 - First-time welcome tour
+DarkBoardApp.prototype.initWelcomeTour = function() {
+  if (localStorage.getItem('darkboard-tour-done')) return;
+  localStorage.setItem('darkboard-tour-done', '1');
+  var steps = [
+    { selector: '.tool-btn[data-tool="select"]', title: 'Selection', desc: 'Cliquez pour selectionner et deplacer des elements.' },
+    { selector: '.tool-btn[data-tool="sticky"]', title: 'Post-it', desc: 'Creez des post-its pour capturer vos idees. Double-cliquez aussi sur le canevas!' },
+    { selector: '.tool-btn[data-tool="draw"]', title: 'Dessin libre', desc: 'Dessinez a main levee sur le tableau.' },
+    { selector: '.tool-btn[data-tool="rect"]', title: 'Formes', desc: 'Rectangles, cercles, losanges, triangles et plus.' },
+    { selector: '.tool-btn[data-tool="connector"]', title: 'Connecteurs', desc: 'Reliez des elements entre eux avec des fleches.' },
+    { selector: '#shareBtn', title: 'Partager', desc: 'Partagez le lien avec votre equipe pour collaborer en temps reel!' }
+  ];
+  var stepIdx = 0;
+  var self = this;
+  var showStep = function() {
+    document.querySelectorAll('.tour-highlight,.tour-tooltip,.tour-overlay').forEach(function(e) { e.remove(); });
+    if (stepIdx >= steps.length) return;
+    var step = steps[stepIdx];
+    var el = document.querySelector(step.selector);
+    if (!el) { stepIdx++; showStep(); return; }
+    var rect = el.getBoundingClientRect();
+    var overlay = document.createElement('div');
+    overlay.className = 'tour-overlay';
+    document.body.appendChild(overlay);
+    var hl = document.createElement('div');
+    hl.className = 'tour-highlight';
+    hl.style.left = (rect.left - 6) + 'px';
+    hl.style.top = (rect.top - 6) + 'px';
+    hl.style.width = (rect.width + 12) + 'px';
+    hl.style.height = (rect.height + 12) + 'px';
+    document.body.appendChild(hl);
+    var tip = document.createElement('div');
+    tip.className = 'tour-tooltip';
+    var dots = steps.map(function(_, i) { return '<span class="dot ' + (i === stepIdx ? 'active' : '') + '"></span>'; }).join('');
+    tip.innerHTML = '<div class="tour-step-dots">' + dots + '</div><h4>' + step.title + '</h4><p>' + step.desc + '</p><div class="tour-actions"><button class="tour-btn tour-btn-skip">Passer</button><button class="tour-btn">' + (stepIdx < steps.length - 1 ? 'Suivant' : 'Terminer') + '</button></div>';
+    tip.style.left = Math.min(rect.left, window.innerWidth - 300) + 'px';
+    tip.style.top = (rect.bottom + 16) + 'px';
+    document.body.appendChild(tip);
+    tip.querySelector('.tour-btn:not(.tour-btn-skip)').addEventListener('click', function() { stepIdx++; showStep(); });
+    tip.querySelector('.tour-btn-skip').addEventListener('click', function() { document.querySelectorAll('.tour-highlight,.tour-tooltip,.tour-overlay').forEach(function(e) { e.remove(); }); });
+    overlay.addEventListener('click', function() { stepIdx++; showStep(); });
+  };
+  setTimeout(showStep, 1500);
+};
+
+// #127 - Contextual tips system
+DarkBoardApp.prototype.initContextualTips = function() {
+  var self = this;
+  var tips = [
+    'Astuce: Double-cliquez pour creer un post-it rapidement',
+    'Astuce: Maintenez Alt en deplacant un element pour le dupliquer',
+    'Astuce: Utilisez Ctrl+G pour grouper des elements selectionnes',
+    'Astuce: Glissez des images directement sur le tableau',
+    'Astuce: Appuyez sur Espace + glissez pour deplacer la vue',
+    'Astuce: Ctrl+F pour rechercher et remplacer du texte',
+    'Astuce: Utilisez les ancres (N) pour creer une presentation'
+  ];
+  var shownTips = JSON.parse(localStorage.getItem('darkboard-shown-tips') || '[]');
+  setTimeout(function() {
+    var remaining = tips.filter(function(_, i) { return shownTips.indexOf(i) === -1; });
+    if (remaining.length === 0) return;
+    var idx = tips.indexOf(remaining[Math.floor(Math.random() * remaining.length)]);
+    shownTips.push(idx);
+    localStorage.setItem('darkboard-shown-tips', JSON.stringify(shownTips));
+    var banner = document.createElement('div');
+    banner.className = 'tip-banner';
+    banner.innerHTML = tips[idx] + '<button class="tip-close">&times;</button>';
+    document.body.appendChild(banner);
+    banner.querySelector('.tip-close').addEventListener('click', function() { banner.remove(); });
+    setTimeout(function() { if (banner.parentNode) banner.remove(); }, 12000);
+  }, 60000);
+};
+
+// #128 - "What's New" notification
+DarkBoardApp.prototype.initWhatsNew = function() {
+  var self = this;
+  var currentVersion = '2.5';
+  var lastVersion = localStorage.getItem('darkboard-version');
+  if (lastVersion && lastVersion !== currentVersion) {
+    setTimeout(function() {
+      self.showToast('Nouveautes: tour de bienvenue, astuces, animations, et plus!', 'info');
+    }, 3000);
+  }
+  localStorage.setItem('darkboard-version', currentVersion);
+};
+
+// #130 - Tool cursor hint
+DarkBoardApp.prototype._showToolCursorHint = function(toolName) {
+  var self = this;
+  if (this._cursorHintEl) { this._cursorHintEl.remove(); this._cursorHintEl = null; }
+  var hints = {
+    sticky: 'Cliquez pour placer un post-it', rect: 'Glissez pour dessiner un rectangle',
+    circle: 'Glissez pour dessiner un cercle', draw: 'Glissez pour dessiner',
+    line: 'Glissez pour tracer une ligne', arrow: 'Glissez pour tracer une fleche',
+    text: 'Cliquez pour placer du texte', connector: 'Cliquez sur un element source',
+    frame: 'Glissez pour creer un cadre', mindmap: 'Cliquez pour placer un noeud',
+    diamond: 'Glissez pour dessiner un losange', triangle: 'Glissez pour dessiner un triangle',
+    envelope: 'Glissez pour creer une enveloppe'
+  };
+  var hint = hints[toolName];
+  if (!hint) return;
+  var handler = function(e) {
+    if (self._cursorHintEl) self._cursorHintEl.remove();
+    var el = document.createElement('div');
+    el.className = 'cursor-hint';
+    el.textContent = hint;
+    el.style.left = (e.clientX + 18) + 'px';
+    el.style.top = (e.clientY + 18) + 'px';
+    document.body.appendChild(el);
+    self._cursorHintEl = el;
+    setTimeout(function() { if (el.parentNode) el.remove(); self._cursorHintEl = null; }, 2000);
+    self.renderer.canvas.removeEventListener('mousemove', handler);
+  };
+  this.renderer.canvas.addEventListener('mousemove', handler, { once: true });
+};
+
+// #131 - Flash green border on new element
+DarkBoardApp.prototype._flashCreatedElement = function(el) {
+  if (!el || el.x === undefined) return;
+  var self = this;
+  requestAnimationFrame(function() {
+    var screen = self.renderer.worldToScreen(el.x, el.y);
+    var zoom = self.renderer.camera.zoom;
+    var w = (el.width || 100) * zoom;
+    var h = (el.height || 100) * zoom;
+    var flash = document.createElement('div');
+    flash.className = 'element-created-flash';
+    flash.style.left = screen.x + 'px';
+    flash.style.top = screen.y + 'px';
+    flash.style.width = w + 'px';
+    flash.style.height = h + 'px';
+    document.body.appendChild(flash);
+    setTimeout(function() { flash.remove(); }, 700);
+  });
+};
+
+// #132 - Delete animation (visual shrink before removal)
+// Intercept _doDeleteSelected to add brief visual feedback
+(function() {
+  var origDoDelete = DarkBoardApp.prototype._doDeleteSelected;
+  if (origDoDelete) {
+    DarkBoardApp.prototype._doDeleteSelected = function() {
+      // Show brief shrink effect for selected elements
+      var self = this;
+      for (var id of this.renderer.selectedIds) {
+        var el = this.renderer.elements.get(id);
+        if (el && el.x !== undefined) {
+          var screen = this.renderer.worldToScreen(el.x, el.y);
+          var zoom = this.renderer.camera.zoom;
+          var w = (el.width || 100) * zoom;
+          var h = (el.height || 100) * zoom;
+          var ghost = document.createElement('div');
+          ghost.style.cssText = 'position:fixed;left:' + screen.x + 'px;top:' + screen.y + 'px;width:' + w + 'px;height:' + h + 'px;border:1px solid var(--danger);border-radius:4px;pointer-events:none;z-index:9997;animation:elementDeleteShrink 0.3s ease-out forwards;background:rgba(233,69,96,0.1);';
+          document.body.appendChild(ghost);
+          setTimeout(function() { ghost.remove(); }, 400);
+        }
+      }
+      // Add CSS animation if not already present
+      if (!document.getElementById('deleteAnimStyle')) {
+        var style = document.createElement('style');
+        style.id = 'deleteAnimStyle';
+        style.textContent = '@keyframes elementDeleteShrink{0%{transform:scale(1);opacity:1}100%{transform:scale(0.7);opacity:0}}';
+        document.head.appendChild(style);
+      }
+      origDoDelete.call(this);
+    };
+  }
+})();
+
+// #133 - Show feedback near cursor
+DarkBoardApp.prototype._showCursorFeedback = function(text) {
+  var el = document.createElement('div');
+  el.className = 'cursor-feedback';
+  el.textContent = text;
+  el.style.left = (window.innerWidth / 2) + 'px';
+  el.style.top = (window.innerHeight / 2 - 40) + 'px';
+  document.body.appendChild(el);
+  setTimeout(function() { el.remove(); }, 700);
+};
+
+// #135 - Vote star animation
+DarkBoardApp.prototype.showVoteAnimation = function(elementId) {
+  var el = this.renderer.elements.get(elementId);
+  if (!el) return;
+  var bounds = getElementBounds(el);
+  var screen = this.renderer.worldToScreen(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2);
+  var star = document.createElement('div');
+  star.className = 'vote-star-anim';
+  star.textContent = '\u2B50';
+  star.style.left = screen.x + 'px';
+  star.style.top = screen.y + 'px';
+  document.body.appendChild(star);
+  setTimeout(function() { star.remove(); }, 800);
+};
+
+// #137 - Connection status messages
+DarkBoardApp.prototype.onConnectionStatusChange = function(status) {
+  var dot = document.getElementById('syncDot');
+  var text = document.getElementById('syncText');
+  if (status === 'disconnected') {
+    if (dot) dot.classList.add('warning');
+    if (text) text.textContent = 'Reconnexion...';
+    this.showToast('Connexion perdue, reconnexion...', 'error');
+  } else if (status === 'reconnected') {
+    if (dot) { dot.classList.remove('warning'); dot.classList.remove('error'); }
+    if (text) text.textContent = 'En ligne';
+    this.showToast('Reconnecte!', 'success');
+  } else if (status === 'connected') {
+    if (dot) { dot.classList.remove('warning'); dot.classList.remove('error'); }
+    if (text) text.textContent = 'En ligne';
+  }
+};
+
+// #138 - Timer end with screen flash and beep
+DarkBoardApp.prototype.onTimerEnd = function() {
+  var flash = document.createElement('div');
+  flash.className = 'timer-flash-overlay';
+  document.body.appendChild(flash);
+  setTimeout(function() { flash.remove(); }, 1200);
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var beep = function(freq, delay) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.value = 0.3;
+      osc.start(ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.4);
+      osc.stop(ctx.currentTime + delay + 0.5);
+    };
+    beep(880, 0);
+    beep(880, 0.3);
+  } catch (e) { /* Web Audio not available */ }
+  this.showToast('Temps ecoule!', 'info');
+};
+
+// #139 - Element count milestone
+DarkBoardApp.prototype._checkElementMilestone = function() {
+  var count = this.renderer.elements.size;
+  var milestones = [50, 100, 200, 500, 1000];
+  if (milestones.indexOf(count) !== -1) {
+    this.showToast(count + ' elements sur le tableau!', 'success');
+  }
+};
+
+// #140 - Collaborative presence feedback
+DarkBoardApp.prototype.onUserJoined = function(name) {
+  if (name) this.showToast(name + ' a rejoint', 'info');
+};
+DarkBoardApp.prototype.onUserLeft = function(name) {
+  if (name) this.showToast(name + ' est parti', 'info');
+};
+
+// #141 - Restore last used tool per session
+DarkBoardApp.prototype.restoreLastTool = function() {
+  var lastTool = localStorage.getItem('darkboard-last-tool');
+  if (lastTool && typeof Tools !== 'undefined' && Tools[lastTool]) {
+    this.setTool(lastTool);
+  }
+};
+
+// #142 - Remember zoom/camera per board
+DarkBoardApp.prototype.saveCameraState = function() {
+  var boardId = getBoardId();
+  var state = { x: this.renderer.camera.x, y: this.renderer.camera.y, zoom: this.renderer.camera.zoom };
+  localStorage.setItem('darkboard-camera-' + boardId, JSON.stringify(state));
+};
+DarkBoardApp.prototype.restoreCameraState = function() {
+  var boardId = getBoardId();
+  var saved = localStorage.getItem('darkboard-camera-' + boardId);
+  if (saved) {
+    try {
+      var state = JSON.parse(saved);
+      this.renderer.camera.x = state.x || 0;
+      this.renderer.camera.y = state.y || 0;
+      this.renderer.camera.zoom = state.zoom || 1;
+      this.renderer.markDirty();
+      if (typeof this.updateZoomDisplay === 'function') this.updateZoomDisplay();
+    } catch (e) { /* ignore */ }
+  }
+};
+
+// #143 - Track recent colors
+DarkBoardApp.prototype.trackRecentColor = function(color) {
+  if (!color || color === 'transparent') return;
+  var recent = JSON.parse(localStorage.getItem('darkboard-recent-colors') || '[]');
+  recent = recent.filter(function(c) { return c !== color; });
+  recent.unshift(color);
+  if (recent.length > 5) recent = recent.slice(0, 5);
+  localStorage.setItem('darkboard-recent-colors', JSON.stringify(recent));
+};
+DarkBoardApp.prototype.getRecentColors = function() {
+  return JSON.parse(localStorage.getItem('darkboard-recent-colors') || '[]');
+};
+
+// #146 - Smart paste dialog for tab-separated text
+DarkBoardApp.prototype.showSmartPasteDialog = function(text, cx, cy) {
+  var self = this;
+  this.showConfirmDialog(
+    'Texte avec tabulations detecte. Creer en tant que:',
+    [
+      { label: 'Post-its', action: function() {
+        var cells = text.split(/[\t\n]/).map(function(c) { return c.trim(); }).filter(function(c) { return c.length > 0; });
+        self.renderer.selectedIds.clear();
+        var perRow = Math.min(cells.length, 5);
+        for (var i = 0; i < cells.length; i++) {
+          var col = i % perRow;
+          var row = Math.floor(i / perRow);
+          var el = createSticky(cx - (perRow * 216) / 2 + col * 216, cy - 100 + row * 216);
+          el.text = cells[i];
+          self.addElement(el);
+          self.renderer.selectedIds.add(el.id);
+        }
+        self.renderer.markDirty();
+        self.showToast(cells.length + ' post-its crees', 'success');
+      }},
+      { label: 'Texte brut', action: function() {
+        var el = createSticky(cx - 100, cy - 100);
+        el.text = text;
+        self.addElement(el);
+        self.renderer.markDirty();
+      }},
+      { label: 'Annuler', action: function() {} }
+    ]
+  );
+};
+
+// #148 - Center on board (Home key)
+DarkBoardApp.prototype.centerOnBoard = function() {
+  var elements = Array.from(this.renderer.elements.values());
+  if (elements.length === 0) {
+    this.renderer.camera.x = 0;
+    this.renderer.camera.y = 0;
+    this.renderer.camera.zoom = 1;
+    this.renderer.markDirty();
+    if (typeof this.updateZoomDisplay === 'function') this.updateZoomDisplay();
+    return;
+  }
+  if (this.ui) this.ui.fitToScreen();
+};
+
+// #150 - Element opacity slider in floating toolbar
+DarkBoardApp.prototype._addOpacityToFloatingToolbar = function() {
+  if (!this._floatingToolbar) return;
+  if (this._floatingToolbar.querySelector('.ftb-opacity-wrap')) return;
+  var self = this;
+  var wrap = document.createElement('span');
+  wrap.className = 'ftb-opacity-wrap';
+  wrap.innerHTML = '<span class="ftb-sep"></span><span style="font-size:10px;opacity:0.6">&#9673;</span><input type="range" min="0.1" max="1" step="0.1" value="1" title="Opacite">';
+  var slider = wrap.querySelector('input');
+  var firstId = this.renderer.selectedIds.values().next().value;
+  var firstEl = firstId ? this.renderer.elements.get(firstId) : null;
+  if (firstEl && firstEl.opacity !== undefined) slider.value = firstEl.opacity;
+  slider.addEventListener('input', function() {
+    self.updateSelectedElements({ opacity: parseFloat(slider.value) });
+  });
+  slider.addEventListener('pointerdown', function(e) { e.stopPropagation(); });
+  this._floatingToolbar.appendChild(wrap);
+};
+
+// #153 - Paste error handling
+DarkBoardApp.prototype.showPasteError = function() {
+  this.showToast('Impossible de coller. Essayez Ctrl+Shift+V pour du texte brut.', 'error');
+};
+
+// #154 - Recovery for accidental far moves
+DarkBoardApp.prototype.showUndoMoveToast = function() {
+  var self = this;
+  var toast = document.createElement('div');
+  toast.className = 'toast show';
+  toast.innerHTML = '<span class="toast-icon toast-icon-info">i</span><span>Elements deplaces loin</span>';
+  var btn = document.createElement('button');
+  btn.textContent = 'Revenir';
+  btn.style.cssText = 'margin-left:12px;background:var(--accent);color:white;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;';
+  btn.addEventListener('click', function() { self.undo(); toast.remove(); });
+  toast.appendChild(btn);
+  toast.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);z-index:10000;background:var(--panel);color:var(--text);padding:10px 24px;border-radius:8px;font-size:14px;opacity:1;transition:opacity 0.3s;box-shadow:0 2px 12px rgba(0,0,0,0.4);display:flex;align-items:center;gap:4px;bottom:80px;pointer-events:auto;';
+  document.body.appendChild(toast);
+  setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 300); }, 8000);
+};
+
+// #155 - Prevent accidental board clear
+DarkBoardApp.prototype.confirmSelectAllDelete = function() {
+  var count = this.renderer.selectedIds.size;
+  if (count > 20 && count === this.renderer.elements.size) {
+    var self = this;
+    this.showConfirmDialog(
+      'Vous allez supprimer TOUS les ' + count + ' elements du tableau. Continuer?',
+      [
+        { label: 'Supprimer tout', className: 'confirm-danger', action: function() { self._doDeleteSelected(); } },
+        { label: 'Annuler', action: function() {} }
+      ]
+    );
+    return true;
+  }
+  return false;
+};
+
+// #156 - Connection quality indicator
+DarkBoardApp.prototype.updateConnectionQuality = function(latencyMs) {
+  var dot = document.getElementById('syncDot');
+  if (!dot) return;
+  if (latencyMs > 1000) { dot.classList.add('error'); dot.classList.remove('warning'); }
+  else if (latencyMs > 500) { dot.classList.add('warning'); dot.classList.remove('error'); }
+  else { dot.classList.remove('warning'); dot.classList.remove('error'); }
+};
+
+// #158 - Graceful degradation: offline mode
+DarkBoardApp.prototype.initOfflineMode = function() {
+  var self = this;
+  this._offlineMode = false;
+  window.addEventListener('offline', function() {
+    self._offlineMode = true;
+    self.showToast('Mode hors-ligne: modifications locales uniquement', 'error');
+    var dot = document.getElementById('syncDot');
+    if (dot) dot.classList.add('error');
+  });
+  window.addEventListener('online', function() {
+    self._offlineMode = false;
+    self.showToast('Connexion retablie', 'success');
+    var dot = document.getElementById('syncDot');
+    if (dot) dot.classList.remove('error');
+  });
+};
+
+// #159 - Board size warning
+DarkBoardApp.prototype.checkBoardSize = function() {
+  try {
+    var elements = Array.from(this.renderer.elements.values());
+    var json = JSON.stringify(elements);
+    var sizeMB = new Blob([json]).size / (1024 * 1024);
+    if (sizeMB > 10) {
+      this.showToast('Attention: le tableau fait ' + sizeMB.toFixed(1) + ' Mo. Pensez a exporter.', 'error');
+    }
+  } catch (e) { /* ignore */ }
+};
+
+// #160 - Save draft in localStorage
+DarkBoardApp.prototype.initDraftSave = function() {
+  var self = this;
+  this._draftIndicator = document.createElement('div');
+  this._draftIndicator.className = 'draft-saved-indicator';
+  this._draftIndicator.textContent = 'Brouillon sauvegarde';
+  document.body.appendChild(this._draftIndicator);
+  setInterval(function() {
+    if (self.renderer.elements.size === 0) return;
+    try {
+      var boardId = getBoardId();
+      var elements = Array.from(self.renderer.elements.values());
+      var data = JSON.stringify(elements);
+      if (data.length < 5 * 1024 * 1024) {
+        localStorage.setItem('darkboard-draft-' + boardId, data);
+        self._draftIndicator.classList.add('visible');
+        setTimeout(function() { self._draftIndicator.classList.remove('visible'); }, 1500);
+      }
+    } catch (e) { /* quota exceeded */ }
+  }, 30000);
+};
+
+// #142 - Camera persistence on zoom/pan
+DarkBoardApp.prototype.initCameraPersistence = function() {
+  var self = this;
+  var saveTimer = null;
+  var debounceSave = function() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function() { self.saveCameraState(); }, 1000);
+  };
+  var origUpdateZoom = this.updateZoomDisplay ? this.updateZoomDisplay.bind(this) : null;
+  if (origUpdateZoom) {
+    this.updateZoomDisplay = function() {
+      origUpdateZoom();
+      debounceSave();
+    };
+  }
+};
+
+// Initialize all improvement features
+DarkBoardApp.prototype.initImprovements = function() {
+  var self = this;
+  setTimeout(function() { self.initWelcomeTour(); }, 2000);
+  this.initContextualTips();
+  this.initWhatsNew();
+  this.restoreLastTool();
+  this.initCameraPersistence();
+  this.restoreCameraState();
+  this.initOfflineMode();
+  var self2 = this;
+  setInterval(function() { self2.checkBoardSize(); }, 120000);
+  this.initDraftSave();
+};
+
+// Patch the floating toolbar to add opacity slider (#150)
+(function() {
+  var origShow = DarkBoardApp.prototype._showFloatingToolbar;
+  if (origShow) {
+    DarkBoardApp.prototype._showFloatingToolbar = function() {
+      origShow.call(this);
+      this._addOpacityToFloatingToolbar();
+    };
+  }
+})();
+
+// Patch boot to initialize improvements
+(function() {
+  var origBoot = window.addEventListener;
+  // Will be called after DOMContentLoaded from the class
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+      if (window.app && typeof window.app.initImprovements === 'function') {
+        window.app.initImprovements();
+      }
+    }, 500);
+  });
+})();
