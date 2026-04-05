@@ -1,4 +1,34 @@
-// Element factory
+// #198: objects.js - Element factories, rendering functions, and hit testing for all DarkBoard element types.
+// Defines createElement and specialized create* functions, plus canvas draw routines for each type.
+
+// #178: Gradient cache to avoid recreating gradient objects every frame
+const _gradientCache = new Map();
+function _getCachedGradient(ctx, key, createFn) {
+  if (_gradientCache.has(key)) return _gradientCache.get(key);
+  const grad = createFn(ctx);
+  if (_gradientCache.size > 200) _gradientCache.clear(); // evict when too large
+  _gradientCache.set(key, grad);
+  return grad;
+}
+
+// #181: Text measurement cache to avoid expensive ctx.measureText calls on every frame
+const _textMeasureCache = new Map();
+function measureTextCached(ctx, text, font) {
+  const key = font + '||' + text;
+  if (_textMeasureCache.has(key)) return _textMeasureCache.get(key);
+  ctx.font = font;
+  const m = ctx.measureText(text);
+  if (_textMeasureCache.size > 500) _textMeasureCache.clear();
+  _textMeasureCache.set(key, m);
+  return m;
+}
+
+/**
+ * Create a new element with default properties merged with provided overrides.
+ * @param {string} type - Element type (rect, sticky, text, frame, etc.)
+ * @param {Object} props - Properties to override defaults
+ * @returns {Object} The new element object with a unique id
+ */
 function createElement(type, props) {
   const base = {
     id: generateId(),
@@ -27,6 +57,12 @@ const STICKY_COLORS = ['#FFD966', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#
 // Envelope colors
 const ENVELOPE_COLORS = ['#4a9eff', '#ff6b6b', '#4ecdc4', '#ffd966', '#96ceb4', '#ff9ff3', '#54a0ff', '#5f27cd'];
 
+/**
+ * Create a sticky note element at the given position.
+ * @param {number} x - X position in world coordinates
+ * @param {number} y - Y position in world coordinates
+ * @returns {Object} A sticky note element with random color, 200x200 size, and empty tags
+ */
 function createSticky(x, y) {
   const color = STICKY_COLORS[Math.floor(Math.random() * STICKY_COLORS.length)];
   return createElement('sticky', {
@@ -53,6 +89,15 @@ function createTextElement(x, y) {
   });
 }
 
+/**
+ * Create a frame (zone) element for grouping other elements visually.
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @param {number} [w=400] - Width
+ * @param {number} [h=300] - Height
+ * @param {string} [title='Zone'] - Frame title label
+ * @returns {Object} A frame element
+ */
 function createFrame(x, y, w, h, title) {
   return createElement('frame', {
     x, y,
@@ -83,7 +128,13 @@ function createEnvelope(x, y, w, h) {
   });
 }
 
-// Connector factory - connected arrow between two elements
+/**
+ * Create a connector (arrow/line) between two elements.
+ * @param {string} sourceId - ID of the source element
+ * @param {string} targetId - ID of the target element
+ * @param {string} [style='arrow'] - Connector style: 'arrow', 'double-arrow', 'line', 'dashed'
+ * @returns {Object} A connector element linking sourceId to targetId
+ */
 function createConnector(sourceId, targetId, style) {
   return createElement('connector', {
     sourceId: sourceId,
@@ -182,7 +233,15 @@ function createList(x, y) {
   });
 }
 
-// Mindmap node factory
+/**
+ * Create a mind map node element.
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @param {string} [text=''] - Node text
+ * @param {string|null} [parentId=null] - ID of the parent node
+ * @param {string} [color='#4a9eff'] - Node background color
+ * @returns {Object} A mindmap node with parent/children references
+ */
 function createMindmapNode(x, y, text, parentId, color) {
   return createElement('mindmap', {
     x, y,
@@ -199,7 +258,13 @@ function createMindmapNode(x, y, text, parentId, color) {
   });
 }
 
-// Embed/iframe factory
+/**
+ * Create an embed (iframe) element for embedding external URLs.
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @param {string} [url=''] - The URL to embed
+ * @returns {Object} An embed element with embedUrl property
+ */
 function createEmbed(x, y, url) {
   return createElement('embed', {
     x, y,
@@ -633,6 +698,8 @@ function renderReactionBar(ctx, el) {
 }
 
 function drawRect(ctx, el) {
+  // #188: null/NaN guard
+  if (!el || !isFinite(el.width) || !isFinite(el.height) || !isFinite(el.x) || !isFinite(el.y)) return;
   const r = el.borderRadius !== undefined ? el.borderRadius : 4;
   ctx.beginPath();
   ctx.roundRect(el.x, el.y, el.width, el.height, r);
@@ -670,6 +737,8 @@ function drawRect(ctx, el) {
 }
 
 function drawCircle(ctx, el) {
+  // #188: null/NaN guard
+  if (!el || !isFinite(el.width) || !isFinite(el.height) || !isFinite(el.x) || !isFinite(el.y)) return;
   const rx = el.width / 2;
   const ry = el.height / 2;
   ctx.beginPath();
@@ -706,6 +775,8 @@ function drawCircle(ctx, el) {
 }
 
 function drawLine(ctx, el) {
+  // #188: null/NaN guard
+  if (!el || !isFinite(el.x) || !isFinite(el.y) || !isFinite(el.x2) || !isFinite(el.y2)) return;
   ctx.beginPath();
   ctx.moveTo(el.x, el.y);
   ctx.lineTo(el.x2, el.y2);
@@ -716,6 +787,8 @@ function drawLine(ctx, el) {
 }
 
 function drawArrow(ctx, el) {
+  // #188: null/NaN guard
+  if (!el || !isFinite(el.x) || !isFinite(el.y) || !isFinite(el.x2) || !isFinite(el.y2)) return;
   const headLen = 14;
   const dx = el.x2 - el.x;
   const dy = el.y2 - el.y;
@@ -738,6 +811,8 @@ function drawArrow(ctx, el) {
 }
 
 function drawSticky(ctx, el) {
+  // #188: null/NaN guard
+  if (!el || !isFinite(el.width) || !isFinite(el.height) || !isFinite(el.x) || !isFinite(el.y)) return;
   const r = 6;
 
   // Layered shadows for realistic look
@@ -759,23 +834,38 @@ function drawSticky(ctx, el) {
 
   ctx.shadowColor = 'transparent';
 
-  // Corner fold with gradient
+  // Corner fold with gradient — #178: cache gradient objects
   const foldSize = 24;
   ctx.beginPath();
   ctx.moveTo(el.x + el.width - foldSize, el.y);
   ctx.lineTo(el.x + el.width, el.y + foldSize);
   ctx.lineTo(el.x + el.width - foldSize, el.y + foldSize);
   ctx.closePath();
-  const foldGrad = ctx.createLinearGradient(
-    el.x + el.width - foldSize, el.y,
-    el.x + el.width, el.y + foldSize
-  );
-  foldGrad.addColorStop(0, 'rgba(0,0,0,0.08)');
-  foldGrad.addColorStop(1, 'rgba(0,0,0,0.2)');
+  const foldKey = `fold:${el.x}:${el.y}:${el.width}`;
+  const foldGrad = _getCachedGradient(ctx, foldKey, (c) => {
+    const g = c.createLinearGradient(
+      el.x + el.width - foldSize, el.y,
+      el.x + el.width, el.y + foldSize
+    );
+    g.addColorStop(0, 'rgba(0,0,0,0.08)');
+    g.addColorStop(1, 'rgba(0,0,0,0.2)');
+    return g;
+  });
   ctx.fillStyle = foldGrad;
   ctx.fill();
 
-  const textContent = el.richText || el.text;
+  // #107 - Subtle gradient overlay for depth on stickies
+  const stickyGrad = ctx.createLinearGradient(el.x, el.y, el.x, el.y + el.height);
+  stickyGrad.addColorStop(0, 'rgba(255,255,255,0.06)');
+  stickyGrad.addColorStop(1, 'rgba(0,0,0,0.04)');
+  ctx.fillStyle = stickyGrad;
+  ctx.beginPath();
+  ctx.roundRect(el.x, el.y, el.width, el.height, r);
+  ctx.fill();
+
+  // #103 - Zoom-dependent detail: hide text below zoom 0.3
+  const _cameraZoom = camera ? camera.zoom : 1;
+  const textContent = (_cameraZoom >= 0.3) ? (el.richText || el.text) : null;
   if (textContent) {
     const maxW = el.width - 28;
     const maxH = el.height - 28;
@@ -818,8 +908,8 @@ function drawSticky(ctx, el) {
     }
   }
 
-  // Draw tags at the bottom
-  if (el.tags && el.tags.length > 0) {
+  // Draw tags at the bottom (#103 - hide below zoom 0.5)
+  if (el.tags && el.tags.length > 0 && _cameraZoom >= 0.5) {
     const tagH = 18;
     const tagPad = 6;
     const tagGap = 4;
@@ -900,6 +990,8 @@ function drawText(ctx, el) {
 }
 
 function drawFreehand(ctx, el) {
+  // #188: null/NaN guard
+  if (!el || !isFinite(el.x) || !isFinite(el.y)) return;
   if (!el.points || el.points.length < 2) return;
   ctx.beginPath();
   ctx.moveTo(el.points[0].x, el.points[0].y);
@@ -920,6 +1012,8 @@ function drawFreehand(ctx, el) {
 }
 
 function drawFrame(ctx, el) {
+  // #188: null/NaN guard
+  if (!el || !isFinite(el.width) || !isFinite(el.height) || !isFinite(el.x) || !isFinite(el.y)) return;
   const r = 8;
   ctx.beginPath();
   ctx.roundRect(el.x, el.y, el.width, el.height, r);
@@ -1087,6 +1181,8 @@ function drawEnvelope(ctx, el) {
 }
 
 function drawConnector(ctx, el) {
+  // #188: null/NaN guard
+  if (!el || !isFinite(el.x) || !isFinite(el.y) || !isFinite(el.x2) || !isFinite(el.y2)) return;
   if (el.x == null || el.y == null || el.x2 == null || el.y2 == null) return;
   const style = el.connectorStyle || 'arrow';
 
@@ -1161,11 +1257,10 @@ function drawConnector(ctx, el) {
     ctx.stroke();
   }
 
-  // Label at midpoint (use curve control point if available for better placement)
+  // Label at midpoint (#111 - auto-rotate to follow line angle)
   if (el.text) {
     let mx, my;
     if (el.lineType === 'curve' && el._cpx !== undefined) {
-      // For quadratic bezier, the visual midpoint is at t=0.5: Q(0.5) = avg of endpoints and cp
       mx = (el.x + 2 * el._cpx + el.x2) / 4;
       my = (el.y + 2 * el._cpy + el.y2) / 4;
     } else {
@@ -1175,17 +1270,24 @@ function drawConnector(ctx, el) {
     const fontSize = el.fontSize || 12;
     ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
     const tw = ctx.measureText(el.text).width;
-    // Background pill for label
     const padX = 6;
     const padY = 4;
+    // #111 - Calculate line angle for label rotation
+    let angle = Math.atan2(el.y2 - el.y, el.x2 - el.x);
+    if (angle > Math.PI / 2) angle -= Math.PI;
+    if (angle < -Math.PI / 2) angle += Math.PI;
+    ctx.save();
+    ctx.translate(mx, my);
+    ctx.rotate(angle);
     ctx.fillStyle = 'rgba(30,30,30,0.85)';
     ctx.beginPath();
-    ctx.roundRect(mx - tw / 2 - padX, my - fontSize / 2 - padY, tw + padX * 2, fontSize + padY * 2, 4);
+    ctx.roundRect(-tw / 2 - padX, -fontSize / 2 - padY, tw + padX * 2, fontSize + padY * 2, 4);
     ctx.fill();
     ctx.fillStyle = '#e0e0e0';
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
-    ctx.fillText(el.text, mx, my);
+    ctx.fillText(el.text, 0, 0);
+    ctx.restore();
     ctx.textAlign = 'left';
   }
 }
@@ -1298,6 +1400,8 @@ const CARD_STATUS_LABELS = {
 const CARD_PRIORITY_COLORS = { 'high': '#e94560', 'medium': '#ffd966', 'low': '#4ecdc4' };
 
 function drawCard(ctx, el) {
+  // #188: null/NaN guard
+  if (!el || !isFinite(el.width) || !isFinite(el.height) || !isFinite(el.x) || !isFinite(el.y)) return;
   const r = 8;
   const w = el.width;
   const h = el.height;
@@ -1407,10 +1511,22 @@ function drawCard(ctx, el) {
   }
 
   if (el.cardDueDate) {
-    ctx.fillStyle = '#888';
+    // #114 - Due date coloring: red if overdue, orange if today, green if future
+    let dueDateColor = '#888';
+    try {
+      const due = new Date(el.cardDueDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      due.setHours(0, 0, 0, 0);
+      const diff = due.getTime() - today.getTime();
+      if (diff < 0) dueDateColor = '#e94560'; // overdue - red
+      else if (diff === 0) dueDateColor = '#ffa500'; // today - orange
+      else dueDateColor = '#4ecdc4'; // future - green
+    } catch(e) {}
+    ctx.fillStyle = dueDateColor;
     const dueText = el.cardDueDate;
     ctx.textAlign = 'right';
-    ctx.fillText('📅 ' + dueText, el.x + w - 12, bY);
+    ctx.fillText('\u{1F4C5} ' + dueText, el.x + w - 12, bY);
     ctx.textAlign = 'left';
   }
 
@@ -1463,6 +1579,8 @@ function drawCard(ctx, el) {
 }
 
 function drawList(ctx, el) {
+  // #188: null/NaN guard
+  if (!el || !isFinite(el.width) || !isFinite(el.height) || !isFinite(el.x) || !isFinite(el.y)) return;
   const r = 8;
   const headerH = 36;
   const itemH = 30;
@@ -1500,7 +1618,25 @@ function drawList(ctx, el) {
   ctx.fillStyle = '#e0e0e0';
   ctx.font = `bold ${el.fontSize || 14}px -apple-system, BlinkMacSystemFont, sans-serif`;
   ctx.textBaseline = 'middle';
-  ctx.fillText(el.text || 'Liste', el.x + 12, el.y + headerH / 2, el.width - 24);
+  ctx.fillText(el.text || 'Liste', el.x + 12, el.y + headerH / 2, el.width - 60);
+
+  // #115 - List item count badge
+  if (items.length > 0) {
+    const badgeText = String(items.length);
+    ctx.font = 'bold 10px sans-serif';
+    const btw = ctx.measureText(badgeText).width;
+    const badgeW = Math.max(btw + 8, 18);
+    const badgeX = el.x + el.width - 12 - badgeW;
+    const badgeY = el.y + headerH / 2 - 8;
+    ctx.fillStyle = 'rgba(74,158,255,0.2)';
+    ctx.beginPath();
+    ctx.roundRect(badgeX, badgeY, badgeW, 16, 8);
+    ctx.fill();
+    ctx.fillStyle = '#4a9eff';
+    ctx.textAlign = 'center';
+    ctx.fillText(badgeText, badgeX + badgeW / 2, el.y + headerH / 2);
+    ctx.textAlign = 'left';
+  }
 
   // Checklist progress (if checkbox mode)
   if (el.checkboxMode && items.length > 0) {
@@ -1740,7 +1876,8 @@ function drawEmbed(ctx, el) {
   ctx.textAlign = 'left';
 }
 
-function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+// #108 - wrapText with optional maxHeight, returns true if text was truncated
+function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxHeight) {
   const lines = text.split('\n');
   let offsetY = 0;
   for (const line of lines) {
@@ -1794,9 +1931,15 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
         }
       }
     }
+    // #108 - Check if we exceeded maxHeight
+    if (maxHeight && offsetY + lineHeight > maxHeight) {
+      ctx.fillText(currentLine + '...', x, y + offsetY);
+      return true; // truncated
+    }
     ctx.fillText(currentLine, x, y + offsetY);
     offsetY += lineHeight;
   }
+  return false;
 }
 
 // Hit testing

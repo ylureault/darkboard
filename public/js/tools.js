@@ -1,4 +1,9 @@
-// Tool implementations
+// #198: tools.js - Tool implementations for the DarkBoard whiteboard.
+// Handles select, hand, shape creation, freehand drawing, and other interactive tools.
+
+// #183: rAF throttle state for pointermove during drag
+let _toolMoveRafPending = false;
+
 const Tools = {
   select: {
     name: 'select',
@@ -92,6 +97,23 @@ const Tools = {
       const hit = app.renderer.hitTest(worldX, worldY);
 
       if (hit) {
+        // #97 - Clicking a frame header selects all children
+        if (hit.type === 'frame' && !e.shiftKey) {
+          const fb = getElementBounds(hit);
+          const titleH = (hit.fontSize || 16) + 16;
+          if (worldY < fb.y && worldY > fb.y - titleH) {
+            app.renderer.selectedIds.clear();
+            app.renderer.selectedIds.add(hit.id);
+            const children = app.getFrameChildren(hit.id);
+            for (const child of children) {
+              app.renderer.selectedIds.add(child.id);
+            }
+            app.renderer.markDirty();
+            if (app.updateUrlHash) app.updateUrlHash();
+            return;
+          }
+        }
+
         // Check if locked
         if (hit.locked && !e.shiftKey) {
           app.renderer.selectedIds.clear();
@@ -275,7 +297,7 @@ const Tools = {
           app.hideSnapIndicator();
         }
 
-        // Compute alignment guides (Ctrl disables snap)
+        // Compute alignment guides (Ctrl disables snap) — #84 configurable threshold
         app.renderer.alignmentGuides = [];
         if (this.originalElements.size === 1 && !app.renderer.snapToGrid && !e.ctrlKey) {
           const firstOrig = this.originalElements.values().next().value;
@@ -288,7 +310,7 @@ const Tools = {
             };
             const movedCX = movedBounds.x + movedBounds.w / 2;
             const movedCY = movedBounds.y + movedBounds.h / 2;
-            const threshold = 6 / app.renderer.camera.zoom;
+            const threshold = (app.renderer.snapGuideThreshold || 10) / app.renderer.camera.zoom;
             const movingId = this.originalElements.keys().next().value;
 
             for (const [id, el] of app.renderer.elements) {
@@ -552,8 +574,22 @@ const Tools = {
     onDoubleClick(app, worldX, worldY) {
       const hit = app.renderer.hitTest(worldX, worldY);
       if (hit && (hit.type === 'sticky' || hit.type === 'text' || hit.type === 'rect' || hit.type === 'circle' || hit.type === 'frame' || hit.type === 'envelope' || hit.type === 'diamond' || hit.type === 'triangle' || hit.type === 'card' || hit.type === 'list' || hit.type === 'connector')) {
+        // #94 - Double-click on frame title to edit it
+        if (hit.type === 'frame') {
+          const fb = getElementBounds(hit);
+          const titleH = (hit.fontSize || 16) + 16;
+          if (worldY < fb.y && worldY > fb.y - titleH) {
+            app.startTextEdit(hit);
+            return;
+          }
+        }
         app.startTextEdit(hit);
       } else if (!hit) {
+        // #85 - If elements selected, zoom to fit them
+        if (app.renderer.selectedIds.size > 0) {
+          app.centerOnSelection();
+          return;
+        }
         // Double-click on empty canvas creates a sticky
         const el = createSticky(worldX - 100, worldY - 100);
         // Use cycling color instead of random
@@ -582,11 +618,18 @@ const Tools = {
     dragging: false,
     lastX: 0,
     lastY: 0,
+    // #91 - Momentum/inertia for panning
+    _velX: 0,
+    _velY: 0,
+    _momentumRaf: null,
 
     onPointerDown(app, worldX, worldY, e) {
       this.dragging = true;
       this.lastX = e.clientX;
       this.lastY = e.clientY;
+      this._velX = 0;
+      this._velY = 0;
+      if (this._momentumRaf) { cancelAnimationFrame(this._momentumRaf); this._momentumRaf = null; }
       app.renderer.canvas.style.cursor = 'grabbing';
     },
 
@@ -594,6 +637,9 @@ const Tools = {
       if (!this.dragging) return;
       const dx = e.clientX - this.lastX;
       const dy = e.clientY - this.lastY;
+      // Track velocity for momentum
+      this._velX = dx * 0.6 + this._velX * 0.4;
+      this._velY = dy * 0.6 + this._velY * 0.4;
       app.renderer.pan(dx, dy);
       this.lastX = e.clientX;
       this.lastY = e.clientY;
@@ -602,6 +648,23 @@ const Tools = {
     onPointerUp(app) {
       this.dragging = false;
       app.renderer.canvas.style.cursor = 'grab';
+      // #91 - Apply momentum/inertia
+      if (Math.abs(this._velX) > 1 || Math.abs(this._velY) > 1) {
+        const decay = 0.92;
+        const self = this;
+        const step = () => {
+          self._velX *= decay;
+          self._velY *= decay;
+          if (Math.abs(self._velX) < 0.5 && Math.abs(self._velY) < 0.5) {
+            self._momentumRaf = null;
+            return;
+          }
+          app.renderer.pan(self._velX, self._velY);
+          app.renderer.markDirty();
+          self._momentumRaf = requestAnimationFrame(step);
+        };
+        this._momentumRaf = requestAnimationFrame(step);
+      }
     },
 
     onKeyDown() {},

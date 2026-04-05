@@ -166,6 +166,22 @@ app.put('/api/board/:id', (req, res) => {
   });
 });
 
+// #181 - Health check endpoint
+app.get('/api/health', (req, res) => {
+  const uptime = process.uptime();
+  const memUsage = process.memoryUsage();
+  res.json({
+    status: 'ok',
+    uptime: Math.floor(uptime),
+    boards: boardStore.getAllBoardIds().length,
+    connections: Array.from(wss.clients).length,
+    memory: {
+      rss: Math.round(memUsage.rss / 1024 / 1024) + 'MB',
+      heap: Math.round(memUsage.heapUsed / 1024 / 1024) + 'MB'
+    }
+  });
+});
+
 // WebSocket
 wss.on('connection', (ws, req) => {
   handleWebSocket(ws, req, boardStore, wss);
@@ -177,4 +193,32 @@ startCleanup(boardStore);
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`DarkBoard running on http://localhost:${PORT}`);
+});
+
+// #182 - Graceful shutdown
+function gracefulShutdown(signal) {
+  console.log(`\n${signal} received. Shutting down gracefully...`);
+  // Save all boards
+  boardStore.saveAll();
+  // Close all WebSocket connections
+  wss.clients.forEach(client => {
+    try { client.close(1001, 'Server shutting down'); } catch (e) { /* ignore */ }
+  });
+  server.close(() => {
+    console.log('Server closed.');
+    process.exit(0);
+  });
+  // Force exit after 5s
+  setTimeout(() => process.exit(1), 5000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// #183 - Uncaught exception handler
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection:', reason);
 });

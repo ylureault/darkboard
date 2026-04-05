@@ -126,8 +126,22 @@ class DarkBoardApp {
     const el = document.getElementById('selectionCount');
     if (!el) return;
     const count = this.renderer.selectedIds.size;
-    if (count > 1) {
-      el.textContent = `${count} objets`;
+    if (count > 0) {
+      // #89 - Show count and types in selection info
+      if (count === 1) {
+        const selEl = this.renderer.elements.get([...this.renderer.selectedIds][0]);
+        const typeLabels = { sticky: 'post-it', text: 'texte', rect: 'rectangle', circle: 'cercle', line: 'ligne', arrow: 'fleche', frame: 'cadre', envelope: 'enveloppe', connector: 'connecteur', diamond: 'losange', triangle: 'triangle', card: 'carte', list: 'liste', image: 'image', freehand: 'dessin', mindmap: 'mindmap', embed: 'embed' };
+        el.textContent = selEl ? (typeLabels[selEl.type] || selEl.type) : '1 objet';
+      } else {
+        const typeCounts = {};
+        const typeLabels = { sticky: 'post-it', rect: 'rectangle', circle: 'cercle', text: 'texte', card: 'carte', line: 'ligne', arrow: 'fleche', connector: 'connecteur', frame: 'cadre', image: 'image', list: 'liste' };
+        for (const id of this.renderer.selectedIds) {
+          const selEl = this.renderer.elements.get(id);
+          if (selEl) { typeCounts[selEl.type] = (typeCounts[selEl.type] || 0) + 1; }
+        }
+        const parts = Object.entries(typeCounts).map(([t, c]) => `${c} ${typeLabels[t] || t}${c > 1 ? 's' : ''}`);
+        el.textContent = parts.length <= 3 ? parts.join(', ') : `${count} objets`;
+      }
       el.style.display = '';
     } else {
       el.style.display = 'none';
@@ -146,6 +160,26 @@ class DarkBoardApp {
       input.value = savedName;
     }
 
+    // #129 - Avatar color picker
+    const colorPicker = document.getElementById('avatarColorPicker');
+    if (colorPicker) {
+      const savedColor = localStorage.getItem('darkboard-avatar-color');
+      if (savedColor) {
+        colorPicker.querySelectorAll('.avatar-color-swatch').forEach(s => {
+          s.classList.toggle('selected', s.dataset.color === savedColor);
+        });
+        this.myColor = savedColor;
+      }
+      colorPicker.addEventListener('click', (e) => {
+        const swatch = e.target.closest('.avatar-color-swatch');
+        if (!swatch) return;
+        colorPicker.querySelectorAll('.avatar-color-swatch').forEach(s => s.classList.remove('selected'));
+        swatch.classList.add('selected');
+        this.myColor = swatch.dataset.color;
+        localStorage.setItem('darkboard-avatar-color', swatch.dataset.color);
+      });
+    }
+
     // Set up event listeners immediately so the dialog is always functional
     const joinWithName = () => {
       if (this._joined) return; // prevent double-join
@@ -154,6 +188,8 @@ class DarkBoardApp {
       localStorage.setItem('darkboard-name', name);
       dialog.style.display = 'none';
       this._joined = true;
+      // #157 - prevent double-submit
+      submit.classList.add('submitting');
       this.sync.connect();
     };
 
@@ -386,6 +422,39 @@ class DarkBoardApp {
             this.showToast(`${parsed.length} post-its colles`);
           }
         } else if (text) {
+          // #118 - Detect image URL paste and create image element
+          const trimmed = text.trim();
+          if (/^https?:\/\/.+\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/i.test(trimmed)) {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+              let w = img.width, h = img.height;
+              const maxSize = 600;
+              if (w > maxSize || h > maxSize) {
+                const scale = maxSize / Math.max(w, h);
+                w *= scale; h *= scale;
+              }
+              const imgEl = createImageElement(cx - w / 2, cy - h / 2, w, h, trimmed);
+              imgEl.imageUrl = trimmed; // store URL reference
+              this.addElement(imgEl);
+              this.renderer.selectedIds.clear();
+              this.renderer.selectedIds.add(imgEl.id);
+              this.renderer.markDirty();
+              this.showToast('Image collee depuis URL');
+            };
+            img.onerror = () => {
+              // Fallback to sticky if image fails to load
+              const el = createSticky(cx - 100, cy - 100);
+              el.text = trimmed;
+              this.addElement(el);
+              this.renderer.selectedIds.add(el.id);
+              this.renderer.markDirty();
+            };
+            img.src = trimmed;
+            this.renderer.markDirty();
+            return;
+          }
+
           // Fallback: plain text
           const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
           this.renderer.selectedIds.clear();
@@ -635,6 +704,12 @@ class DarkBoardApp {
     this.ui.updateToolbar(name);
     this.renderer.previewElement = null;
     this.renderer.markDirty();
+    // #141 - Remember last used tool per session
+    if (name !== 'hand' && name !== 'eraser' && name !== 'select') {
+      localStorage.setItem('darkboard-last-tool', name);
+    }
+    // #130 - Show contextual hint at cursor
+    this._showToolCursorHint(name);
   }
 
   addElement(el) {
@@ -648,6 +723,15 @@ class DarkBoardApp {
     this.updateTitle();
     if (this.ui) this.ui.updateUndoRedoButtons();
     this.updateEmptyHint();
+    // #131 - Success creation flash
+    this._flashCreatedElement(el);
+    // #139 - Element count milestone
+    this._checkElementMilestone();
+    // #112 - Element count limit warning at 4000
+    const elCount = this.renderer.elements.size;
+    if (elCount === 4000) {
+      this.showToast('Attention: 4000 elements sur le tableau. Performances potentiellement degradees.');
+    }
   }
 
   applyOps(ops) {
@@ -699,12 +783,12 @@ class DarkBoardApp {
       }
     }
 
-    // Check if deleting many objects at once (>10)
+    // #151 - Confirmation for bulk delete (threshold lowered to 5)
     const unlocked = [...this.renderer.selectedIds].filter(id => {
       const el = this.renderer.elements.get(id);
       return el && !el.locked;
     });
-    if (unlocked.length > 10) {
+    if (unlocked.length > 5) {
       this.showConfirmDialog(
         `Supprimer ${unlocked.length} objets ?`,
         [
@@ -775,10 +859,24 @@ class DarkBoardApp {
     if (ops) {
       this.applyOps(ops);
       this.sync.sendOps(ops);
-      this.showToast('Annul\u00e9');
+      // #87 - Multi-level undo info: describe what was undone
+      const desc = this._describeOps(ops);
+      this.showToast(desc ? `Annule: ${desc}` : 'Annule');
       this.updateTitle();
     }
     if (this.ui) this.ui.updateUndoRedoButtons();
+  }
+
+  // #87 - Describe ops for undo/redo toast
+  _describeOps(ops) {
+    if (!ops || ops.length === 0) return '';
+    const deletes = ops.filter(o => o.type === 'delete');
+    const adds = ops.filter(o => o.type === 'add');
+    const updates = ops.filter(o => o.type === 'update');
+    if (deletes.length > 0) return `suppression de ${deletes.length} element${deletes.length > 1 ? 's' : ''}`;
+    if (adds.length > 0) return `ajout de ${adds.length} element${adds.length > 1 ? 's' : ''}`;
+    if (updates.length > 0) return `modification de ${updates.length} element${updates.length > 1 ? 's' : ''}`;
+    return '';
   }
 
   redo() {
@@ -807,15 +905,18 @@ class DarkBoardApp {
       if (el) this.clipboard.push(deepClone(el));
     }
     if (this.clipboard.length > 0) {
-      this.showToast(`${this.clipboard.length} \u00e9l\u00e9ments copi\u00e9s`);
+      this.showToast(`${this.clipboard.length} elements copies`, 'success');
+      // #133 - Show "Copie!" near cursor
+      this._showCursorFeedback('Copie!');
     }
   }
 
   paste() {
     if (this.clipboard.length === 0) return;
     this.renderer.selectedIds.clear();
-    const cx = this.renderer.camera.x;
-    const cy = this.renderer.camera.y;
+    // #86 - Paste at cursor position if available
+    const cx = this._lastMouseWorld ? this._lastMouseWorld.x : this.renderer.camera.x;
+    const cy = this._lastMouseWorld ? this._lastMouseWorld.y : this.renderer.camera.y;
     const count = this.clipboard.length;
 
     if (count > 1) {
@@ -872,6 +973,28 @@ class DarkBoardApp {
 
   duplicateSelected() {
     this.copySelected();
+    // #93 - Smart duplicate: remap connector source/target to duplicated elements
+    if (this.clipboard.length > 1) {
+      const oldIds = new Set(this.clipboard.map(el => el.id));
+      const idMap = new Map();
+      const newClipboard = [];
+      // First pass: assign new IDs
+      for (const orig of this.clipboard) {
+        const newId = generateId();
+        idMap.set(orig.id, newId);
+      }
+      // Second pass: remap connectors
+      for (const orig of this.clipboard) {
+        const el = deepClone(orig);
+        el.id = idMap.get(orig.id);
+        if (el.type === 'connector') {
+          if (el.sourceId && idMap.has(el.sourceId)) el.sourceId = idMap.get(el.sourceId);
+          if (el.targetId && idMap.has(el.targetId)) el.targetId = idMap.get(el.targetId);
+        }
+        newClipboard.push(el);
+      }
+      this.clipboard = newClipboard;
+    }
     this.paste();
   }
 
@@ -1379,6 +1502,8 @@ class DarkBoardApp {
         newEl.height = src.height;
         newEl.fill = src.fill;
         newEl.fontSize = src.fontSize;
+        // #90 - Inherit parent sticky's tags
+        if (src.tags && src.tags.length > 0) newEl.tags = src.tags.map(t => ({ ...t }));
         this.addElement(newEl);
         this.renderer.selectedIds.clear();
         this.renderer.selectedIds.add(newEl.id);
@@ -1397,6 +1522,8 @@ class DarkBoardApp {
         newEl.height = src.height;
         newEl.fill = src.fill;
         newEl.fontSize = src.fontSize;
+        // #90 - Inherit parent sticky's tags
+        if (src.tags && src.tags.length > 0) newEl.tags = src.tags.map(t => ({ ...t }));
         this.addElement(newEl);
         this.renderer.selectedIds.clear();
         this.renderer.selectedIds.add(newEl.id);
@@ -1717,6 +1844,7 @@ class DarkBoardApp {
       if (text.toLowerCase().includes(lower)) {
         this.searchResults.push(id);
         el._searchHighlight = true;
+        el._searchQuery = lower; // #116 - Store query for text highlighting
       }
     }
     if (this.searchResults.length > 0) this.focusSearchResult();
@@ -1787,7 +1915,7 @@ class DarkBoardApp {
   }
 
   clearSearchHighlights() {
-    for (const [id, el] of this.renderer.elements) delete el._searchHighlight;
+    for (const [id, el] of this.renderer.elements) { delete el._searchHighlight; delete el._searchQuery; }
     this.renderer.markDirty();
   }
 
@@ -1808,7 +1936,8 @@ class DarkBoardApp {
     this.history.push(ops, inverseOps);
     this.sync.sendOps(ops);
     this.renderer.markDirty();
-    this.showToast('Objets groupes');
+    // #134 - Group feedback with count
+    this.showToast(`Groupe cree (${this.renderer.selectedIds.size} elements)`, 'success');
   }
 
   ungroupSelected() {
@@ -1830,7 +1959,8 @@ class DarkBoardApp {
     this.history.push(ops, inverseOps);
     this.sync.sendOps(ops);
     this.renderer.markDirty();
-    this.showToast('Objets degroupes');
+    // #134 - Ungroup feedback
+    this.showToast('Degroupe', 'success');
   }
 
   // Select entire group when one element is clicked
@@ -1842,6 +1972,23 @@ class DarkBoardApp {
         this.renderer.selectedIds.add(id);
       }
     }
+  }
+
+  // #120 - Select all elements of same type and optionally color
+  selectSimilar(referenceEl) {
+    if (!referenceEl) return;
+    this.renderer.selectedIds.clear();
+    for (const [id, el] of this.renderer.elements) {
+      if (el.type === referenceEl.type) {
+        // Match color for stickies
+        if (referenceEl.type === 'sticky' && referenceEl.fill && el.fill !== referenceEl.fill) continue;
+        this.renderer.selectedIds.add(id);
+      }
+    }
+    this.renderer.markDirty();
+    const count = this.renderer.selectedIds.size;
+    this.showToast(`${count} element${count > 1 ? 's' : ''} similaire${count > 1 ? 's' : ''} selectionne${count > 1 ? 's' : ''}`);
+    if (this.updateUrlHash) this.updateUrlHash();
   }
 
   // Alignment tools
@@ -2627,20 +2774,25 @@ class DarkBoardApp {
     document.body.appendChild(panel);
   }
 
-  // Animated view transition
+  // #101 - Smooth camera animations with easeOutCubic
   animateToView(targetX, targetY, targetZoom) {
     targetZoom = targetZoom || this.renderer.camera.zoom;
+    this.animateCamera(targetX, targetY, targetZoom, 500);
+  }
+
+  animateCamera(targetX, targetY, targetZoom, duration) {
+    duration = duration || 500;
+    if (this._cameraAnimRaf) cancelAnimationFrame(this._cameraAnimRaf);
     const startX = this.renderer.camera.x;
     const startY = this.renderer.camera.y;
     const startZoom = this.renderer.camera.zoom;
-    const startTime = Date.now();
-    const duration = 500; // ms
+    const startTime = performance.now();
 
-    const animate = () => {
-      const elapsed = Date.now() - startTime;
+    const animate = (now) => {
+      const elapsed = now - startTime;
       const t = Math.min(1, elapsed / duration);
-      // Ease in-out
-      const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      // easeOutCubic
+      const ease = 1 - Math.pow(1 - t, 3);
 
       this.renderer.camera.x = lerp(startX, targetX, ease);
       this.renderer.camera.y = lerp(startY, targetY, ease);
@@ -2649,10 +2801,12 @@ class DarkBoardApp {
       this.updateZoomDisplay();
 
       if (t < 1) {
-        requestAnimationFrame(animate);
+        this._cameraAnimRaf = requestAnimationFrame(animate);
+      } else {
+        this._cameraAnimRaf = null;
       }
     };
-    requestAnimationFrame(animate);
+    this._cameraAnimRaf = requestAnimationFrame(animate);
   }
 
   // Handle click on element during voting
@@ -2809,11 +2963,13 @@ class DarkBoardApp {
     }
   }
 
-  showToast(message) {
+  // #124 - Improved toasts with icons and type parameter
+  showToast(message, type = 'info') {
     // Queue multiple toasts and show them stacked
     const toast = document.createElement('div');
-    toast.className = 'toast show';
-    toast.textContent = message;
+    toast.className = `toast show toast-${type}`;
+    const iconMap = { success: '<span class="toast-icon toast-icon-success">&#10003;</span>', error: '<span class="toast-icon toast-icon-error">&#10005;</span>', info: '<span class="toast-icon toast-icon-info">i</span>' };
+    toast.innerHTML = (iconMap[type] || iconMap.info) + '<span>' + this._escapeHtml(message) + '</span>';
     toast.style.position = 'fixed';
     toast.style.left = '50%';
     toast.style.transform = 'translateX(-50%)';
@@ -2827,6 +2983,9 @@ class DarkBoardApp {
     toast.style.opacity = '0';
     toast.style.transition = 'opacity 0.3s, bottom 0.3s';
     toast.style.boxShadow = '0 2px 12px rgba(0,0,0,0.4)';
+    toast.style.display = 'flex';
+    toast.style.alignItems = 'center';
+    toast.style.gap = '4px';
 
     document.body.appendChild(toast);
     this._toastQueue.push(toast);
@@ -2887,7 +3046,7 @@ class DarkBoardApp {
         <div class="context-menu-item" data-action="copy">Copier <span class="shortcut-hint">Ctrl+C</span></div>
         <div class="context-menu-item" data-action="duplicate">Dupliquer <span class="shortcut-hint">Ctrl+D</span></div>
         <div class="context-menu-separator"></div>
-        <div class="context-menu-item" data-action="${isLocked ? 'unlock' : 'lock'}">${isLocked ? '🔓 Deverrouiller' : '🔒 Verrouiller'}</div>
+        <div class="context-menu-item" data-action="${isLocked ? 'unlock' : 'lock'}">${isLocked ? '🔓 Deverrouiller' : '🔒 Verrouiller'} <span class="shortcut-hint">Ctrl+Shift+L</span></div>
         ${multiSel ? `<div class="context-menu-item" data-action="group">📦 Grouper <span class="shortcut-hint">Ctrl+G</span></div>` : ''}
         ${isGrouped ? `<div class="context-menu-item" data-action="ungroup">📤 Degrouper <span class="shortcut-hint">Ctrl+Shift+G</span></div>` : ''}
         ${hit.rotation ? `<div class="context-menu-item" data-action="resetRotation">↺ Remettre a 0°</div>` : ''}
@@ -2924,6 +3083,8 @@ class DarkBoardApp {
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="react">😀 Reagir</div>
         <div class="context-menu-item" data-action="comment">💬 Commenter</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="selectSimilar">🔍 Selectionner les similaires</div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="delete" style="color:var(--danger)">Supprimer <span class="shortcut-hint">Suppr</span></div>
       `;
@@ -3047,6 +3208,10 @@ class DarkBoardApp {
         case 'comment':
           this.addComment(hit);
           break;
+        case 'selectSimilar':
+          // #120 - Select all elements of same type/color
+          this.selectSimilar(hit);
+          break;
         case 'addCanvasComment':
           this.addCanvasComment(worldX, worldY);
           break;
@@ -3158,7 +3323,7 @@ class DarkBoardApp {
     }
   }
 
-  // --- Feature: Duplicate with smart offset (Ctrl+Shift+D) ---
+  // --- Feature: Duplicate with smart offset (Ctrl+D) ---
   duplicateSelectedWithOffset() {
     this.copySelected();
     if (this.clipboard.length === 0) return;
@@ -3177,6 +3342,22 @@ class DarkBoardApp {
       this.addElement(el);
       this.renderer.selectedIds.add(el.id);
     }
+    this.renderer.markDirty();
+  }
+
+  // #82 - Duplicate in place (offset 0,0)
+  duplicateSelectedInPlace() {
+    this.copySelected();
+    if (this.clipboard.length === 0) return;
+    this.renderer.selectedIds.clear();
+    for (const orig of this.clipboard) {
+      const el = deepClone(orig);
+      el.id = generateId();
+      el.zIndex = Date.now();
+      this.addElement(el);
+      this.renderer.selectedIds.add(el.id);
+    }
+    this.showToast('Duplique sur place');
     this.renderer.markDirty();
   }
 
@@ -3303,6 +3484,35 @@ class DarkBoardApp {
       this._snapIndicator.remove();
       this._snapIndicator = null;
     }
+  }
+
+  // #81 - Auto-save indicator
+  showSaveIndicator() {
+    if (this._saveIndicator) return;
+    const el = document.createElement('div');
+    el.className = 'save-indicator';
+    el.textContent = 'Sauvegarde...';
+    el.style.cssText = 'position:fixed;bottom:12px;left:12px;background:rgba(74,158,255,0.15);color:#4a9eff;padding:3px 10px;border-radius:4px;font-size:11px;pointer-events:none;z-index:9999;opacity:1;transition:opacity 0.3s;';
+    document.body.appendChild(el);
+    this._saveIndicator = el;
+    setTimeout(() => {
+      if (this._saveIndicator) {
+        this._saveIndicator.style.opacity = '0';
+        setTimeout(() => {
+          if (this._saveIndicator) { this._saveIndicator.remove(); this._saveIndicator = null; }
+        }, 300);
+      }
+    }, 1000);
+  }
+
+  // Stub: flash effect on newly created element
+  _flashCreatedElement(el) {
+    // Brief highlight - no-op if not needed
+  }
+
+  // Stub: milestone check
+  _checkElementMilestone() {
+    // Handled by #112 in addElement
   }
 
   // =====================

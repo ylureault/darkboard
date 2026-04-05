@@ -175,7 +175,14 @@ class SyncClient {
         });
         this.app.updateUsersPanel();
         this.updateOnlineCount();
-        this.app.showToast(`${msg.name} a rejoint le tableau`);
+        this.app.showToast(`${msg.name} a rejoint le tableau`, 'success');
+        // #193 - Pulse animation on users panel
+        const usersPanel = document.querySelector('.users-panel');
+        if (usersPanel) {
+          usersPanel.classList.remove('new-user-pulse');
+          void usersPanel.offsetWidth; // Force reflow
+          usersPanel.classList.add('new-user-pulse');
+        }
         break;
 
       case 'user-leave':
@@ -374,6 +381,8 @@ class SyncClient {
     }
     this.ws.send(JSON.stringify(msg));
     this.showSaved();
+    // #81 - Auto-save indicator
+    if (this.app && this.app.showSaveIndicator) this.app.showSaveIndicator();
   }
 
   sendCursor(x, y) {

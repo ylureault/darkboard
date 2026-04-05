@@ -68,6 +68,12 @@ class InputHandler {
         };
         this.touchState.lastScale = 1;
         this.touchState.lastTime = Date.now();
+        // #98 - Track initial angle for rotation
+        this.touchState._startAngle = Math.atan2(
+          e.touches[1].clientY - e.touches[0].clientY,
+          e.touches[1].clientX - e.touches[0].clientX
+        );
+        this.touchState._totalRotation = 0;
         this.pinchVelocity = 0;
       }
 
@@ -129,6 +135,15 @@ class InputHandler {
           this.touchState.lastTime = now;
 
           this.app.updateZoomDisplay();
+
+          // #98 - Track rotation angle
+          const currentAngle = Math.atan2(
+            e.touches[1].clientY - e.touches[0].clientY,
+            e.touches[1].clientX - e.touches[0].clientX
+          );
+          if (this.touchState._startAngle !== undefined) {
+            this.touchState._totalRotation = (currentAngle - this.touchState._startAngle) * 180 / Math.PI;
+          }
         }
 
         this.touchState.dist = d;
@@ -136,6 +151,7 @@ class InputHandler {
       }
     }, { passive: false });
 
+    // #98 - Track touch rotation angle for pinch-to-rotate
     canvas.addEventListener('touchend', (e) => {
       // Apply pinch momentum when releasing a two-finger gesture
       if (e.touches.length < 2 && Math.abs(this.pinchVelocity) > 0.001) {
@@ -144,6 +160,17 @@ class InputHandler {
           this.applyPinchMomentum(this.pinchVelocity, center.x, center.y);
         }
       }
+      // #98 - Apply rotation if significant angle change detected during pinch
+      if (e.touches.length < 2 && this.touchState._totalRotation &&
+          Math.abs(this.touchState._totalRotation) > 15 && this.app.renderer.selectedIds.size > 0) {
+        const angle = Math.round(this.touchState._totalRotation / 15) * 15;
+        for (const id of this.app.renderer.selectedIds) {
+          const el = this.app.renderer.elements.get(id);
+          if (el && !el.locked) el.rotation = (el.rotation || 0) + angle;
+        }
+        this.app.renderer.markDirty();
+      }
+      this.touchState._totalRotation = 0;
     }, { passive: true });
   }
 
@@ -208,8 +235,10 @@ class InputHandler {
   }
 
   onPointerMove(e) {
-    // Send cursor position
+    // Send cursor position and track last mouse position (#86, #109)
     const world = this.getWorldPos(e);
+    this.app._lastMouseWorld = { x: world.x, y: world.y };
+    this.app.renderer._lastMouseScreen = { x: e.clientX, y: e.clientY };
     this.app.sync.sendCursor(world.x, world.y);
 
     if (this.isPanning) {
@@ -370,8 +399,17 @@ class InputHandler {
       if (e.key === 'v' && !e.shiftKey) { e.preventDefault(); this.app.paste(); return; }
       if (e.key === 'g' && e.shiftKey) { e.preventDefault(); this.app.ungroupSelected(); return; }
       if (e.key === 'g') { e.preventDefault(); this.app.groupSelected(); return; }
-      if (e.key === 'd' && e.shiftKey) { e.preventDefault(); this.app.duplicateSelectedWithOffset(); return; }
+      // #82 - Ctrl+Shift+D = duplicate in place (offset 0,0)
+      if (e.key === 'd' && e.shiftKey) { e.preventDefault(); this.app.duplicateSelectedInPlace(); return; }
       if (e.key === 'd') { e.preventDefault(); this.app.duplicateSelected(); return; }
+
+      // #88 - Ctrl+Shift+L: lock/unlock selected elements
+      if (e.key === 'l' && e.shiftKey) { e.preventDefault(); this.app.toggleLockSelected(); return; }
+      if (e.key === 'L' && e.shiftKey) { e.preventDefault(); this.app.toggleLockSelected(); return; }
+
+      // #96 - Ctrl+Shift+A: deselect all
+      if (e.key === 'a' && e.shiftKey) { e.preventDefault(); this.app.renderer.selectedIds.clear(); this.app.renderer.markDirty(); return; }
+      if (e.key === 'A' && e.shiftKey) { e.preventDefault(); this.app.renderer.selectedIds.clear(); this.app.renderer.markDirty(); return; }
 
       // Ctrl+F: Search & replace
       if (e.key === 'f') {

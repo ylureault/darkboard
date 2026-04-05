@@ -17,8 +17,26 @@ class CanvasRenderer {
     this.laserPointers = new Map(); // userId -> {x, y, color}
     this.comments = []; // anchored comments
     this.alignmentGuides = []; // { type: 'h'|'v', x?, y? }
-    this._lastMinimapRender = 0; // throttle minimap to every 500ms
+    this.snapGuideThreshold = 10; // #84 - configurable snap guide threshold (px)
+    this._lastMinimapRender = 0; // throttle minimap to every 1000ms
     this._minimapCache = null;
+    this._elementRenderCache = new Map(); // #177: bitmap cache for complex elements
+    this._spatialGrid = new Map(); // #182: spatial index grid for viewport culling
+    this._spatialGridCellSize = 500; // world units per grid cell
+    this._spatialGridDirty = true;
+
+    // #165 - Text measurement cache for performance
+    this._textMeasureCache = new Map();
+    this._textMeasureCacheMax = 500;
+
+    // #167 - Frame rate monitoring
+    this._frameCount = 0;
+    this._lastFPSTime = performance.now();
+    this._currentFPS = 60;
+
+    // #170 - Batch element sorting cache
+    this._sortedCache = null;
+    this._sortedCacheDirty = true;
 
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -69,11 +87,99 @@ class CanvasRenderer {
 
   markDirty() {
     this.dirty = true;
+    this._sortedCacheDirty = true;
+    this._spatialGridDirty = true; // #182
+  }
+
+  // #182: Rebuild spatial grid index for fast viewport culling on large boards
+  rebuildSpatialGrid() {
+    if (!this._spatialGridDirty) return;
+    this._spatialGrid.clear();
+    const cs = this._spatialGridCellSize;
+    for (const [id, el] of this.elements) {
+      const bounds = getElementBounds(el);
+      const minCX = Math.floor(bounds.x / cs);
+      const minCY = Math.floor(bounds.y / cs);
+      const maxCX = Math.floor((bounds.x + bounds.w) / cs);
+      const maxCY = Math.floor((bounds.y + bounds.h) / cs);
+      for (let cx = minCX; cx <= maxCX; cx++) {
+        for (let cy = minCY; cy <= maxCY; cy++) {
+          const key = cx + ',' + cy;
+          if (!this._spatialGrid.has(key)) this._spatialGrid.set(key, []);
+          this._spatialGrid.get(key).push(id);
+        }
+      }
+    }
+    this._spatialGridDirty = false;
+  }
+
+  // #182: Get elements visible in a world-space rectangle using spatial grid
+  getVisibleElementIds(left, top, right, bottom) {
+    const cs = this._spatialGridCellSize;
+    const minCX = Math.floor(left / cs);
+    const minCY = Math.floor(top / cs);
+    const maxCX = Math.floor(right / cs);
+    const maxCY = Math.floor(bottom / cs);
+    const visible = new Set();
+    for (let cx = minCX; cx <= maxCX; cx++) {
+      for (let cy = minCY; cy <= maxCY; cy++) {
+        const key = cx + ',' + cy;
+        const ids = this._spatialGrid.get(key);
+        if (ids) {
+          for (const id of ids) visible.add(id);
+        }
+      }
+    }
+    return visible;
+  }
+
+  // #165 - Cached text measurement to avoid expensive ctx.measureText calls
+  measureTextCached(ctx, text, font) {
+    const key = font + '|' + text;
+    if (this._textMeasureCache.has(key)) return this._textMeasureCache.get(key);
+    ctx.font = font;
+    const m = ctx.measureText(text);
+    if (this._textMeasureCache.size >= this._textMeasureCacheMax) {
+      // Evict oldest entries (first 100)
+      const keys = this._textMeasureCache.keys();
+      for (let i = 0; i < 100; i++) keys.next();
+      // Simple strategy: clear all
+      this._textMeasureCache.clear();
+    }
+    this._textMeasureCache.set(key, m);
+    return m;
+  }
+
+  // #170 - Sorted elements cache
+  getSortedElements() {
+    if (!this._sortedCacheDirty && this._sortedCache) return this._sortedCache;
+    this._sortedCache = Array.from(this.elements.values())
+      .sort((a, b) => {
+        // #113 - Selected elements get temporary z-boost during rendering
+        const aZ = (a.zIndex || 0) + (this.selectedIds.has(a.id) ? 999999 : 0);
+        const bZ = (b.zIndex || 0) + (this.selectedIds.has(b.id) ? 999999 : 0);
+        return aZ - bZ;
+      });
+    this._sortedCacheDirty = false;
+    return this._sortedCache;
   }
 
   startRenderLoop() {
-    const loop = () => {
-      if (this.dirty) {
+    this._lastFrameTime = 0; // #176: rAF throttling
+    this._lastCursorRender = 0; // #184: lazy render cursors at 30fps
+    const loop = (timestamp) => {
+      // #167 - FPS tracking
+      this._frameCount++;
+      const now = performance.now();
+      if (now - this._lastFPSTime >= 1000) {
+        this._currentFPS = this._frameCount;
+        this._frameCount = 0;
+        this._lastFPSTime = now;
+      }
+
+      // #176: Skip frame if less than ~16.67ms (60fps cap) since last render
+      if (this.dirty && (timestamp - this._lastFrameTime >= 16)) {
+        this._lastFrameTime = timestamp;
         this.render();
         this.dirty = false;
       }
@@ -99,15 +205,39 @@ class CanvasRenderer {
       this.drawGrid(ctx, w, h);
     }
 
+    // #105 - Ruler markings at screen edges
+    if (this.gridEnabled && this.camera.zoom >= 0.3) {
+      const rulerInterval = 200; // world units
+      const viewTL2 = this.screenToWorld(0, 0);
+      const viewBR2 = this.screenToWorld(w, h);
+      const rStartX = Math.floor(viewTL2.x / rulerInterval) * rulerInterval;
+      const rStartY = Math.floor(viewTL2.y / rulerInterval) * rulerInterval;
+      ctx.save();
+      ctx.fillStyle = 'rgba(255,255,255,0.2)';
+      ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.textBaseline = 'top';
+      for (let rx = rStartX; rx <= viewBR2.x; rx += rulerInterval) {
+        const s = this.worldToScreen(rx, 0);
+        ctx.textAlign = 'center';
+        ctx.fillText(String(Math.round(rx)), s.x, 2);
+      }
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      for (let ry = rStartY; ry <= viewBR2.y; ry += rulerInterval) {
+        const s = this.worldToScreen(0, ry);
+        ctx.fillText(String(Math.round(ry)), 30, s.y);
+      }
+      ctx.restore();
+    }
+
     // Apply camera transform
     ctx.save();
     ctx.translate(w / 2, h / 2);
     ctx.scale(this.camera.zoom, this.camera.zoom);
     ctx.translate(-this.camera.x, -this.camera.y);
 
-    // Render elements sorted by zIndex
-    const sorted = Array.from(this.elements.values())
-      .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+    // Render elements sorted by zIndex (using cache for perf #170)
+    const sorted = this.getSortedElements();
 
     // Viewport culling: compute visible world bounds to skip off-screen elements
     const viewTLCull = this.screenToWorld(0, 0);
@@ -179,7 +309,7 @@ class CanvasRenderer {
         continue;
       }
 
-      // Search highlight glow
+      // Search highlight glow (#116 - also highlight matching text)
       if (el._searchHighlight) {
         ctx.save();
         ctx.shadowColor = '#4a9eff';
@@ -188,6 +318,23 @@ class CanvasRenderer {
         ctx.lineWidth = 3 / this.camera.zoom;
         ctx.strokeRect(elBounds.x - 4, elBounds.y - 4, elBounds.w + 8, elBounds.h + 8);
         ctx.restore();
+        if (el._searchQuery && el.text) {
+          const query = el._searchQuery;
+          const textLower = el.text.toLowerCase();
+          const idx = textLower.indexOf(query);
+          if (idx >= 0) {
+            ctx.save();
+            const fs = el.fontSize || 16;
+            ctx.font = `${fs}px -apple-system, BlinkMacSystemFont, sans-serif`;
+            const beforeW = ctx.measureText(el.text.substring(0, idx)).width;
+            const matchW = ctx.measureText(el.text.substring(idx, idx + query.length)).width;
+            const textX = el.type === 'sticky' ? elBounds.x + 14 : elBounds.x + 8;
+            const textY = el.type === 'sticky' ? elBounds.y + 14 : elBounds.y + 8;
+            ctx.fillStyle = 'rgba(74, 158, 255, 0.3)';
+            ctx.fillRect(textX + beforeW, textY, matchW, fs * 1.4);
+            ctx.restore();
+          }
+        }
       }
       renderElement(ctx, el, this.selectedIds.has(el.id), this.camera);
       if (el.reactions && el.reactions.length > 0) {
@@ -247,15 +394,24 @@ class CanvasRenderer {
       if (el) this.drawSelectionBox(ctx, el);
     }
 
-    // Selection marquee
+    // Selection marquee (#92 - improved with animated dash and corner radius)
     if (this.selectionBox) {
+      const dashLen = 6 / this.camera.zoom;
+      const gapLen = 4 / this.camera.zoom;
+      const animOffset = ((performance.now() / 50) % (dashLen + gapLen)) / this.camera.zoom;
       ctx.strokeStyle = '#4a9eff';
-      ctx.lineWidth = 1 / this.camera.zoom;
-      ctx.setLineDash([6 / this.camera.zoom, 4 / this.camera.zoom]);
-      ctx.strokeRect(this.selectionBox.x, this.selectionBox.y, this.selectionBox.w, this.selectionBox.h);
-      ctx.fillStyle = 'rgba(74, 158, 255, 0.08)';
-      ctx.fillRect(this.selectionBox.x, this.selectionBox.y, this.selectionBox.w, this.selectionBox.h);
+      ctx.lineWidth = 1.5 / this.camera.zoom;
+      ctx.setLineDash([dashLen, gapLen]);
+      ctx.lineDashOffset = animOffset;
+      const mr = 3 / this.camera.zoom;
+      ctx.beginPath();
+      ctx.roundRect(this.selectionBox.x, this.selectionBox.y, this.selectionBox.w, this.selectionBox.h, mr);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(74, 158, 255, 0.1)';
+      ctx.fill();
       ctx.setLineDash([]);
+      ctx.lineDashOffset = 0;
+      this.dirty = true; // Keep animating while marquee is active
     }
 
     // Connector snap target highlight
@@ -295,7 +451,7 @@ class CanvasRenderer {
       this.drawCommentBubble(ctx, comment);
     }
 
-    // Alignment guides
+    // Alignment guides (#110 - with distance labels)
     if (this.alignmentGuides.length > 0) {
       ctx.save();
       ctx.strokeStyle = '#ff6b9d';
@@ -313,6 +469,21 @@ class CanvasRenderer {
           ctx.lineTo(guide.x, viewBR.y);
         }
         ctx.stroke();
+        // #110 - Show coordinate label on guide
+        const labelFs = 10 / this.camera.zoom;
+        ctx.font = `${labelFs}px sans-serif`;
+        ctx.fillStyle = '#ff6b9d';
+        ctx.setLineDash([]);
+        if (guide.type === 'h') {
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(Math.round(guide.y) + 'px', viewTL.x + 8 / this.camera.zoom, guide.y - 2 / this.camera.zoom);
+        } else {
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          ctx.fillText(Math.round(guide.x) + 'px', guide.x + 2 / this.camera.zoom, viewTL.y + 8 / this.camera.zoom);
+        }
+        ctx.setLineDash([6 / this.camera.zoom, 4 / this.camera.zoom]);
       }
       ctx.setLineDash([]);
       ctx.restore();
@@ -342,17 +513,40 @@ class CanvasRenderer {
       ctx.fillText(label, dim.x, by + bh / 2);
     }
 
-    // Remote cursors
-    for (const [userId, user] of this.remoteUsers) {
-      this.drawRemoteCursor(ctx, user);
+    // Remote cursors — #184: only update at 30fps max
+    const cursorNow = performance.now();
+    if (cursorNow - this._lastCursorRender >= 33) {
+      this._lastCursorRender = cursorNow;
+      this._cachedCursorData = [];
+      for (const [userId, user] of this.remoteUsers) {
+        this._cachedCursorData.push(user);
+      }
+    }
+    if (this._cachedCursorData) {
+      for (const user of this._cachedCursorData) {
+        this.drawRemoteCursor(ctx, user);
+      }
     }
 
     ctx.restore();
 
-    // Minimap (rendered in screen space, after ctx.restore) — throttled to every 500ms
+    // #109 - Cursor coordinate display at bottom of screen
+    if (this._lastMouseScreen) {
+      const world = this.screenToWorld(this._lastMouseScreen.x, this._lastMouseScreen.y);
+      const coordText = `${Math.round(world.x)}, ${Math.round(world.y)}`;
+      ctx.save();
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.textBaseline = 'bottom';
+      ctx.textAlign = 'right';
+      ctx.fillText(coordText, w - 200, h - 8);
+      ctx.restore();
+    }
+
+    // Minimap (rendered in screen space, after ctx.restore) — #179: throttled to every 1000ms
     if (this.minimapEnabled) {
       const now = performance.now();
-      if (now - this._lastMinimapRender >= 500) {
+      if (now - this._lastMinimapRender >= 1000) {
         this._lastMinimapRender = now;
         this.drawMinimap();
       } else if (this._minimapCache) {
@@ -395,17 +589,41 @@ class CanvasRenderer {
         }
       }
     } else {
-      // Line grid (default)
-      ctx.strokeStyle = this.gridColor || 'rgba(255, 255, 255, 0.04)';
+      // #104 - Line grid with major/minor lines
+      const minorColor = this.gridColor || 'rgba(255, 255, 255, 0.04)';
+      const majorColor = this.gridColor ? this.gridColor : 'rgba(255, 255, 255, 0.08)';
+      const majorInterval = gridSize * 5; // Major every 5 minor lines (e.g. 100px if gridSize=20)
+
+      // Minor grid lines
+      ctx.strokeStyle = minorColor;
       ctx.lineWidth = 1;
       ctx.beginPath();
-
       for (let x = startX; x <= endWorld.x; x += gridSize) {
+        if (Math.abs(x % majorInterval) < 0.1) continue; // skip major positions
         const s = this.worldToScreen(x, 0);
         ctx.moveTo(s.x, 0);
         ctx.lineTo(s.x, h);
       }
       for (let y = startY; y <= endWorld.y; y += gridSize) {
+        if (Math.abs(y % majorInterval) < 0.1) continue;
+        const s = this.worldToScreen(0, y);
+        ctx.moveTo(0, s.y);
+        ctx.lineTo(w, s.y);
+      }
+      ctx.stroke();
+
+      // Major grid lines
+      const majorStartX = Math.floor(startWorld.x / majorInterval) * majorInterval;
+      const majorStartY = Math.floor(startWorld.y / majorInterval) * majorInterval;
+      ctx.strokeStyle = majorColor;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x = majorStartX; x <= endWorld.x; x += majorInterval) {
+        const s = this.worldToScreen(x, 0);
+        ctx.moveTo(s.x, 0);
+        ctx.lineTo(s.x, h);
+      }
+      for (let y = majorStartY; y <= endWorld.y; y += majorInterval) {
         const s = this.worldToScreen(0, y);
         ctx.moveTo(0, s.y);
         ctx.lineTo(w, s.y);
@@ -417,16 +635,25 @@ class CanvasRenderer {
   drawSelectionBox(ctx, el) {
     const bounds = getElementBounds(el);
     const pad = 6 / this.camera.zoom;
-    const handleSize = 8 / this.camera.zoom;
+    const handleSize = 10 / this.camera.zoom; // #106 - larger handles
 
-    // Dashed border
+    // #106 - Dashed border with corner radius and gradient fill
+    const selR = 4 / this.camera.zoom;
     ctx.strokeStyle = '#4a9eff';
     ctx.lineWidth = 2 / this.camera.zoom;
     ctx.setLineDash([6 / this.camera.zoom, 4 / this.camera.zoom]);
-    ctx.strokeRect(bounds.x - pad, bounds.y - pad, bounds.w + pad * 2, bounds.h + pad * 2);
+    ctx.beginPath();
+    ctx.roundRect(bounds.x - pad, bounds.y - pad, bounds.w + pad * 2, bounds.h + pad * 2, selR);
+    ctx.stroke();
+    // Subtle gradient fill
+    const selGrad = ctx.createLinearGradient(bounds.x, bounds.y, bounds.x, bounds.y + bounds.h);
+    selGrad.addColorStop(0, 'rgba(74, 158, 255, 0.04)');
+    selGrad.addColorStop(1, 'rgba(74, 158, 255, 0.01)');
+    ctx.fillStyle = selGrad;
+    ctx.fill();
     ctx.setLineDash([]);
 
-    // Corner resize handles (squares)
+    // #106 - Corner resize handles (circular, larger)
     const corners = [
       { x: bounds.x, y: bounds.y },
       { x: bounds.x + bounds.w, y: bounds.y },
@@ -767,10 +994,12 @@ class CanvasRenderer {
 
   // Hit test: find element under point
   hitTest(worldX, worldY) {
-    const sorted = Array.from(this.elements.values())
-      .sort((a, b) => (b.zIndex || 0) - (a.zIndex || 0));
+    // Use cached sort (reversed for top-first hit testing)
+    const sorted = this.getSortedElements();
+    const reversed = [];
+    for (let i = sorted.length - 1; i >= 0; i--) reversed.push(sorted[i]);
     const threshold = 8 / this.camera.zoom;
-    for (const el of sorted) {
+    for (const el of reversed) {
       if (hitTestElement(el, worldX, worldY, threshold)) {
         return el;
       }
