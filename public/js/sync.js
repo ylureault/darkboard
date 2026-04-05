@@ -364,30 +364,80 @@ class SyncClient {
 
   send(msg) {
     if (!this.connected || !this.ws) {
-      // Queue operation messages while offline
-      if (msg.type === 'op') {
-        this.offlineQueue.push(msg);
-      }
+      // #187: Queue all messages while offline for retry on reconnection
+      this.offlineQueue.push(msg);
       return;
     }
-    this.ws.send(JSON.stringify(msg));
+    // #195: Warn if message is too large
+    const data = JSON.stringify(msg);
+    if (data.length > this._maxMessageSize) {
+      console.warn('SyncClient: message exceeds 500KB (' + Math.round(data.length / 1024) + 'KB). Consider reducing payload.');
+    }
+    try {
+      this.ws.send(data);
+    } catch (e) {
+      console.error('SyncClient: send failed, queueing message', e);
+      this.offlineQueue.push(msg);
+    }
   }
 
   sendOps(ops) {
+    // #185: Merge consecutive updates to same element before sending
+    const compressedOps = this.compressOps(ops);
     const msg = {
       type: 'op',
       boardId: getBoardId(),
-      ops
+      ops: compressedOps
     };
     if (!this.connected || !this.ws) {
       this.offlineQueue.push(msg);
       this.updateSyncIndicator('offline', 'Hors ligne (' + this.offlineQueue.length + ' en attente)');
       return;
     }
-    this.ws.send(JSON.stringify(msg));
+    // #195: Warn if message is too large
+    const data = JSON.stringify(msg);
+    if (data.length > this._maxMessageSize) {
+      console.warn('SyncClient: ops message exceeds 500KB (' + Math.round(data.length / 1024) + 'KB)');
+    }
+    try {
+      this.ws.send(data);
+    } catch (e) {
+      console.error('SyncClient: sendOps failed, queueing', e);
+      this.offlineQueue.push(msg);
+      return;
+    }
     this.showSaved();
     // #81 - Auto-save indicator
     if (this.app && this.app.showSaveIndicator) this.app.showSaveIndicator();
+  }
+
+  // #180: Batch rapid operations (e.g., during drag) and send in batches every 50ms
+  sendOpsBatched(ops) {
+    this._opBatchQueue.push(...ops);
+    if (!this._opBatchTimer) {
+      this._opBatchTimer = setTimeout(() => {
+        if (this._opBatchQueue.length > 0) {
+          this.sendOps(this._opBatchQueue.slice());
+          this._opBatchQueue = [];
+        }
+        this._opBatchTimer = null;
+      }, 50);
+    }
+  }
+
+  // #185: Simple delta encoding — merge consecutive updates to the same element
+  compressOps(ops) {
+    if (!ops || ops.length < 2) return ops;
+    const merged = [];
+    for (const op of ops) {
+      const last = merged[merged.length - 1];
+      if (last && last.type === 'update' && op.type === 'update' && last.elementId === op.elementId) {
+        Object.assign(last.props, op.props);
+      } else {
+        merged.push({ ...op, props: op.props ? { ...op.props } : undefined });
+      }
+    }
+    return merged;
   }
 
   sendCursor(x, y) {

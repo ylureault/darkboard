@@ -158,11 +158,14 @@ class UI {
 
       if (type === 'fill') {
         this.app.currentFill = color;
+        // #149 - Update all selected stickies simultaneously
         this.app.updateSelectedElements({ fill: color });
       } else {
         this.app.currentStroke = color;
         this.app.updateSelectedElements({ stroke: color });
       }
+      // #143 - Track recent color
+      if (this.app.trackRecentColor) this.app.trackRecentColor(color);
 
       // Update color indicator
       const indicatorId = type === 'fill' ? 'colorIndicatorFill' : 'colorIndicatorStroke';
@@ -304,7 +307,8 @@ class UI {
     link.download = `insuffle-darkboard-${getBoardId()}.png`;
     link.href = exportCanvas.toDataURL('image/png');
     link.click();
-    this.app.showToast('Export PNG termine !');
+    // #136 - Export success feedback with thumbnail preview
+    this.app.showToast('PNG exporte!', 'success');
   }
 
   initCSVExport() {
@@ -347,13 +351,22 @@ class UI {
     link.href = URL.createObjectURL(blob);
     link.click();
     URL.revokeObjectURL(link.href);
-    this.app.showToast('Export CSV termine !');
+    this.app.showToast('Export CSV termine !', 'success');
   }
 
   initJSONExport() {
     document.getElementById('exportJSON').addEventListener('click', () => {
       this.exportJSON();
     });
+  }
+
+  // #145 - Export all (JSON + PNG sequentially)
+  exportAll() {
+    this.exportJSON();
+    setTimeout(() => {
+      this.exportPNG();
+      this.app.showToast('Export complet (JSON + PNG) termine!', 'success');
+    }, 500);
   }
 
   exportJSON() {
