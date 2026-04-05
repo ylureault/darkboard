@@ -393,11 +393,12 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
   background: var(--btn-hover);
 }
 
+/* #R2-87 gradient fade divider */
 .bb-sep {
   width: 1px;
   height: 20px;
-  background: var(--panel-border);
-  margin: 0 4px;
+  background: linear-gradient(to bottom, transparent, var(--panel-border), transparent);
+  margin: 0 var(--sp-1);
   flex-shrink: 0;
 }
 
@@ -833,19 +834,20 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
 /* =========================
    USERS PANEL
    ========================= */
+/* #R2-72 #R2-74 consistent panel padding and radius */
 .users-panel {
   position: fixed;
   top: 12px;
   left: 12px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-2);
   background: var(--panel);
   border: 1px solid var(--panel-border);
-  border-radius: 10px;
-  padding: 6px 12px;
+  border-radius: var(--radius-lg);
+  padding: var(--sp-2) var(--sp-3);
   z-index: 100;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  box-shadow: var(--elevation-3); /* #R2-69 */
   cursor: pointer;
 }
 
@@ -1254,19 +1256,23 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
 /* =========================
    ANCHORS PANEL
    ========================= */
+/* #R2-61 #R2-74 panel gradient + consistent radius */
 .anchors-panel {
   position: fixed;
   top: 68px;
   right: 12px;
   width: 240px;
-  background: var(--panel);
+  background: linear-gradient(180deg, var(--panel) 0%, rgba(30,30,30,0.98) 100%);
   border: 1px solid var(--panel-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   z-index: 100;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  box-shadow: var(--elevation-3); /* #R2-69 */
   max-height: calc(100vh - 140px);
   display: flex;
   flex-direction: column;
+}
+body.light-theme .anchors-panel {
+  background: linear-gradient(180deg, var(--panel) 0%, #f8f7f5 100%);
 }
 
 .anchors-header {
@@ -1651,6 +1657,7 @@ body.light-theme .context-menu {
 /* =========================
    VOTE BADGE ON STICKIES
    ========================= */
+/* #R2-86 pill badge with subtle shadow */
 .vote-badge {
   position: absolute;
   top: -8px;
@@ -1658,14 +1665,15 @@ body.light-theme .context-menu {
   min-width: 24px;
   height: 24px;
   background: var(--accent);
-  border-radius: 12px;
+  border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 12px;
   font-weight: 700;
   color: white;
-  padding: 0 6px;
+  padding: 0 8px;
+  box-shadow: var(--elevation-2);
 }
 
 /* =========================
@@ -2135,11 +2143,29 @@ body.light-theme .context-menu {
 .kanban-card:hover .kanban-card-goto { display: block; }
 
 /* Light theme overrides for views */
-body.light-theme .view-overlay { background: #f5f5f5; }
-body.light-theme .view-header { background: rgba(255,255,255,0.8); }
-body.light-theme .view-table thead th { background: rgba(255,255,255,0.95); }
-body.light-theme .kanban-column { background: rgba(0,0,0,0.03); }
-body.light-theme .kanban-card { background: white; }
+body.light-theme .view-overlay { background: #f5f4f2; /* #R2-66 warm */ }
+body.light-theme .view-header { background: rgba(255,255,254,0.85); }
+body.light-theme .view-table thead th { background: rgba(255,255,254,0.95); }
+body.light-theme .kanban-column { background: rgba(0,0,0,0.025); border-color: var(--panel-border); }
+/* #R2-93 light theme kanban card styling */
+body.light-theme .kanban-card {
+  background: #fffffe;
+  border-color: rgba(0,0,0,0.08);
+  box-shadow: var(--elevation-1);
+}
+body.light-theme .kanban-card:hover {
+  box-shadow: var(--elevation-2);
+}
+/* #R2-94 light theme tag pill contrast */
+body.light-theme .tag-pill {
+  border: 1px solid rgba(0,0,0,0.08);
+}
+body.light-theme .kanban-card-tag {
+  border: 1px solid rgba(0,0,0,0.06);
+}
+body.light-theme .view-table .tag-mini {
+  border: 1px solid rgba(0,0,0,0.06);
+}
 
 /* =========================
    TAG EDITOR PANEL
@@ -2334,18 +2360,22 @@ body.light-theme .kanban-card { background: white; }
 /* =========================
    CARD EDITOR PANEL
    ========================= */
+/* #R2-61 #R2-74 #R2-80 panel polish */
 .card-editor-panel {
   position: fixed;
   top: 80px;
   right: 16px;
   width: 320px;
   max-height: calc(100vh - 100px);
-  background: var(--panel);
+  background: linear-gradient(180deg, var(--panel) 0%, rgba(30,30,30,0.98) 100%);
   border: 1px solid var(--panel-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   z-index: 300;
   overflow-y: auto;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  box-shadow: var(--elevation-3);
+}
+body.light-theme .card-editor-panel {
+  background: linear-gradient(180deg, var(--panel) 0%, #f8f7f5 100%);
 }
 
 .card-editor-header {
@@ -2552,10 +2582,11 @@ body.light-theme .kanban-card { background: white; }
   color: white;
 }
 
+/* #R2-87 gradient fade divider */
 .fmt-sep {
   width: 1px;
   height: 24px;
-  background: var(--panel-border);
+  background: linear-gradient(to bottom, transparent, var(--panel-border), transparent);
   margin: 0 3px;
   flex-shrink: 0;
 }
@@ -2607,20 +2638,24 @@ body.light-theme .kanban-card { background: white; }
 /* =========================
    SEARCH & REPLACE PANEL
    ========================= */
+/* #R2-61 panel gradient background */
 .search-panel {
   position: fixed;
   top: 68px;
   right: 12px;
-  background: var(--panel);
+  background: linear-gradient(180deg, var(--panel) 0%, rgba(30,30,30,0.98) 100%);
   border: 1px solid var(--panel-border);
-  border-radius: 12px;
-  padding: 12px 14px;
+  border-radius: var(--radius-lg); /* #R2-74 */
+  padding: var(--sp-3) var(--sp-4); /* #R2-72 */
   z-index: 200;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  box-shadow: var(--elevation-3); /* #R2-69 */
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--sp-2);
   min-width: 300px;
+}
+body.light-theme .search-panel {
+  background: linear-gradient(180deg, var(--panel) 0%, #f8f7f5 100%);
 }
 
 .search-panel .search-row {
@@ -2685,9 +2720,10 @@ body.light-theme .kanban-card { background: white; }
   border-color: var(--accent);
 }
 
+/* #R2-87 gradient fade divider */
 .search-sep {
   height: 1px;
-  background: var(--panel-border);
+  background: linear-gradient(to right, transparent, var(--panel-border), transparent);
 }
 
 .search-close {
@@ -2907,13 +2943,7 @@ button, .tool-btn, .share-btn, .zoom-btn, .pres-btn {
   background: rgba(255, 255, 255, 0.25);
 }
 
-body.light-theme ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
-}
-
-body.light-theme ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
-}
+/* scrollbar light overrides - see #R2-98 at end of file */
 
 /* Thin scrollbar for Firefox */
 .anchors-list,
@@ -3508,10 +3538,11 @@ body.light-theme .mention-dropdown {
 /* =========================
    WORKSHOP: FACILITATOR SEPARATOR
    ========================= */
+/* #R2-87 gradient fade divider */
 .fctl-separator {
   height: 1px;
-  background: var(--panel-border);
-  margin: 4px 0;
+  background: linear-gradient(to right, transparent, var(--panel-border), transparent);
+  margin: var(--sp-1) 0;
 }
 
 /* =========================
@@ -4355,3 +4386,375 @@ body.light-theme .color-panel {
 .kanban-card:active { transform: scale(0.98); }
 .quota-btn:active { transform: scale(0.96); }
 .checkin-emoji-btn:active { transform: scale(0.9); }
+
+/* =============================================
+   IMPROVEMENTS R2-51 to R2-100: UI REFINEMENTS
+   ============================================= */
+
+/* #R2-51 font-display swap to prevent FOIT */
+@font-face {
+  font-family: 'SF Mono';
+  font-display: swap;
+  src: local('SF Mono');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-display: swap;
+  src: local('JetBrains Mono');
+}
+
+/* #R2-57 hyphenation support for sticky note text */
+.kanban-card-text,
+.text-edit-overlay[contenteditable] {
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  overflow-wrap: break-word;
+}
+
+/* #R2-59 Consistent font-size across panels */
+.anchors-header,
+.card-editor-header h3,
+.chat-header,
+.checkin-results-header {
+  font-size: var(--fs-md);
+}
+.anchor-item,
+.fctl-btn,
+.context-menu-item,
+.users-dropdown-item,
+.chat-msg,
+.kanban-card-text {
+  font-size: var(--fs-sm);
+}
+.color-section-label,
+.tag-editor-label,
+.facilitator-label,
+.card-editor-body label {
+  font-size: var(--fs-xs);
+}
+
+/* #R2-60 ellipsis in narrow panels */
+.anchor-item .anchor-name,
+.users-dropdown-item .user-name,
+.kanban-card-text,
+.card-editor-header h3 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* #R2-68 subtle color tint on selection box */
+/* Applied via canvas JS, but provide CSS token */
+:root {
+  --selection-tint: rgba(74, 158, 255, 0.06);
+}
+
+/* #R2-70 subtle noise texture overlay option */
+.noise-overlay::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* #R2-71 better responsive toolbar overflow */
+@media (max-width: 640px) {
+  .toolbar {
+    gap: 1px;
+    padding: 3px 4px;
+    max-width: calc(100vw - 24px);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .toolbar::-webkit-scrollbar { display: none; }
+  .tool-btn {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+  }
+  .toolbar .divider { margin: 0 2px; }
+  .bottom-bar {
+    max-width: calc(50vw - 12px);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .bottom-bar::-webkit-scrollbar { display: none; }
+  .bb-btn-label span:not(.bb-btn-icon) { display: none; }
+}
+
+/* #R2-75 container query support for dynamic panel sizing */
+@supports (container-type: inline-size) {
+  .facilitator-panel,
+  .anchors-panel,
+  .card-editor-panel {
+    container-type: inline-size;
+  }
+  @container (max-width: 250px) {
+    .fctl-btn span:not(svg) { font-size: 11px; }
+    .anchor-item { padding: 6px 8px; }
+  }
+}
+
+/* #R2-78 button sizing hierarchy */
+.btn-sm {
+  height: var(--btn-size-sm);
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-xs);
+  border-radius: var(--radius-sm);
+}
+.btn-md {
+  height: var(--btn-size-md);
+  padding: 0 var(--sp-4);
+  font-size: var(--fs-sm);
+  border-radius: var(--radius-md);
+}
+.btn-lg {
+  height: var(--btn-size-lg);
+  padding: 0 var(--sp-6);
+  font-size: var(--fs-md);
+  border-radius: var(--radius-md);
+}
+
+/* #R2-79 consistent icon sizing */
+.tool-btn svg { width: var(--icon-toolbar); height: var(--icon-toolbar); }
+.fctl-btn svg { width: var(--icon-inline); height: var(--icon-inline); }
+.bb-btn svg { width: var(--icon-inline); height: var(--icon-inline); }
+
+/* #R2-80 whitespace management in dense panels */
+.card-editor-body {
+  padding: var(--sp-4);
+}
+.card-editor-body label {
+  margin-top: var(--sp-3);
+  margin-bottom: var(--sp-1);
+}
+
+/* #R2-83 ripple effect on buttons */
+@keyframes ripple {
+  0% { transform: translate(-50%, -50%) scale(0); opacity: 0.4; }
+  100% { transform: translate(-50%, -50%) scale(4); opacity: 0; }
+}
+.tool-btn,
+.bb-btn,
+.fctl-btn,
+.modal-btn,
+.ftb-btn {
+  overflow: hidden;
+  position: relative;
+}
+.ripple-effect {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  pointer-events: none;
+  animation: ripple 0.5s ease-out forwards;
+}
+body.light-theme .ripple-effect {
+  background: rgba(0,0,0,0.12);
+}
+
+/* #R2-84 improved checkbox/radio styling */
+.modal-label input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--panel-border);
+  border-radius: var(--radius-sm);
+  background: var(--btn);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.modal-label input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.modal-label input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 5px;
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* #R2-88 subtle hover states on all interactive elements */
+.anchor-action-btn:hover,
+.tag-remove:hover,
+.chat-close:hover,
+.search-close:hover,
+.anchors-close:hover,
+.card-editor-close:hover,
+.tag-editor-close:hover,
+.view-close-btn:hover {
+  background: var(--btn-hover);
+  border-radius: var(--radius-sm);
+}
+
+/* #R2-90 loading shimmer effect */
+.shimmer-loading {
+  background: linear-gradient(90deg, var(--btn) 25%, var(--btn-hover) 50%, var(--btn) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* #R2-92 better light theme toolbar styling */
+body.light-theme .toolbar {
+  background: rgba(255, 255, 254, 0.9);
+  border-color: rgba(0,0,0,0.08);
+  box-shadow: var(--elevation-2);
+}
+body.light-theme .tool-btn:hover {
+  background: rgba(0,0,0,0.06);
+}
+body.light-theme .tool-btn.active {
+  background: var(--accent);
+  color: white;
+}
+
+/* #R2-95 dark theme code/kbd element styling */
+kbd, code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--btn);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  color: var(--text);
+  box-shadow: 0 1px 0 var(--panel-border);
+}
+
+/* #R2-96 color-panel styling in light theme */
+body.light-theme .color-panel {
+  border-color: rgba(0,0,0,0.08);
+}
+body.light-theme .color-swatch {
+  border-color: rgba(0,0,0,0.06);
+}
+body.light-theme .color-swatch.active {
+  border-color: #333;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+body.light-theme .color-swatch.active::after {
+  border-color: #333;
+}
+
+/* #R2-97 system theme auto-detection with override support - see JS */
+
+/* #R2-98 theme-aware scrollbar colors */
+body.light-theme ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+}
+body.light-theme ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* #R2-99 brand badge visibility in both themes */
+.brand-badge {
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--elevation-1);
+}
+body.light-theme .brand-badge {
+  background: rgba(255,255,254,0.95);
+  color: var(--text-muted);
+  box-shadow: var(--elevation-1);
+}
+
+/* ============================================================
+   R2 IMPROVEMENTS (176-200): Positive UX & Final Polish
+   ============================================================ */
+
+/* #R2-176: Keyboard shortcut cheat sheet */
+.cheat-sheet-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(10px); display: flex; align-items: center;
+  justify-content: center; z-index: 600; animation: fadeIn 0.15s ease;
+}
+.cheat-sheet {
+  background: var(--panel); border: 1px solid var(--panel-border);
+  border-radius: var(--radius-xl); padding: var(--sp-6) var(--sp-8);
+  max-width: 700px; width: 90vw; max-height: 80vh; overflow-y: auto;
+  box-shadow: var(--shadow-xl); animation: slideIn 0.2s ease;
+}
+.cheat-sheet h3 { font-size: 18px; margin-bottom: 12px; }
+.cheat-sheet-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.cheat-sheet-section h4 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); margin-bottom: 6px; }
+.cheat-sheet-section .cs-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; color: var(--text-muted); }
+.cheat-sheet-section .cs-row kbd { background: var(--btn); border: 1px solid var(--panel-border); border-radius: 3px; padding: 1px 6px; font-size: 11px; font-family: var(--font-mono); color: var(--text); }
+
+/* #R2-177: "Did you know?" tip */
+.dyk-banner {
+  position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+  background: var(--panel); border: 1px solid var(--accent-20); border-left: 3px solid var(--accent);
+  border-radius: var(--radius-md); padding: 10px 20px; font-size: 13px; color: var(--text);
+  z-index: 500; box-shadow: var(--shadow-md); display: flex; align-items: center;
+  gap: 10px; animation: slideUp 0.3s ease; max-width: 450px;
+}
+.dyk-banner .dyk-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; margin-left: 8px; }
+
+/* #R2-178: Confetti particles */
+@keyframes confettiPop {
+  0% { transform: translate(0,0) scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0.3) rotate(var(--rot)); opacity: 0; }
+}
+.confetti-particle { position: fixed; width: 8px; height: 8px; border-radius: 2px; pointer-events: none; z-index: 9999; animation: confettiPop 1s cubic-bezier(.25,.46,.45,.94) forwards; }
+
+/* #R2-179: Milestone celebration */
+.milestone-toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 100px;
+  background: linear-gradient(135deg, var(--accent), var(--success)); color: white;
+  padding: 12px 28px; border-radius: var(--radius-lg); font-size: 15px; font-weight: 700;
+  z-index: 10001; box-shadow: var(--shadow-lg); pointer-events: none;
+  animation: milestoneIn 0.4s ease-out;
+}
+@keyframes milestoneIn { 0% { transform: translateX(-50%) scale(0.5); opacity: 0; } 60% { transform: translateX(-50%) scale(1.1); } 100% { transform: translateX(-50%) scale(1); opacity: 1; } }
+
+/* #R2-180: Tool tip preview */
+.tool-tip-preview {
+  position: fixed; background: var(--panel); border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md); padding: 8px 12px; font-size: 12px; color: var(--text);
+  z-index: 600; box-shadow: var(--shadow-md); pointer-events: none; white-space: nowrap;
+  animation: fadeIn 0.12s ease;
+}
+.tool-tip-preview .ttp-title { font-weight: 600; margin-bottom: 2px; }
+.tool-tip-preview .ttp-desc { color: var(--text-muted); font-size: 11px; }
+
+/* #R2-183: Getting started checklist */
+.getting-started-checklist { background: var(--surface-2); border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 10px 14px; margin-top: 8px; font-size: 12px; }
+.getting-started-checklist h5 { font-size: 12px; margin-bottom: 6px; color: var(--accent); }
+.gs-item { display: flex; align-items: center; gap: 6px; padding: 3px 0; color: var(--text-muted); }
+.gs-item.gs-done { color: var(--success); text-decoration: line-through; opacity: 0.6; }
+
+/* #R2-184: Delete animation (shrink + fade + rotation) */
+@keyframes deleteSpinFade { 0% { transform: scale(1) rotate(0deg); opacity: 1; } 100% { transform: scale(0.3) rotate(12deg); opacity: 0; } }
+
+/* #R2-186: Parallax on brand badge */
+.brand-badge { transition: opacity 0.3s, transform 0.3s ease-out; }
+
+/* #R2-188: "Saved" indicator pulse */
+.saved-indicator {
+  position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%);
+  background: var(--success); color: white; padding: 4px 14px; border-radius: var(--radius-full);
+  font-size: 11px; font-weight: 600; z-index: 500; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+}
+.saved-indicator.visible { opacity: 1; animation: savedPulse 0.4s ease-out; }
+@keyframes savedPulse { 0% { transform: translateX(-50%) scale(0.85); } 50% { transform: translateX(-50%) scale(1.08); } 100% { transform: translateX(-50%) scale(1); } }
+
+/* #R2-190: Seasonal theme accent colors */
+:root.season-spring { --accent: #4ecdc4; --btn-active: #4ecdc4; }
+:root.season-summer { --accent: #ff9f43; --btn-active: #ff9f43; }
+:root.season-autumn { --accent: #e17055; --btn-active: #e17055; }
+:root.season-winter { --accent: #74b9ff; --btn-active: #74b9ff; }
+
+/* #R2-192: Element count milestone pop */
+@keyframes milestoneCountPop { 0% { transform: scale(1); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }

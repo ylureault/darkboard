@@ -1204,24 +1204,47 @@ class UI {
     const toggle = document.getElementById('themeToggle');
     const icon = document.getElementById('themeIcon');
 
-    // Load saved theme
+    // #R2-97 system theme auto-detection that respects override
     const savedTheme = localStorage.getItem('darkboard-theme');
     if (savedTheme === 'light') {
-      this.setTheme('light');
+      this.setTheme('light', false);
+    } else if (savedTheme === 'dark') {
+      this.setTheme('dark', false);
+    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+      this.setTheme('light', false);
+    }
+
+    // Listen for system theme changes when no manual override
+    if (window.matchMedia) {
+      window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+        const manualTheme = localStorage.getItem('darkboard-theme');
+        if (!manualTheme) {
+          this.setTheme(e.matches ? 'light' : 'dark', true);
+        }
+      });
     }
 
     toggle.addEventListener('click', () => {
       const isLight = document.body.classList.contains('light-theme');
-      this.setTheme(isLight ? 'dark' : 'light');
+      this.setTheme(isLight ? 'dark' : 'light', true);
+      localStorage.setItem('darkboard-theme', isLight ? 'dark' : 'light'); // #R2-97 manual override
     });
+
+    // #R2-83 ripple effect on button clicks
+    this.initRippleEffect();
   }
 
-  setTheme(theme) {
+  // #R2-91 #R2-100 smooth theme transition with fade
+  setTheme(theme, animate = true) {
     const icon = document.getElementById('themeIcon');
+    if (animate) {
+      document.body.classList.add('theme-transitioning');
+      setTimeout(() => document.body.classList.remove('theme-transitioning'), 250);
+    }
     if (theme === 'light') {
       document.body.classList.add('light-theme');
       icon.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
-      this.app.renderer.bgColor = '#f5f5f5';
+      this.app.renderer.bgColor = '#f5f4f2';
       this.app.renderer.gridColor = 'rgba(0, 0, 0, 0.06)';
     } else {
       document.body.classList.remove('light-theme');
@@ -1229,8 +1252,23 @@ class UI {
       this.app.renderer.bgColor = '#121212';
       this.app.renderer.gridColor = 'rgba(255, 255, 255, 0.04)';
     }
-    localStorage.setItem('darkboard-theme', theme);
+    if (animate) localStorage.setItem('darkboard-theme', theme);
     this.app.renderer.markDirty();
+  }
+
+  // #R2-83 ripple effect initialization
+  initRippleEffect() {
+    document.addEventListener('pointerdown', (e) => {
+      const btn = e.target.closest('.tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn');
+      if (!btn || btn.disabled) return;
+      const rect = btn.getBoundingClientRect();
+      const ripple = document.createElement('span');
+      ripple.className = 'ripple-effect';
+      ripple.style.left = (e.clientX - rect.left) + 'px';
+      ripple.style.top = (e.clientY - rect.top) + 'px';
+      btn.appendChild(ripple);
+      ripple.addEventListener('animationend', () => ripple.remove());
+    });
   }
 
   initTemplates() {

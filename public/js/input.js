@@ -10,6 +10,11 @@ class InputHandler {
     this.pointerDown = false;
     this.zoomMode = false; // Z key held
 
+    // #R2-21: Pan velocity tracking for inertia
+    this._panVelX = 0;
+    this._panVelY = 0;
+    this._panMomentumRaf = null;
+
     // Pinch zoom momentum
     this.pinchVelocity = 0;
     this.pinchMomentumRaf = null;
@@ -239,6 +244,9 @@ class InputHandler {
     if (this.isPanning) {
       const dx = e.clientX - this.lastPanX;
       const dy = e.clientY - this.lastPanY;
+      // #R2-21: Track velocity for pan inertia
+      this._panVelX = dx * 0.6 + this._panVelX * 0.4;
+      this._panVelY = dy * 0.6 + this._panVelY * 0.4;
       // Track if right-click moved beyond 5px threshold
       if (this.rightClickStart) {
         const totalDx = e.clientX - this.rightClickStart.x;
@@ -273,6 +281,26 @@ class InputHandler {
         this.rightClickStart = null;
         this.rightClickMoved = false;
       }
+      // #R2-21: Apply pan momentum/inertia after releasing pan
+      if (Math.abs(this._panVelX) > 1 || Math.abs(this._panVelY) > 1) {
+        if (this._panMomentumRaf) cancelAnimationFrame(this._panMomentumRaf);
+        const decay = 0.92;
+        const self = this;
+        const step = () => {
+          self._panVelX *= decay;
+          self._panVelY *= decay;
+          if (Math.abs(self._panVelX) < 0.5 && Math.abs(self._panVelY) < 0.5) {
+            self._panMomentumRaf = null;
+            return;
+          }
+          self.app.renderer.pan(self._panVelX, self._panVelY);
+          self.app.renderer.markDirty();
+          self._panMomentumRaf = requestAnimationFrame(step);
+        };
+        this._panMomentumRaf = requestAnimationFrame(step);
+      }
+      this._panVelX = 0;
+      this._panVelY = 0;
       return;
     }
 

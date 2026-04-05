@@ -389,7 +389,7 @@ const Tools = {
         const orig = this.originalElements.get(elementId);
         if (el && orig) {
           this.applyResize(el, orig, handle, dx, dy, e.shiftKey, e.ctrlKey || e.metaKey);
-          // Show dimension tooltip during resize
+          // #R2-20: Show dimension tooltip during resize
           app.renderer._resizeDimensions = {
             w: Math.round(el.width),
             h: Math.round(el.height),
@@ -630,6 +630,16 @@ const Tools = {
     },
 
     onDoubleClick(app, worldX, worldY) {
+      // #R2-17: Double-click resize handle to auto-fit text content
+      const handleHit = app.renderer.hitTestHandle(worldX, worldY);
+      if (handleHit && handleHit.handle !== 'rotate') {
+        const el = app.renderer.elements.get(handleHit.elementId);
+        if (el && el.text && app.autoFitTextContent) {
+          app.autoFitTextContent(el);
+          return;
+        }
+      }
+
       const hit = app.renderer.hitTest(worldX, worldY);
       if (hit && (hit.type === 'sticky' || hit.type === 'text' || hit.type === 'rect' || hit.type === 'circle' || hit.type === 'frame' || hit.type === 'envelope' || hit.type === 'diamond' || hit.type === 'triangle' || hit.type === 'card' || hit.type === 'list' || hit.type === 'connector')) {
         // #94 - Double-click on frame title to edit it

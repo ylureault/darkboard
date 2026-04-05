@@ -307,7 +307,24 @@ class CanvasRenderer {
       if (elBounds.x + elBounds.w < vpLeft || elBounds.x > vpRight ||
           elBounds.y + elBounds.h < vpTop || elBounds.y > vpBottom) {
         ctx.globalAlpha = 1;
+        el._wasVisible = false; // #R2-22: Track visibility for fade-in
         continue;
+      }
+
+      // #R2-22: Fade in elements when they enter viewport
+      if (el._wasVisible === false) {
+        el._fadeInStart = performance.now();
+        el._wasVisible = true;
+      }
+      if (el._fadeInStart) {
+        const fadeElapsed = performance.now() - el._fadeInStart;
+        const fadeDuration = 200;
+        if (fadeElapsed < fadeDuration) {
+          ctx.globalAlpha = Math.min(1, fadeElapsed / fadeDuration) * (ctx.globalAlpha || 1);
+          this.dirty = true; // Keep rendering during fade
+        } else {
+          delete el._fadeInStart;
+        }
       }
 
       // Search highlight glow (#116 - also highlight matching text)
@@ -336,6 +353,20 @@ class CanvasRenderer {
             ctx.restore();
           }
         }
+      }
+      // #R2-24: Hover highlight on elements (subtle border glow)
+      if (this._hoveredElementId === el.id && !this.selectedIds.has(el.id)) {
+        ctx.save();
+        ctx.shadowColor = 'rgba(74, 158, 255, 0.5)';
+        ctx.shadowBlur = 8 / this.camera.zoom;
+        ctx.strokeStyle = 'rgba(74, 158, 255, 0.35)';
+        ctx.lineWidth = 2 / this.camera.zoom;
+        const hb = getElementBounds(el);
+        ctx.beginPath();
+        ctx.roundRect(hb.x - 2, hb.y - 2, hb.w + 4, hb.h + 4, 4 / this.camera.zoom);
+        ctx.stroke();
+        ctx.shadowColor = 'transparent';
+        ctx.restore();
       }
       renderElement(ctx, el, this.selectedIds.has(el.id), this.camera);
       if (el.reactions && el.reactions.length > 0) {
@@ -452,9 +483,28 @@ class CanvasRenderer {
       this.drawCommentBubble(ctx, comment);
     }
 
-    // Alignment guides (#110 - with distance labels)
+    // #R2-11: Ghost preview at original positions during drag
+    if (this._dragGhosts && this._dragGhosts.length > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      ctx.strokeStyle = '#4a9eff';
+      ctx.lineWidth = 1.5 / this.camera.zoom;
+      ctx.setLineDash([4 / this.camera.zoom, 4 / this.camera.zoom]);
+      for (const ghost of this._dragGhosts) {
+        if (ghost.w > 0 && ghost.h > 0) {
+          ctx.strokeRect(ghost.x, ghost.y, ghost.w, ghost.h);
+        }
+      }
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    // #R2-43: Alignment guides with fade effect (#110 - with distance labels)
     if (this.alignmentGuides.length > 0) {
       ctx.save();
+      const snapOpacity = this._snapGuideOpacity !== undefined ? this._snapGuideOpacity : 1.0;
+      ctx.globalAlpha = snapOpacity;
       ctx.strokeStyle = '#ff6b9d';
       ctx.lineWidth = 1 / this.camera.zoom;
       ctx.setLineDash([6 / this.camera.zoom, 4 / this.camera.zoom]);

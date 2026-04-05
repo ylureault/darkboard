@@ -905,6 +905,7 @@ class DarkBoardApp {
       const desc = this._describeOps(ops);
       this.showToast(desc ? `Annule: ${desc}` : 'Annule');
       this.updateTitle();
+      this.flashUndoRedoButton('undo'); // #R2-46
     }
     if (this.ui) this.ui.updateUndoRedoButtons();
   }
@@ -928,6 +929,7 @@ class DarkBoardApp {
       this.sync.sendOps(ops);
       this.showToast('R\u00e9tabli');
       this.updateTitle();
+      this.flashUndoRedoButton('redo'); // #R2-46
     }
     if (this.ui) this.ui.updateUndoRedoButtons();
   }
@@ -2862,9 +2864,19 @@ class DarkBoardApp {
     return false;
   }
 
+  // #R2-47: Zoom level indicator with smooth transition
   updateZoomDisplay() {
     const pct = Math.round(this.renderer.camera.zoom * 100);
-    document.getElementById('zoomLevel').textContent = pct + '%';
+    const el = document.getElementById('zoomLevel');
+    if (!el) return;
+    const prev = el.textContent;
+    el.textContent = pct + '%';
+    if (prev !== pct + '%') {
+      el.style.transition = 'transform 0.15s ease-out';
+      el.style.transform = 'scale(1.15)';
+      clearTimeout(this._zoomDisplayTimer);
+      this._zoomDisplayTimer = setTimeout(() => { el.style.transform = 'scale(1)'; }, 150);
+    }
   }
 
   updateUsersPanel() {
@@ -3127,6 +3139,22 @@ class DarkBoardApp {
         <div class="context-menu-item" data-action="comment">💬 Commenter</div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="selectSimilar">🔍 Selectionner les similaires</div>
+        ${!multiSel ? `<div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="convertTo">🔄 Convertir en...</div>
+        <div class="context-menu-item" data-action="linkElement">🔗 Lier a un element</div>` : ''}
+        ${!multiSel && hit.type === 'sticky' ? `
+        <div class="context-menu-item" data-action="assignUser">👤 Assigner</div>
+        <div class="context-menu-item" data-action="setDueDate">📅 Echeance</div>
+        <div class="context-menu-item" data-action="setPriority">⚡ Priorite</div>
+        <div class="context-menu-item" data-action="setStickyTemplate">📋 Template</div>
+        <div class="context-menu-item" data-action="setCategory">🎨 Categorie</div>` : ''}
+        ${multiSel ? `<div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="batchColor">🎨 Couleur commune</div>
+        <div class="context-menu-item" data-action="autoGrid">📐 Grille auto</div>
+        <div class="context-menu-item" data-action="autoCircle">⭕ Cercle auto</div>
+        <div class="context-menu-item" data-action="smartSpace">↔ Espacement egal</div>` : ''}
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item context-menu-info" style="font-size:11px;color:var(--text-muted);cursor:default">z:${hit.zIndex || 0} | ${Math.round(hit.width || 0)}x${Math.round(hit.height || 0)}</div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="delete" style="color:var(--danger)">Supprimer <span class="shortcut-hint">Suppr</span></div>
       `;
@@ -3138,6 +3166,12 @@ class DarkBoardApp {
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="addAnchor">📌 Ajouter une ancre ici</div>
         <div class="context-menu-item" data-action="addCanvasComment">💬 Ajouter un commentaire</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="toggleGridPattern">${this.renderer.gridPattern === 'dots' ? '▦ Grille lignes' : '⁘ Grille points'}</div>
+        <div class="context-menu-item" data-action="toggleGrid">${this.renderer.gridEnabled ? '▣ Masquer la grille' : '▢ Afficher la grille'}</div>
+        <div class="context-menu-item" data-action="bgColor">🎨 Couleur de fond</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="exportPNG">📷 Exporter en PNG</div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="resetView">Reinitialiser la vue</div>
       `;
@@ -3178,6 +3212,38 @@ class DarkBoardApp {
           this.renderer.camera = { x: 0, y: 0, zoom: 1 };
           this.renderer.markDirty();
           this.updateZoomDisplay();
+          break;
+        // #R2-26: Toggle grid dot pattern
+        case 'toggleGridPattern':
+          this.renderer.gridPattern = this.renderer.gridPattern === 'dots' ? 'lines' : 'dots';
+          this.renderer.markDirty();
+          this.showToast(this.renderer.gridPattern === 'dots' ? 'Grille: points' : 'Grille: lignes');
+          break;
+        case 'toggleGrid':
+          this.renderer.gridEnabled = !this.renderer.gridEnabled;
+          this.renderer.markDirty();
+          break;
+        // #R2-29: Canvas background color picker
+        case 'bgColor': {
+          const bgColors = ['#121212', '#1a1a2e', '#0a0a0a', '#1e1e1e', '#2d2d2d', '#0d1117', '#1a1a1a', '#ffffff', '#f5f5f5', '#fafafa'];
+          const bgMenu = document.createElement('div');
+          bgMenu.className = 'context-menu';
+          bgMenu.style.left = (parseInt(menu.style.left) + 160) + 'px';
+          bgMenu.style.top = menu.style.top;
+          for (const c of bgColors) {
+            const item = document.createElement('div');
+            item.className = 'context-menu-item';
+            item.innerHTML = `<span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:${c};border:1px solid rgba(255,255,255,0.2);vertical-align:middle;margin-right:6px;"></span>${c}`;
+            item.addEventListener('click', () => { this.setBackgroundColor(c); bgMenu.remove(); });
+            bgMenu.appendChild(item);
+          }
+          document.body.appendChild(bgMenu);
+          setTimeout(() => { document.addEventListener('pointerdown', function h(e) { if (!bgMenu.contains(e.target)) { bgMenu.remove(); document.removeEventListener('pointerdown', h); } }); }, 0);
+          break;
+        }
+        // #R2-37: Export PNG from context menu
+        case 'exportPNG':
+          this.exportAsPNG();
           break;
         case 'lock':
           this.updateSelectedElements({ locked: true });
@@ -3281,6 +3347,65 @@ class DarkBoardApp {
           }
           break;
         }
+        // #R2-108: Convert element type
+        case 'convertTo':
+          this._showConvertMenu(hit);
+          break;
+        // #R2-107: Link to another element
+        case 'linkElement': {
+          const linkId = prompt('ID de l\'element cible (ou copiez-collez depuis l\'URL #id):');
+          if (linkId) {
+            this.updateSelectedElements({ linkedElementId: linkId.replace('#', '') });
+            this.showToast('Element lie !');
+          }
+          break;
+        }
+        // #R2-138: Assign user
+        case 'assignUser': {
+          const assignee = prompt('Assigner a (nom):', hit.assignee || '');
+          if (assignee !== null) {
+            this.updateSelectedElements({ assignee: assignee || null });
+          }
+          break;
+        }
+        // #R2-139: Set due date
+        case 'setDueDate': {
+          const dd = prompt('Date d\'echeance (YYYY-MM-DD):', hit.dueDate || '');
+          if (dd !== null) {
+            this.updateSelectedElements({ dueDate: dd || null });
+          }
+          break;
+        }
+        // #R2-140: Set priority
+        case 'setPriority':
+          this._showPriorityPicker(hit);
+          break;
+        // #R2-147: Sticky template
+        case 'setStickyTemplate':
+          this._showTemplatePicker(hit);
+          break;
+        // #R2-148: Set category
+        case 'setCategory':
+          this._showCategoryPicker(hit);
+          break;
+        // #R2-150: Batch color change
+        case 'batchColor': {
+          const bc = prompt('Couleur hex (#FFD966):');
+          if (bc) this.updateSelectedElements({ fill: bc });
+          break;
+        }
+        // #R2-141: Auto grid layout
+        case 'autoGrid':
+          this._autoArrangeGrid();
+          break;
+        // #R2-142: Auto circle layout
+        case 'autoCircle':
+          this._autoArrangeCircle();
+          break;
+        // #R2-143: Smart spacing
+        case 'smartSpace':
+          this._smartSpacing();
+          break;
       }
       this.hideContextMenu();
     });
@@ -4256,6 +4381,212 @@ class DarkBoardApp {
     document.body.appendChild(overlay);
   }
 
+  // #R2-5: Tab cycles through elements
+  cycleSelection(direction) {
+    const sorted = this.renderer.getSortedElements();
+    if (sorted.length === 0) return;
+    const currentId = this.renderer.selectedIds.size === 1 ? [...this.renderer.selectedIds][0] : null;
+    let idx = -1;
+    if (currentId) {
+      idx = sorted.findIndex(el => el.id === currentId);
+    }
+    if (direction > 0) {
+      idx = (idx + 1) % sorted.length;
+    } else {
+      idx = (idx - 1 + sorted.length) % sorted.length;
+    }
+    this.renderer.selectedIds.clear();
+    this.renderer.selectedIds.add(sorted[idx].id);
+    this.renderer.markDirty();
+    // Pan to element
+    const b = getElementBounds(sorted[idx]);
+    if (b) {
+      const screen = this.renderer.worldToScreen(b.x + b.w / 2, b.y + b.h / 2);
+      const margin = 100;
+      if (screen.x < margin || screen.x > window.innerWidth - margin ||
+          screen.y < margin || screen.y > window.innerHeight - margin) {
+        this.animateToView(b.x + b.w / 2, b.y + b.h / 2);
+      }
+    }
+    if (this.updateUrlHash) this.updateUrlHash();
+  }
+
+  // #R2-34: Bring forward one step
+  bringForward() {
+    if (this.renderer.selectedIds.size === 0) return;
+    const sorted = this.renderer.getSortedElements();
+    const ops = [], inverseOps = [];
+    for (const id of this.renderer.selectedIds) {
+      const el = this.renderer.elements.get(id);
+      if (!el) continue;
+      const idx = sorted.indexOf(el);
+      if (idx < sorted.length - 1) {
+        const above = sorted[idx + 1];
+        inverseOps.push({ type: 'update', elementId: id, props: { zIndex: el.zIndex || 0 } });
+        el.zIndex = (above.zIndex || 0) + 1;
+        ops.push({ type: 'update', elementId: id, props: { zIndex: el.zIndex } });
+      }
+    }
+    if (ops.length > 0) { this.history.push(ops, inverseOps); this.sync.sendOps(ops); this.renderer.markDirty(); }
+  }
+
+  // #R2-34: Send backward one step
+  sendBackward() {
+    if (this.renderer.selectedIds.size === 0) return;
+    const sorted = this.renderer.getSortedElements();
+    const ops = [], inverseOps = [];
+    for (const id of this.renderer.selectedIds) {
+      const el = this.renderer.elements.get(id);
+      if (!el) continue;
+      const idx = sorted.indexOf(el);
+      if (idx > 0) {
+        const below = sorted[idx - 1];
+        inverseOps.push({ type: 'update', elementId: id, props: { zIndex: el.zIndex || 0 } });
+        el.zIndex = (below.zIndex || 0) - 1;
+        ops.push({ type: 'update', elementId: id, props: { zIndex: el.zIndex } });
+      }
+    }
+    if (ops.length > 0) { this.history.push(ops, inverseOps); this.sync.sendOps(ops); this.renderer.markDirty(); }
+  }
+
+  // #R2-36: Copy style from selected element
+  copyStyle() {
+    if (this.renderer.selectedIds.size !== 1) return;
+    const id = [...this.renderer.selectedIds][0];
+    const el = this.renderer.elements.get(id);
+    if (!el) return;
+    this._copiedStyle = {
+      fill: el.fill,
+      stroke: el.stroke,
+      strokeWidth: el.strokeWidth,
+      fontSize: el.fontSize,
+      opacity: el.opacity,
+      borderRadius: el.borderRadius,
+      shadowEnabled: el.shadowEnabled
+    };
+    this.showToast('Style copie', 'success');
+    this._showCursorFeedback('Style copie!');
+  }
+
+  // #R2-36: Paste style onto selected elements
+  pasteStyle() {
+    if (!this._copiedStyle || this.renderer.selectedIds.size === 0) return;
+    const props = {};
+    for (const [key, val] of Object.entries(this._copiedStyle)) {
+      if (val !== undefined && val !== null) props[key] = val;
+    }
+    this.updateSelectedElements(props);
+    this.showToast('Style applique', 'success');
+  }
+
+  // #R2-37: Export as PNG
+  exportAsPNG() {
+    const elements = Array.from(this.renderer.elements.values());
+    if (elements.length === 0) { this.showToast('Rien a exporter'); return; }
+    // Calculate bounds
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const el of elements) {
+      const b = getElementBounds(el);
+      if (b.x < minX) minX = b.x;
+      if (b.y < minY) minY = b.y;
+      if (b.x + b.w > maxX) maxX = b.x + b.w;
+      if (b.y + b.h > maxY) maxY = b.y + b.h;
+    }
+    const pad = 40;
+    minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+    const w = maxX - minX;
+    const h = maxY - minY;
+    const scale = Math.min(2, 4000 / Math.max(w, h)); // max 4000px
+    const offscreen = document.createElement('canvas');
+    offscreen.width = w * scale;
+    offscreen.height = h * scale;
+    const ctx = offscreen.getContext('2d');
+    ctx.fillStyle = this.renderer.bgColor || '#121212';
+    ctx.fillRect(0, 0, offscreen.width, offscreen.height);
+    ctx.scale(scale, scale);
+    ctx.translate(-minX, -minY);
+    const sorted = this.renderer.getSortedElements();
+    for (const el of sorted) {
+      if (el.hidden) continue;
+      renderElement(ctx, el, false, { zoom: 1 });
+    }
+    offscreen.toBlob((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'darkboard-export.png';
+      a.click();
+      URL.revokeObjectURL(url);
+      this.showToast('Export PNG telecharge', 'success');
+    }, 'image/png');
+  }
+
+  // #R2-29: Canvas background color picker
+  setBackgroundColor(color) {
+    this.renderer.bgColor = color;
+    this.renderer.markDirty();
+    this.showToast('Fond modifie');
+  }
+
+  // #R2-40: Reset zoom to 100%
+  resetZoom() {
+    this.renderer.camera.zoom = 1;
+    this.renderer.markDirty();
+    this.updateZoomDisplay();
+  }
+
+  // #R2-43: Snap indicator lines flash briefly then fade (enhance existing)
+  showSnapGuideFade() {
+    if (this._snapGuideFadeTimer) clearTimeout(this._snapGuideFadeTimer);
+    this.renderer._snapGuideOpacity = 1.0;
+    this._snapGuideFadeTimer = setTimeout(() => {
+      const fadeStep = () => {
+        this.renderer._snapGuideOpacity -= 0.05;
+        if (this.renderer._snapGuideOpacity <= 0) {
+          this.renderer._snapGuideOpacity = 0;
+          return;
+        }
+        this.renderer.markDirty();
+        requestAnimationFrame(fadeStep);
+      };
+      requestAnimationFrame(fadeStep);
+    }, 300);
+  }
+
+  // #R2-46: Undo/redo button visual feedback
+  flashUndoRedoButton(type) {
+    const btn = document.querySelector(type === 'undo' ? '#undoBtn' : '#redoBtn');
+    if (!btn) return;
+    btn.classList.add('btn-flash');
+    setTimeout(() => btn.classList.remove('btn-flash'), 300);
+  }
+
+  // #R2-50: Smooth scroll position restoration on page reload
+  saveScrollPosition() {
+    const boardId = typeof getBoardId === 'function' ? getBoardId() : 'default';
+    const state = {
+      x: this.renderer.camera.x,
+      y: this.renderer.camera.y,
+      zoom: this.renderer.camera.zoom
+    };
+    try { sessionStorage.setItem('darkboard-scroll-' + boardId, JSON.stringify(state)); } catch(e) {}
+  }
+
+  restoreScrollPosition() {
+    const boardId = typeof getBoardId === 'function' ? getBoardId() : 'default';
+    try {
+      const saved = sessionStorage.getItem('darkboard-scroll-' + boardId);
+      if (saved) {
+        const state = JSON.parse(saved);
+        this.renderer.camera.x = state.x || 0;
+        this.renderer.camera.y = state.y || 0;
+        this.renderer.camera.zoom = state.zoom || 1;
+        this.renderer.markDirty();
+        this.updateZoomDisplay();
+      }
+    } catch(e) {}
+  }
+
   // ===== AUTO TAG COLOR =====
   getAutoTagColor(label) {
     const colors = ['#FF6B6B', '#F4A460', '#FFD966', '#4ECDC4', '#45B7D1', '#4a9eff', '#DDA0DD', '#96CEB4', '#e94560', '#0f3460'];
@@ -4400,23 +4731,34 @@ DarkBoardApp.prototype._showToolCursorHint = function(toolName) {
   this.renderer.canvas.addEventListener('mousemove', handler, { once: true });
 };
 
-// #131 - Flash green border on new element
+// #R2-45: Element creation animation (scale from 0.8 to 1.0) - replaces #131
 DarkBoardApp.prototype._flashCreatedElement = function(el) {
   if (!el || el.x === undefined) return;
   var self = this;
+  // Add scale-in CSS animation if not present
+  if (!document.getElementById('r2CreateAnimStyle')) {
+    var style = document.createElement('style');
+    style.id = 'r2CreateAnimStyle';
+    style.textContent = '@keyframes elementScaleIn{0%{transform:translate(-50%,-50%) scale(0.8);opacity:0.6}100%{transform:translate(-50%,-50%) scale(1);opacity:0}}' +
+      '.element-scale-in{position:fixed;pointer-events:none;z-index:9997;border:2px solid rgba(74,158,255,0.6);border-radius:6px;background:rgba(74,158,255,0.08);animation:elementScaleIn 0.35s ease-out forwards;}' +
+      '.btn-flash{animation:btnFlashAnim 0.3s ease-out!important}@keyframes btnFlashAnim{0%{background:rgba(74,158,255,0.4)}100%{background:inherit}}' +
+      '@keyframes syncPulse{0%{box-shadow:0 0 0 0 rgba(74,158,255,0.4)}70%{box-shadow:0 0 0 6px rgba(74,158,255,0)}100%{box-shadow:0 0 0 0 rgba(74,158,255,0)}}' +
+      '#syncDot.warning{animation:syncPulse 1.5s infinite}';
+    document.head.appendChild(style);
+  }
   requestAnimationFrame(function() {
-    var screen = self.renderer.worldToScreen(el.x, el.y);
+    var screen = self.renderer.worldToScreen(el.x + (el.width || 100) / 2, el.y + (el.height || 100) / 2);
     var zoom = self.renderer.camera.zoom;
     var w = (el.width || 100) * zoom;
     var h = (el.height || 100) * zoom;
     var flash = document.createElement('div');
-    flash.className = 'element-created-flash';
+    flash.className = 'element-scale-in';
     flash.style.left = screen.x + 'px';
     flash.style.top = screen.y + 'px';
     flash.style.width = w + 'px';
     flash.style.height = h + 'px';
     document.body.appendChild(flash);
-    setTimeout(function() { flash.remove(); }, 700);
+    setTimeout(function() { flash.remove(); }, 400);
   });
 };
 
@@ -4789,6 +5131,67 @@ DarkBoardApp.prototype.initImprovements = function() {
   }
 })();
 
+// #R2-49: Loading skeleton for initial board load
+DarkBoardApp.prototype.showLoadingSkeleton = function() {
+  if (document.getElementById('r2LoadingSkeleton')) return;
+  var skel = document.createElement('div');
+  skel.id = 'r2LoadingSkeleton';
+  skel.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9998;background:#121212;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;pointer-events:none;transition:opacity 0.5s;';
+  skel.innerHTML = '<div style="width:60px;height:60px;border:3px solid rgba(74,158,255,0.2);border-top:3px solid #4a9eff;border-radius:50%;animation:spin 0.8s linear infinite"></div><div style="color:#666;font-size:14px">Chargement du tableau...</div>';
+  if (!document.getElementById('r2SpinStyle')) {
+    var style = document.createElement('style');
+    style.id = 'r2SpinStyle';
+    style.textContent = '@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}';
+    document.head.appendChild(style);
+  }
+  document.body.appendChild(skel);
+};
+
+DarkBoardApp.prototype.hideLoadingSkeleton = function() {
+  var skel = document.getElementById('r2LoadingSkeleton');
+  if (skel) {
+    skel.style.opacity = '0';
+    setTimeout(function() { skel.remove(); }, 500);
+  }
+};
+
+// #R2-50: Save scroll position on beforeunload
+DarkBoardApp.prototype.initScrollPersistence = function() {
+  var self = this;
+  window.addEventListener('beforeunload', function() {
+    self.saveScrollPosition();
+  });
+  // Restore scroll position after board loads
+  setTimeout(function() {
+    self.restoreScrollPosition();
+  }, 1200);
+};
+
+// #R2-17: Double-click resize handle to auto-fit text content
+DarkBoardApp.prototype.autoFitTextContent = function(el) {
+  if (!el || !el.text) return;
+  var ctx = this.renderer.ctx;
+  var font = (el.fontSize || 16) + 'px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.font = font;
+  var lines = el.text.split('\n');
+  var maxW = 0;
+  for (var i = 0; i < lines.length; i++) {
+    var m = ctx.measureText(lines[i]);
+    if (m.width > maxW) maxW = m.width;
+  }
+  var pad = el.type === 'sticky' ? 28 : 16;
+  var newW = Math.max(60, maxW + pad * 2);
+  var newH = Math.max(40, lines.length * (el.fontSize || 16) * 1.4 + pad * 2);
+  var oldW = el.width, oldH = el.height;
+  el.width = newW;
+  el.height = newH;
+  var ops = [{ type: 'update', elementId: el.id, props: { width: newW, height: newH } }];
+  var inverseOps = [{ type: 'update', elementId: el.id, props: { width: oldW, height: oldH } }];
+  this.history.push(ops, inverseOps);
+  this.sync.sendOps(ops);
+  this.renderer.markDirty();
+};
+
 // Patch boot to initialize improvements
 (function() {
   var origBoot = window.addEventListener;
@@ -4797,6 +5200,10 @@ DarkBoardApp.prototype.initImprovements = function() {
     setTimeout(function() {
       if (window.app && typeof window.app.initImprovements === 'function') {
         window.app.initImprovements();
+        // #R2-50: Initialize scroll persistence
+        if (typeof window.app.initScrollPersistence === 'function') {
+          window.app.initScrollPersistence();
+        }
       }
     }, 500);
   });
