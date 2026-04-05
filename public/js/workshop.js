@@ -113,6 +113,46 @@ class Workshop {
 
     // Auto Clusters
     document.getElementById('btnAutoCluster').addEventListener('click', () => this.autoCluster());
+
+    // #R2-111: ROTI Poll
+    const btnROTI = document.getElementById('btnROTI');
+    if (btnROTI) btnROTI.addEventListener('click', () => this.showROTIPoll());
+
+    // #R2-112: Fishbowl mode
+    const btnFishbowl = document.getElementById('btnFishbowl');
+    if (btnFishbowl) btnFishbowl.addEventListener('click', () => this.toggleFishbowl());
+
+    // #R2-113: Export vote CSV
+    const btnVoteCSV = document.getElementById('btnVoteCSV');
+    if (btnVoteCSV) btnVoteCSV.addEventListener('click', () => this.exportVoteResultsCSV());
+
+    // #R2-114: Timer presets
+    const btnTimerPresets = document.getElementById('btnTimerPresets');
+    if (btnTimerPresets) btnTimerPresets.addEventListener('click', () => this.showTimerPresets());
+
+    // #R2-115: Break timer
+    const btnBreakTimer = document.getElementById('btnBreakTimer');
+    if (btnBreakTimer) btnBreakTimer.addEventListener('click', () => this.startBreakTimer(5));
+
+    // #R2-116: Parking lot
+    const btnParkingLot = document.getElementById('btnParkingLot');
+    if (btnParkingLot) btnParkingLot.addEventListener('click', () => this.createParkingLot());
+
+    // #R2-117: Sentiment analysis
+    const btnSentiment = document.getElementById('btnSentiment');
+    if (btnSentiment) btnSentiment.addEventListener('click', () => this.analyzeSentiment());
+
+    // #R2-118: Word cloud
+    const btnWordCloud = document.getElementById('btnWordCloud');
+    if (btnWordCloud) btnWordCloud.addEventListener('click', () => this.generateWordCloud());
+
+    // #R2-119: Voting heatmap
+    const btnHeatmap = document.getElementById('btnHeatmap');
+    if (btnHeatmap) btnHeatmap.addEventListener('click', () => this.showVotingHeatmap());
+
+    // #R2-120: Retro template
+    const btnRetroTemplate = document.getElementById('btnRetroTemplate');
+    if (btnRetroTemplate) btnRetroTemplate.addEventListener('click', () => this.generateRetroTemplate());
   }
 
   setFacilitator(isFacilitator, facilitatorId) {

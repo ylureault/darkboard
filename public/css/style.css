@@ -4758,3 +4758,510 @@ body.light-theme .brand-badge {
 
 /* #R2-192: Element count milestone pop */
 @keyframes milestoneCountPop { 0% { transform: scale(1); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }
+
+/* ============================================================
+   R2 IMPROVEMENTS (101-150): New Features & Enhanced Functionality
+   ============================================================ */
+
+/* #R2-107: Linked element indicator on canvas */
+.linked-indicator { cursor: pointer; }
+
+/* #R2-109: Context menu info line */
+.context-menu-info {
+  padding: 4px 14px;
+  font-size: 10px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--panel-border);
+  pointer-events: none;
+  user-select: none;
+  letter-spacing: 0.3px;
+}
+
+/* #R2-111: ROTI poll buttons */
+.roti-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin: 16px 0;
+}
+.roti-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--panel-border);
+  background: var(--btn);
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.roti-btn:hover {
+  border-color: var(--accent);
+  background: var(--btn-hover);
+  transform: scale(1.1);
+}
+.roti-btn.selected {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
+/* #R2-112: Fishbowl mode indicator */
+.fishbowl-banner {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, var(--accent), #6366f1);
+  color: white;
+  padding: 8px 20px;
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 500;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: slideDown 0.3s ease;
+}
+.fishbowl-banner button {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  color: white;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+}
+.fishbowl-banner button:hover {
+  background: rgba(255,255,255,0.35);
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* #R2-114: Timer presets buttons */
+.timer-presets {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0;
+  flex-wrap: wrap;
+}
+.timer-preset-btn {
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--panel-border);
+  background: var(--btn);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.timer-preset-btn:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+/* #R2-115: Break timer overlay */
+.break-timer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  backdrop-filter: blur(20px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 700;
+  color: white;
+  animation: fadeIn 0.3s ease;
+}
+.break-timer-overlay .break-time {
+  font-size: 72px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 16px;
+}
+.break-timer-overlay .break-message {
+  font-size: 20px;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+.break-timer-overlay .break-stretch {
+  font-size: 40px;
+  animation: stretchBounce 2s ease-in-out infinite;
+}
+@keyframes stretchBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* #R2-116: Parking lot frame */
+.parking-lot-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* #R2-117: Sentiment analysis results */
+.sentiment-results {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin: 12px 0;
+}
+.sentiment-item {
+  text-align: center;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  background: var(--btn);
+}
+.sentiment-item .sentiment-emoji { font-size: 24px; }
+.sentiment-item .sentiment-count { font-size: 18px; font-weight: 700; margin-top: 4px; }
+.sentiment-item .sentiment-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+
+/* #R2-118: Word cloud display */
+.word-cloud-container {
+  background: var(--surface-2);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  min-height: 200px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.word-cloud-word {
+  display: inline-block;
+  padding: 2px 6px;
+  color: var(--text);
+  transition: transform 0.2s, color 0.2s;
+  cursor: default;
+}
+.word-cloud-word:hover {
+  transform: scale(1.15);
+  color: var(--accent);
+}
+
+/* #R2-119: Voting heatmap overlay */
+.heatmap-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  mix-blend-mode: multiply;
+}
+
+/* #R2-124: Element search panel */
+.element-search-panel {
+  position: fixed;
+  top: 60px;
+  right: 16px;
+  width: 300px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 500;
+  padding: 12px;
+  animation: panelSlideIn 0.2s ease-out;
+}
+.element-search-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--btn);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+.element-search-input:focus {
+  border-color: var(--accent);
+}
+.element-search-results {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: 8px;
+}
+.element-search-result {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.element-search-result:hover {
+  background: var(--btn-hover);
+}
+.element-search-result .esr-type {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  min-width: 50px;
+}
+
+/* #R2-123: Board stats overlay */
+.board-stats-overlay {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-xl);
+  padding: 24px 32px;
+  z-index: 600;
+  box-shadow: var(--shadow-xl);
+  min-width: 300px;
+  animation: slideIn 0.2s ease;
+}
+.board-stats-overlay h3 {
+  font-size: 16px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.board-stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--panel-border);
+}
+.board-stat-row:last-child { border-bottom: none; }
+.board-stat-value {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* #R2-129: Board title editing */
+.board-title-editable {
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.board-title-editable:hover {
+  background: var(--btn-hover);
+}
+
+/* #R2-131: Typing indicator */
+.typing-indicator {
+  position: fixed;
+  bottom: 54px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-full);
+  padding: 4px 14px;
+  font-size: 11px;
+  color: var(--text-muted);
+  z-index: 400;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  animation: fadeIn 0.15s ease;
+}
+.typing-dots {
+  display: flex;
+  gap: 3px;
+}
+.typing-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: typingBounce 1.4s infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-4px); }
+}
+
+/* #R2-133: Chat emoji reactions */
+.chat-reaction-bar {
+  display: flex;
+  gap: 2px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.chat-reaction-btn {
+  background: var(--btn);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-full);
+  padding: 1px 6px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.12s;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.chat-reaction-btn:hover {
+  background: var(--btn-hover);
+  border-color: var(--accent);
+}
+.chat-reaction-btn.reacted {
+  background: var(--accent-20);
+  border-color: var(--accent);
+}
+.chat-reaction-btn .reaction-count {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* #R2-134: User presence indicators */
+.user-presence-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+.user-presence-dot.online { background: var(--success); }
+.user-presence-dot.idle { background: var(--warning); }
+.user-presence-dot.away { background: var(--text-muted); }
+
+/* #R2-136: Ping animation on canvas */
+@keyframes pingRipple {
+  0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
+}
+.ping-animation {
+  position: fixed;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid var(--accent);
+  pointer-events: none;
+  z-index: 500;
+  animation: pingRipple 1s ease-out forwards;
+}
+
+/* #R2-137: Voice-to-text stub button */
+.voice-to-text-btn {
+  background: var(--btn);
+  border: 1px solid var(--panel-border);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--text);
+}
+.voice-to-text-btn:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+.voice-to-text-btn.recording {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: white;
+  animation: voicePulse 1s ease-in-out infinite;
+}
+@keyframes voicePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,107,107,0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(255,107,107,0); }
+}
+
+/* #R2-140: Priority indicator colors */
+.priority-high { color: #ff6b6b; }
+.priority-medium { color: #ffd966; }
+.priority-low { color: #4ecdc4; }
+
+/* #R2-141-143: Auto-arrange transition */
+.arranging-transition {
+  transition: all 0.3s ease-out;
+}
+
+/* #R2-147: Sticky template picker */
+.template-picker-menu {
+  position: fixed;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 600;
+  padding: 8px;
+  min-width: 160px;
+  animation: contextMenuIn 0.12s ease-out;
+}
+.template-picker-item {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.template-picker-item:hover {
+  background: var(--btn-hover);
+}
+.template-picker-item .tpi-icon {
+  font-size: 14px;
+}
+
+/* #R2-148: Category color bar */
+.category-bar {
+  height: 4px;
+  border-radius: 2px;
+}
+
+/* #R2-150: Batch edit panel */
+.batch-edit-panel {
+  position: fixed;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 600;
+  padding: 12px;
+  min-width: 200px;
+  animation: contextMenuIn 0.12s ease-out;
+}
+.batch-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--text);
+}
+.batch-edit-row label {
+  min-width: 50px;
+  color: var(--text-muted);
+  font-size: 11px;
+}

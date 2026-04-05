@@ -21,6 +21,36 @@ class UI {
     this.initPresentationMode();
     this.initHelpOverlay();
     this.initViewModes();
+    this.initR2Features(); // #R2-101-150: New feature UI bindings
+  }
+
+  // #R2-101-150: Initialize new feature UI bindings
+  initR2Features() {
+    // #R2-134: Presence tracking - detect idle state
+    let idleTimer = null;
+    const resetIdle = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      if (this.app.sync && this.app.sync.sendPresence) {
+        this.app.sync.sendPresence('online');
+      }
+      idleTimer = setTimeout(() => {
+        if (this.app.sync && this.app.sync.sendPresence) {
+          this.app.sync.sendPresence('idle');
+        }
+      }, 120000); // 2 minutes idle
+    };
+    document.addEventListener('mousemove', resetIdle, { passive: true });
+    document.addEventListener('keydown', resetIdle, { passive: true });
+
+    // #R2-131: Typing indicator on text edit
+    const chatInput = document.getElementById('chatInput');
+    if (chatInput) {
+      chatInput.addEventListener('input', () => {
+        if (this.app.sync && this.app.sync.sendTyping) {
+          this.app.sync.sendTyping();
+        }
+      });
+    }
   }
 
   initToolbar() {

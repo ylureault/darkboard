@@ -324,6 +324,50 @@ class SyncClient {
         this.app.onReaction(msg);
         break;
 
+      // #R2-136: Ping location from another user
+      case 'ping':
+        if (msg.userId !== this.app.myUserId && this.app._showPingAnimation) {
+          this.app._showPingAnimation(msg.x, msg.y, msg.color || '#4a9eff');
+        }
+        break;
+
+      // #R2-131: Typing indicator from another user
+      case 'typing':
+        if (msg.userId !== this.app.myUserId && this.app._showTypingIndicator) {
+          this.app._showTypingIndicator(msg.name);
+        }
+        break;
+
+      // #R2-112: Fishbowl mode sync
+      case 'fishbowl':
+        if (this.app.workshop) {
+          if (msg.active) {
+            this.app.workshop.fishbowlActive = true;
+            this.app.workshop.fishbowlEditorId = msg.editorId;
+            this.app.workshop.fishbowlEditorName = msg.editorName;
+            // If not the active editor, disable editing
+            if (msg.editorId !== this.app.myUserId) {
+              this.app.showToast(msg.editorName + ' est maintenant l\'editeur actif (Fishbowl)');
+            }
+          } else {
+            this.app.workshop.fishbowlActive = false;
+            this.app.workshop.fishbowlEditorId = null;
+            this.app.showToast('Mode Fishbowl desactive');
+          }
+          this.app.renderer.markDirty();
+        }
+        break;
+
+      // #R2-134: User presence status update
+      case 'presence': {
+        const pu = this.app.renderer.remoteUsers.get(msg.userId);
+        if (pu) {
+          pu.presenceStatus = msg.status; // 'online', 'idle', 'away'
+          this.app.updateUsersPanel();
+        }
+        break;
+      }
+
       case 'comment-add': {
         const c = msg.comment;
         // Avoid duplicate
@@ -526,6 +570,45 @@ class SyncClient {
       boardId: getBoardId(),
       elementId,
       emoji
+    });
+  }
+
+  // #R2-136: Send ping location
+  sendPing(x, y) {
+    this.send({
+      type: 'ping',
+      boardId: getBoardId(),
+      x, y
+    });
+  }
+
+  // #R2-131: Send typing indicator
+  sendTyping() {
+    if (this._typingThrottle) return;
+    this._typingThrottle = setTimeout(() => { this._typingThrottle = null; }, 2000);
+    this.send({
+      type: 'typing',
+      boardId: getBoardId()
+    });
+  }
+
+  // #R2-112: Send fishbowl mode update
+  sendFishbowl(active, editorId, editorName) {
+    this.send({
+      type: 'fishbowl',
+      boardId: getBoardId(),
+      active,
+      editorId,
+      editorName
+    });
+  }
+
+  // #R2-134: Send presence status
+  sendPresence(status) {
+    this.send({
+      type: 'presence',
+      boardId: getBoardId(),
+      status
     });
   }
 }

@@ -3154,7 +3154,7 @@ class DarkBoardApp {
         <div class="context-menu-item" data-action="autoCircle">⭕ Cercle auto</div>
         <div class="context-menu-item" data-action="smartSpace">↔ Espacement egal</div>` : ''}
         <div class="context-menu-separator"></div>
-        <div class="context-menu-item context-menu-info" style="font-size:11px;color:var(--text-muted);cursor:default">z:${hit.zIndex || 0} | ${Math.round(hit.width || 0)}x${Math.round(hit.height || 0)}</div>
+        <div class="context-menu-item context-menu-info" style="font-size:11px;color:var(--text-muted);cursor:default">z:${hit.zIndex || 0} | ${Math.round(hit.width || 0)}x${Math.round(hit.height || 0)}</div><!-- #R2-109 #R2-110 -->
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="delete" style="color:var(--danger)">Supprimer <span class="shortcut-hint">Suppr</span></div>
       `;
@@ -5931,6 +5931,304 @@ DarkBoardApp.prototype._checkElementCountMilestone = function() {
   }
 })();
 
+// #R2-122: CSV paste to stickies enhancement
+DarkBoardApp.prototype.csvPasteToStickies = function(csvText) {
+  if (!csvText || !csvText.trim()) return;
+  var lines = csvText.split('\n').filter(function(l) { return l.trim(); });
+  var self = this;
+  var startX = this.renderer.camera.x - 300;
+  var startY = this.renderer.camera.y - 200;
+  var col = 0, row = 0;
+  var ops = [], inverseOps = [];
+  lines.forEach(function(line) {
+    var cells = line.split(/[,;\t]/);
+    col = 0;
+    cells.forEach(function(cell) {
+      var text = cell.trim().replace(/^["']|["']$/g, '');
+      if (!text) { col++; return; }
+      var el = createElement('sticky', startX + col * 220, startY + row * 220);
+      el.text = text;
+      el.fill = ['#FFD966', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#DDA0DD'][col % 6];
+      self.renderer.elements.set(el.id, el);
+      ops.push({ type: 'add', element: { ...el } });
+      inverseOps.push({ type: 'delete', elementId: el.id });
+      col++;
+    });
+    row++;
+  });
+  if (ops.length > 0) {
+    this.history.push(ops, inverseOps);
+    this.sync.sendOps(ops);
+    this.renderer.markDirty();
+    this.showToast(ops.length + ' post-its crees depuis CSV');
+  }
+};
+
+// #R2-127: Print layout - prepare canvas for printing
+DarkBoardApp.prototype.printLayout = function() {
+  var self = this;
+  // Fit all elements, then trigger print
+  var elements = Array.from(this.renderer.elements.values());
+  if (elements.length === 0) { this.showToast('Aucun element a imprimer'); return; }
+  // Calculate bounds
+  var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  elements.forEach(function(el) {
+    var b = getElementBounds(el);
+    if (!b) return;
+    if (b.x < minX) minX = b.x;
+    if (b.y < minY) minY = b.y;
+    if (b.x + b.w > maxX) maxX = b.x + b.w;
+    if (b.y + b.h > maxY) maxY = b.y + b.h;
+  });
+  // Center view and zoom to fit
+  var padding = 50;
+  var cx = (minX + maxX) / 2;
+  var cy = (minY + maxY) / 2;
+  this.renderer.camera.x = cx;
+  this.renderer.camera.y = cy;
+  var fitW = window.innerWidth / (maxX - minX + padding * 2);
+  var fitH = window.innerHeight / (maxY - minY + padding * 2);
+  this.renderer.camera.zoom = Math.min(fitW, fitH, 2);
+  this.renderer.markDirty();
+  setTimeout(function() { window.print(); }, 300);
+};
+
+// #R2-132: @mention notifications in chat
+DarkBoardApp.prototype.checkMentions = function(text) {
+  if (!text) return [];
+  var mentions = [];
+  var regex = /@(\w+)/g;
+  var match;
+  while ((match = regex.exec(text)) !== null) {
+    var name = match[1].toLowerCase();
+    // Find user by name
+    for (var entry of this.renderer.remoteUsers) {
+      var user = entry[1];
+      if (user.name && user.name.toLowerCase() === name) {
+        mentions.push({ userId: entry[0], name: user.name });
+      }
+    }
+  }
+  return mentions;
+};
+
+// #R2-135: Collaborative cursor trails
+DarkBoardApp.prototype.initCursorTrails = function() {
+  this._cursorTrails = new Map(); // userId -> array of {x, y, time}
+  var self = this;
+  // Render trails in the draw loop
+  var origDraw = this.renderer.drawRemoteUsers;
+  if (origDraw) {
+    this.renderer.drawRemoteUsers = function(ctx) {
+      // Draw trails first (behind cursors)
+      for (var entry of self._cursorTrails) {
+        var trail = entry[1];
+        if (trail.points.length < 2) continue;
+        ctx.beginPath();
+        ctx.strokeStyle = trail.color || '#4a9eff';
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.3;
+        for (var i = 0; i < trail.points.length; i++) {
+          var p = trail.points[i];
+          var screen = self.renderer.worldToScreen(p.x, p.y);
+          if (i === 0) ctx.moveTo(screen.x, screen.y);
+          else ctx.lineTo(screen.x, screen.y);
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      origDraw.call(self.renderer, ctx);
+    };
+  }
+};
+DarkBoardApp.prototype._updateCursorTrail = function(userId, x, y, color) {
+  if (!this._cursorTrails) return;
+  if (!this._cursorTrails.has(userId)) {
+    this._cursorTrails.set(userId, { points: [], color: color });
+  }
+  var trail = this._cursorTrails.get(userId);
+  trail.points.push({ x: x, y: y, time: Date.now() });
+  trail.color = color;
+  // Keep only last 20 points and last 3 seconds
+  var now = Date.now();
+  trail.points = trail.points.filter(function(p) { return now - p.time < 3000; }).slice(-20);
+};
+
+// #R2-137: Voice-to-text stub (requires Web Speech API)
+DarkBoardApp.prototype.initVoiceToText = function() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return;
+  this._voiceRecognition = null;
+  this._voiceActive = false;
+};
+DarkBoardApp.prototype.toggleVoiceToText = function() {
+  var self = this;
+  if (this._voiceActive) {
+    if (this._voiceRecognition) this._voiceRecognition.stop();
+    this._voiceActive = false;
+    this.showToast('Dictee vocale arretee');
+    return;
+  }
+  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) { this.showToast('Reconnaissance vocale non disponible dans ce navigateur'); return; }
+  var recognition = new SpeechRecognition();
+  recognition.lang = 'fr-FR';
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.onresult = function(event) {
+    var transcript = '';
+    for (var i = event.resultIndex; i < event.results.length; i++) {
+      if (event.results[i].isFinal) transcript += event.results[i][0].transcript;
+    }
+    if (transcript.trim()) {
+      // Create a sticky with the transcribed text
+      var el = createElement('sticky', self.renderer.camera.x, self.renderer.camera.y);
+      el.text = transcript.trim();
+      el.fill = '#45B7D1';
+      self.renderer.elements.set(el.id, el);
+      var ops = [{ type: 'add', element: { ...el } }];
+      self.history.push(ops, [{ type: 'delete', elementId: el.id }]);
+      self.sync.sendOps(ops);
+      self.renderer.markDirty();
+      self.showToast('Post-it cree par dictee vocale');
+    }
+  };
+  recognition.onerror = function(event) {
+    self._voiceActive = false;
+    self.showToast('Erreur de reconnaissance: ' + event.error);
+  };
+  recognition.onend = function() { self._voiceActive = false; };
+  recognition.start();
+  this._voiceRecognition = recognition;
+  this._voiceActive = true;
+  this.showToast('Dictee vocale activee - parlez pour creer des post-its');
+};
+
+// #R2-121: Enhanced CSV import — detect delimiter and create stickies from rows
+DarkBoardApp.prototype.importCSVToStickies = function(text) {
+  if (!text || !text.trim()) return;
+  // Detect delimiter: tab, semicolon, or comma
+  var firstLine = text.split('\n')[0];
+  var delimiter = ',';
+  if (firstLine.indexOf('\t') !== -1) delimiter = '\t';
+  else if (firstLine.indexOf(';') !== -1) delimiter = ';';
+  var lines = text.split('\n').filter(function(l) { return l.trim(); });
+  // Skip header row if it looks like headers
+  var startIdx = 0;
+  if (lines.length > 1 && lines[0].split(delimiter).every(function(c) { return !/\d/.test(c.trim()); })) startIdx = 1;
+  var ops = [], inverseOps = [];
+  var startX = this.renderer.camera.x - 300;
+  var startY = this.renderer.camera.y - 200;
+  var self = this;
+  var colors = ['#FFD966', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#DDA0DD'];
+  for (var i = startIdx; i < lines.length; i++) {
+    var cells = lines[i].split(delimiter);
+    var row = i - startIdx;
+    for (var j = 0; j < cells.length; j++) {
+      var cellText = cells[j].trim().replace(/^["']|["']$/g, '');
+      if (!cellText) continue;
+      var el = createElement('sticky', startX + j * 220, startY + row * 220);
+      el.text = cellText;
+      el.fill = colors[j % colors.length];
+      self.renderer.elements.set(el.id, el);
+      ops.push({ type: 'add', element: { ...el } });
+      inverseOps.push({ type: 'delete', elementId: el.id });
+    }
+  }
+  if (ops.length > 0) {
+    this.history.push(ops, inverseOps);
+    this.sync.sendOps(ops);
+    this.renderer.markDirty();
+    this.showToast(ops.length + ' post-its importes depuis CSV');
+  }
+};
+
+// #R2-144: Smart alignment guides — show guides when elements are near-aligned
+DarkBoardApp.prototype.initSmartAlignGuides = function() {
+  this._alignGuides = [];
+  var self = this;
+  var SNAP_THRESHOLD = 5;
+  // Store original moveSelectedElements if it exists
+  var origMove = this._origMoveSelected || DarkBoardApp.prototype.moveSelectedElements;
+  if (origMove) {
+    this._origMoveSelected = origMove;
+    DarkBoardApp.prototype.moveSelectedElements = function(dx, dy) {
+      origMove.call(this, dx, dy);
+      // Check alignment with other elements
+      self._alignGuides = [];
+      if (self.renderer.selectedIds.size !== 1) return;
+      var selectedId = Array.from(self.renderer.selectedIds)[0];
+      var sel = self.renderer.elements.get(selectedId);
+      if (!sel) return;
+      var sb = getElementBounds(sel);
+      if (!sb) return;
+      var selCX = sb.x + sb.w / 2, selCY = sb.y + sb.h / 2;
+      for (var entry of self.renderer.elements) {
+        var el = entry[1];
+        if (el.id === selectedId) continue;
+        var b = getElementBounds(el);
+        if (!b) continue;
+        var cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+        // Horizontal center alignment
+        if (Math.abs(selCY - cy) < SNAP_THRESHOLD) {
+          self._alignGuides.push({ type: 'h', y: cy, x1: Math.min(sb.x, b.x), x2: Math.max(sb.x + sb.w, b.x + b.w) });
+        }
+        // Vertical center alignment
+        if (Math.abs(selCX - cx) < SNAP_THRESHOLD) {
+          self._alignGuides.push({ type: 'v', x: cx, y1: Math.min(sb.y, b.y), y2: Math.max(sb.y + sb.h, b.y + b.h) });
+        }
+      }
+      self.renderer.markDirty();
+    };
+  }
+};
+
+// #R2-145: Auto-connect nearby elements with connectors
+DarkBoardApp.prototype.autoConnectNearby = function() {
+  var elements = Array.from(this.renderer.elements.values());
+  var connectables = elements.filter(function(el) { return el.type === 'sticky' || el.type === 'rect' || el.type === 'circle' || el.type === 'card'; });
+  var THRESHOLD = 300; // pixels distance
+  var ops = [], inverseOps = [];
+  var self = this;
+  var existingConns = new Set();
+  // Track existing connectors to avoid duplicates
+  elements.forEach(function(el) {
+    if (el.type === 'connector' && el.sourceId && el.targetId) {
+      existingConns.add(el.sourceId + '-' + el.targetId);
+      existingConns.add(el.targetId + '-' + el.sourceId);
+    }
+  });
+  for (var i = 0; i < connectables.length; i++) {
+    for (var j = i + 1; j < connectables.length; j++) {
+      var a = connectables[i], b = connectables[j];
+      var ba = getElementBounds(a), bb = getElementBounds(b);
+      if (!ba || !bb) continue;
+      var dist = Math.sqrt(Math.pow((ba.x + ba.w / 2) - (bb.x + bb.w / 2), 2) + Math.pow((ba.y + ba.h / 2) - (bb.y + bb.h / 2), 2));
+      if (dist > THRESHOLD) continue;
+      var key = a.id + '-' + b.id;
+      if (existingConns.has(key)) continue;
+      var conn = createElement('connector', ba.x + ba.w / 2, ba.y + ba.h / 2);
+      conn.x2 = bb.x + bb.w / 2;
+      conn.y2 = bb.y + bb.h / 2;
+      conn.sourceId = a.id;
+      conn.targetId = b.id;
+      conn.stroke = '#888';
+      conn.lineWidth = 1;
+      self.renderer.elements.set(conn.id, conn);
+      ops.push({ type: 'add', element: { ...conn } });
+      inverseOps.push({ type: 'delete', elementId: conn.id });
+      existingConns.add(key);
+    }
+  }
+  if (ops.length > 0) {
+    this.history.push(ops, inverseOps);
+    this.sync.sendOps(ops);
+    this.renderer.markDirty();
+    this.showToast(ops.length + ' connecteurs crees automatiquement');
+  } else {
+    this.showToast('Aucun element assez proche a connecter');
+  }
+};
+
 // Wire R2 improvements into init
 (function() {
   var origInitImprovements = DarkBoardApp.prototype.initImprovements;
@@ -5956,5 +6254,11 @@ DarkBoardApp.prototype._checkElementCountMilestone = function() {
     this.initSoundEffects();
     // #R2-190
     this.initSeasonalTheme();
+    // #R2-135
+    this.initCursorTrails();
+    // #R2-137
+    this.initVoiceToText();
+    // #R2-144
+    this.initSmartAlignGuides();
   };
 })();

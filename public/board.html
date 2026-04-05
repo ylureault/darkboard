@@ -375,6 +375,90 @@
         Clusters
         <span class="fctl-tooltip">Regrouper automatiquement les post-its similaires</span>
       </button>
+      <div class="fctl-separator"></div>
+      <!-- #R2-111: ROTI Poll -->
+      <button class="fctl-btn" id="btnROTI" title="ROTI — Return On Time Invested" aria-label="Sondage ROTI">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+        </svg>
+        ROTI
+        <span class="fctl-tooltip">Return On Time Invested (1-5)</span>
+      </button>
+      <!-- #R2-112: Fishbowl mode -->
+      <button class="fctl-btn" id="btnFishbowl" title="Fishbowl — Un editeur a la fois" aria-label="Mode fishbowl">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <circle cx="12" cy="12" r="10"/><path d="M8 12a4 4 0 018 0"/><circle cx="12" cy="12" r="2"/>
+        </svg>
+        Fishbowl
+        <span class="fctl-tooltip">Un seul editeur a la fois, les autres observent</span>
+      </button>
+      <!-- #R2-113: Export vote CSV -->
+      <button class="fctl-btn" id="btnVoteCSV" title="Export votes CSV" aria-label="Exporter les votes en CSV">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/>
+          <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>
+        </svg>
+        Votes CSV
+        <span class="fctl-tooltip">Exporter les resultats de vote en CSV</span>
+      </button>
+      <!-- #R2-114: Timer presets -->
+      <button class="fctl-btn" id="btnTimerPresets" title="Presets timer" aria-label="Presets de timer rapides">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <circle cx="12" cy="13" r="8"/><path d="M12 9v4"/><path d="M5 3l2 2M19 3l-2 2"/>
+          <circle cx="12" cy="13" r="1" fill="currentColor"/>
+        </svg>
+        Presets
+        <span class="fctl-tooltip">Timer rapide: 1, 3, 5 ou 10 minutes</span>
+      </button>
+      <!-- #R2-115: Break timer -->
+      <button class="fctl-btn" id="btnBreakTimer" title="Pause — Lancer une pause" aria-label="Lancer un timer de pause">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <path d="M18.36 6.64a9 9 0 11-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>
+        </svg>
+        Pause
+        <span class="fctl-tooltip">Timer de pause avec rappel de stretching</span>
+      </button>
+      <!-- #R2-116: Parking lot -->
+      <button class="fctl-btn" id="btnParkingLot" title="Parking Lot — Zone de sujets a traiter plus tard" aria-label="Creer un parking lot">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><text x="12" y="16" text-anchor="middle" font-size="12" font-weight="bold" fill="currentColor" stroke="none">P</text>
+        </svg>
+        Parking
+        <span class="fctl-tooltip">Creer une zone pour les sujets a traiter plus tard</span>
+      </button>
+      <!-- #R2-117: Sentiment analysis -->
+      <button class="fctl-btn" id="btnSentiment" title="Analyse sentiment — Analyser le ton des post-its" aria-label="Analyse de sentiment">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>
+        </svg>
+        Sentiment
+        <span class="fctl-tooltip">Analyser le sentiment des post-its</span>
+      </button>
+      <!-- #R2-118: Word cloud -->
+      <button class="fctl-btn" id="btnWordCloud" title="Nuage de mots — Generer un nuage de mots" aria-label="Generer un nuage de mots">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <path d="M17 10H3M21 6H3M21 14H3M17 18H3"/>
+        </svg>
+        Mots
+        <span class="fctl-tooltip">Nuage de mots a partir des post-its</span>
+      </button>
+      <!-- #R2-119: Voting heatmap -->
+      <button class="fctl-btn" id="btnHeatmap" title="Heatmap — Heatmap des votes" aria-label="Heatmap des votes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        Heatmap
+        <span class="fctl-tooltip">Afficher la heatmap de vote sur le canevas</span>
+      </button>
+      <!-- #R2-120: Retro template -->
+      <button class="fctl-btn" id="btnRetroTemplate" title="Retro — Generer un template de retrospective" aria-label="Template de retrospective">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <rect x="2" y="3" width="6" height="18" rx="1"/><rect x="9" y="3" width="6" height="18" rx="1"/><rect x="16" y="3" width="6" height="18" rx="1"/>
+        </svg>
+        Retro
+        <span class="fctl-tooltip">Template 3 colonnes: bien / ameliorer / actions</span>
+      </button>
     </div>
   </div>
 
