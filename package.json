@@ -9,6 +9,7 @@
     "test": "node test/darkboard.test.js && node test/server.test.js"
   },
   "dependencies": {
+    "compression": "^1.8.1",
     "express": "^4.18.2",
     "uuid": "^9.0.0",
     "ws": "^8.16.0"

@@ -3,13 +3,21 @@ const http = require('http');
 const { WebSocketServer } = require('ws');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const compression = require('compression'); // #R2-195
 const { BoardStore } = require('./lib/boards');
 const { handleWebSocket } = require('./lib/ws-handler');
 const { startCleanup } = require('./lib/board-cleanup');
 
+// #R2-198: WebSocket server with per-message deflate compression option
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({
+  server,
+  perMessageDeflate: {
+    zlibDeflateOptions: { chunkSize: 1024, memLevel: 7, level: 3 },
+    threshold: 256 // only compress messages > 256 bytes
+  }
+});
 
 const boardStore = new BoardStore();
 
@@ -36,10 +44,20 @@ setInterval(() => {
   }
 }, 300000);
 
-// Security headers
+// #R2-195: Gzip compression for API responses
+app.use(compression());
+
+// Security headers + #R2-196: CORS headers for API routes
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
+  // #R2-196: CORS headers
+  if (req.path.startsWith('/api')) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+  }
   next();
 });
 
@@ -114,11 +132,17 @@ app.post('/api/boards', (req, res) => {
   res.status(201).json({ id: boardId, url: `/board/${boardId}` });
 });
 
-// READ a board
+// READ a board (with #R2-197 ETag support)
 app.get('/api/board/:id', (req, res) => {
   const board = boardStore.getBoard(req.params.id);
   if (!board) {
     return res.status(404).json({ error: 'Board not found' });
+  }
+  // #R2-197: ETag based on element count + last modified
+  const etag = `"${board.elements.size}-${board.lastModified || 0}"`;
+  res.setHeader('ETag', etag);
+  if (req.headers['if-none-match'] === etag) {
+    return res.sendStatus(304);
   }
   res.json({
     id: req.params.id,
@@ -166,6 +190,49 @@ app.put('/api/board/:id', (req, res) => {
   });
 });
 
+// #R2-193: Board analytics endpoint
+app.get('/api/board/:id/analytics', (req, res) => {
+  const board = boardStore.getBoard(req.params.id);
+  if (!board) {
+    return res.status(404).json({ error: 'Board not found' });
+  }
+  const elements = Array.from(board.elements.values());
+  // Element counts by type
+  const typeCounts = {};
+  const creationTimeline = [];
+  const userActivity = {};
+  for (const el of elements) {
+    typeCounts[el.type] = (typeCounts[el.type] || 0) + 1;
+    if (el.zIndex) creationTimeline.push({ id: el.id, type: el.type, created: el.zIndex });
+    if (el.createdBy) userActivity[el.createdBy] = (userActivity[el.createdBy] || 0) + 1;
+  }
+  creationTimeline.sort((a, b) => a.created - b.created);
+  res.json({
+    id: req.params.id,
+    totalElements: elements.length,
+    typeCounts,
+    userActivity,
+    creationTimeline: creationTimeline.slice(-100), // last 100
+    connectedUsers: board.connections.size,
+    createdAt: board.createdAt,
+    lastActivity: board.lastActivity
+  });
+});
+
+// #R2-200: API versioning prefix - mirror main API endpoints under /api/v1/
+app.use('/api/v1', (req, res, next) => {
+  // Rewrite /api/v1/... to /api/...
+  req.url = req.url; // pass through
+  next();
+});
+app.get('/api/v1/boards', (req, res) => res.redirect(307, '/api/boards'));
+app.post('/api/v1/boards', (req, res) => res.redirect(307, '/api/boards'));
+app.get('/api/v1/board/:id', (req, res) => res.redirect(307, `/api/board/${req.params.id}`));
+app.get('/api/v1/board/:id/stats', (req, res) => res.redirect(307, `/api/board/${req.params.id}/stats`));
+app.get('/api/v1/board/:id/analytics', (req, res) => res.redirect(307, `/api/board/${req.params.id}/analytics`));
+app.put('/api/v1/board/:id', (req, res) => res.redirect(307, `/api/board/${req.params.id}`));
+app.get('/api/v1/health', (req, res) => res.redirect(307, '/api/health'));
+
 // #181 - Health check endpoint
 app.get('/api/health', (req, res) => {
   const uptime = process.uptime();
@@ -192,7 +259,19 @@ startCleanup(boardStore);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`DarkBoard running on http://localhost:${PORT}`);
+  // #R2-194: Server startup banner with version and config info
+  const pkg = require('./package.json');
+  console.log('');
+  console.log('  ╔══════════════════════════════════════════╗');
+  console.log('  ║   DarkBoard by Insuffle Academie         ║');
+  console.log(`  ║   Version: ${(pkg.version || '1.0.0').padEnd(30)}║`);
+  console.log(`  ║   Port: ${String(PORT).padEnd(33)}║`);
+  console.log(`  ║   Boards loaded: ${String(boardStore.getAllBoardIds().length).padEnd(24)}║`);
+  console.log(`  ║   Node: ${process.version.padEnd(33)}║`);
+  console.log(`  ║   PID: ${String(process.pid).padEnd(34)}║`);
+  console.log('  ╚══════════════════════════════════════════╝');
+  console.log(`  → http://localhost:${PORT}`);
+  console.log('');
 });
 
 // #182 - Graceful shutdown

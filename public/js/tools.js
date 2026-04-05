@@ -359,12 +359,36 @@ const Tools = {
             el.points = orig.points.map(p => ({ x: p.x + snapDx, y: p.y + snapDy }));
           }
         }
+        // #R2-11: Show ghost preview at original position while dragging
+        if (Math.abs(snapDx) > 3 || Math.abs(snapDy) > 3) {
+          app.renderer._dragGhosts = [];
+          for (const [id, orig] of this.originalElements) {
+            app.renderer._dragGhosts.push({ x: orig.x, y: orig.y, w: orig.width || 0, h: orig.height || 0 });
+          }
+        } else {
+          app.renderer._dragGhosts = null;
+        }
+        // #R2-20: Show dimension tooltip during move (total offset)
+        if (this.originalElements.size > 0 && (Math.abs(snapDx) > 1 || Math.abs(snapDy) > 1)) {
+          const firstOrig = this.originalElements.values().next().value;
+          if (firstOrig) {
+            const el = app.renderer.elements.get(this.originalElements.keys().next().value);
+            if (el) {
+              app.renderer._resizeDimensions = {
+                w: Math.round(snapDx),
+                h: Math.round(snapDy),
+                x: el.x + (el.width || 0) / 2,
+                y: el.y + (el.height || 0) + 20 / app.renderer.camera.zoom
+              };
+            }
+          }
+        }
       } else if (this.dragType === 'resize') {
         const { elementId, handle } = this.resizeHandle;
         const el = app.renderer.elements.get(elementId);
         const orig = this.originalElements.get(elementId);
         if (el && orig) {
-          this.applyResize(el, orig, handle, dx, dy, e.shiftKey);
+          this.applyResize(el, orig, handle, dx, dy, e.shiftKey, e.ctrlKey || e.metaKey);
           // Show dimension tooltip during resize
           app.renderer._resizeDimensions = {
             w: Math.round(el.width),
@@ -514,12 +538,23 @@ const Tools = {
         }
       } else if (this.dragType === 'marquee' && app.renderer.selectionBox) {
         const box = app.renderer.selectionBox;
+        // #R2-19: Alt held = include partially overlapping elements
+        const partial = e && e.altKey;
         for (const [id, el] of app.renderer.elements) {
           const bounds = getElementBounds(el);
-          if (bounds.x >= box.x && bounds.y >= box.y &&
-              bounds.x + bounds.w <= box.x + box.w &&
-              bounds.y + bounds.h <= box.y + box.h) {
-            app.renderer.selectedIds.add(id);
+          if (partial) {
+            // Partial overlap: any intersection with marquee
+            if (bounds.x + bounds.w > box.x && bounds.x < box.x + box.w &&
+                bounds.y + bounds.h > box.y && bounds.y < box.y + box.h) {
+              app.renderer.selectedIds.add(id);
+            }
+          } else {
+            // Fully enclosed
+            if (bounds.x >= box.x && bounds.y >= box.y &&
+                bounds.x + bounds.w <= box.x + box.w &&
+                bounds.y + bounds.h <= box.y + box.h) {
+              app.renderer.selectedIds.add(id);
+            }
           }
         }
         app.renderer.selectionBox = null;
@@ -531,11 +566,12 @@ const Tools = {
       this.originalElements = null;
       this.altDuplicated = false;
       app.renderer._resizeDimensions = null;
+      app.renderer._dragGhosts = null; // #R2-11: Clear ghost preview
       app.renderer.markDirty();
       if (app.updateUrlHash) app.updateUrlHash();
     },
 
-    applyResize(el, orig, handle, dx, dy, constrain) {
+    applyResize(el, orig, handle, dx, dy, constrain, ctrlKey) {
       if (el.type === 'line' || el.type === 'arrow') {
         // For lines, move the appropriate endpoint
         if (handle === 'nw' || handle === 'w' || handle === 'sw') {
@@ -555,15 +591,37 @@ const Tools = {
       if (handle.includes('s')) { newH = orig.height + dy; }
       if (handle.includes('n')) { newY = orig.y + dy; newH = orig.height - dy; }
 
+      // #R2-14: Constrain resize to aspect ratio when holding Shift
       if (constrain) {
-        const size = Math.max(Math.abs(newW), Math.abs(newH));
-        newW = newW < 0 ? -size : size;
-        newH = newH < 0 ? -size : size;
+        const ratio = orig.width / (orig.height || 1);
+        if (handle === 'nw' || handle === 'se' || handle === 'ne' || handle === 'sw') {
+          // Corner handles: maintain aspect ratio
+          const absW = Math.abs(newW);
+          const absH = Math.abs(newH);
+          if (absW / ratio > absH) {
+            newH = (newH < 0 ? -1 : 1) * absW / ratio;
+          } else {
+            newW = (newW < 0 ? -1 : 1) * absH * ratio;
+          }
+        } else {
+          // Edge handles: square constraint
+          const size = Math.max(Math.abs(newW), Math.abs(newH));
+          newW = newW < 0 ? -size : size;
+          newH = newH < 0 ? -size : size;
+        }
       }
 
-      // Min size
-      if (newW < 10) { newW = 10; }
-      if (newH < 10) { newH = 10; }
+      // #R2-13: Hold Ctrl while resizing to resize from center
+      if (ctrlKey) {
+        const cx = orig.x + orig.width / 2;
+        const cy = orig.y + orig.height / 2;
+        newX = cx - newW / 2;
+        newY = cy - newH / 2;
+      }
+
+      // #R2-15: Minimum element size of 20x20 during resize
+      if (newW < 20) { newW = 20; }
+      if (newH < 20) { newH = 20; }
 
       el.x = newX;
       el.y = newY;

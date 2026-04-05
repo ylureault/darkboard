@@ -308,6 +308,195 @@ test('BoardStore: error handling for disk operations', () => {
 });
 
 // ============================================================
+// Iteration 169-175 Tests
+// ============================================================
+
+// 169. Test applyOps with interleaved add/update/delete operations
+test('169: applyOps with interleaved add/update/delete operations', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+  store.createBoard('srv-interleave');
+
+  // Interleaved operations in a single batch
+  store.applyOps('srv-interleave', [
+    { type: 'add', elementId: 'i1', element: { id: 'i1', type: 'rect', x: 0, y: 0 } },
+    { type: 'add', elementId: 'i2', element: { id: 'i2', type: 'sticky', x: 10, y: 10 } },
+    { type: 'update', elementId: 'i1', props: { x: 50, fill: '#ff0000' } },
+    { type: 'add', elementId: 'i3', element: { id: 'i3', type: 'circle', x: 20, y: 20 } },
+    { type: 'delete', elementId: 'i2' },
+    { type: 'update', elementId: 'i3', props: { width: 100 } }
+  ]);
+
+  const board = store.getBoard('srv-interleave');
+  assert.strictEqual(board.elements.size, 2); // i1 and i3 remain
+  assert.ok(board.elements.has('i1'));
+  assert.ok(!board.elements.has('i2')); // deleted
+  assert.ok(board.elements.has('i3'));
+  assert.strictEqual(board.elements.get('i1').x, 50);
+  assert.strictEqual(board.elements.get('i1').fill, '#ff0000');
+  assert.strictEqual(board.elements.get('i3').width, 100);
+
+  store.deleteBoard('srv-interleave');
+});
+
+// 170. Test tag registry persistence (set tagRegistry, verify it persists)
+test('170: Tag registry persistence', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+  store.createBoard('srv-tags');
+
+  const board = store.getBoard('srv-tags');
+  assert.ok(Array.isArray(board.tagRegistry));
+  assert.strictEqual(board.tagRegistry.length, 0);
+
+  // Set tag registry
+  board.tagRegistry.push('important', 'todo', 'review');
+  assert.strictEqual(board.tagRegistry.length, 3);
+  assert.strictEqual(board.tagRegistry[0], 'important');
+  assert.strictEqual(board.tagRegistry[1], 'todo');
+  assert.strictEqual(board.tagRegistry[2], 'review');
+
+  // Verify it persists on the same board reference
+  const board2 = store.getBoard('srv-tags');
+  assert.strictEqual(board2.tagRegistry.length, 3);
+  assert.deepStrictEqual(board2.tagRegistry, ['important', 'todo', 'review']);
+
+  store.deleteBoard('srv-tags');
+});
+
+// 171. Test anchor operations on non-existent board (should not throw)
+test('171: Anchor operations on non-existent board do not throw', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  // None of these should throw
+  try {
+    store.addAnchor('nonexistent-anchor-board', { id: 'a1', name: 'test' });
+    store.updateAnchor('nonexistent-anchor-board', 'a1', { name: 'updated' });
+    store.deleteAnchor('nonexistent-anchor-board', 'a1');
+    assert.ok(true);
+  } catch (e) {
+    assert.fail('Anchor operations on non-existent board should not throw: ' + e.message);
+  }
+});
+
+// 172. Test comment operations on non-existent board (should not throw)
+test('172: Comment operations on non-existent board do not throw', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  try {
+    store.addComment('nonexistent-comment-board', { id: 'c1', text: 'hello' });
+    store.updateComment('nonexistent-comment-board', 'c1', { text: 'updated' });
+    store.deleteComment('nonexistent-comment-board', 'c1');
+    assert.ok(true);
+  } catch (e) {
+    assert.fail('Comment operations on non-existent board should not throw: ' + e.message);
+  }
+});
+
+// 173. Test that multiple boards can coexist independently
+test('173: Multiple boards coexist independently', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-multi-a');
+  store.createBoard('srv-multi-b');
+  store.createBoard('srv-multi-c');
+
+  // Add different elements to each board
+  store.applyOps('srv-multi-a', [
+    { type: 'add', elementId: 'ea1', element: { id: 'ea1', type: 'rect', x: 1 } }
+  ]);
+  store.applyOps('srv-multi-b', [
+    { type: 'add', elementId: 'eb1', element: { id: 'eb1', type: 'sticky', x: 2 } },
+    { type: 'add', elementId: 'eb2', element: { id: 'eb2', type: 'circle', x: 3 } }
+  ]);
+  store.applyOps('srv-multi-c', [
+    { type: 'add', elementId: 'ec1', element: { id: 'ec1', type: 'line', x: 4 } },
+    { type: 'add', elementId: 'ec2', element: { id: 'ec2', type: 'arrow', x: 5 } },
+    { type: 'add', elementId: 'ec3', element: { id: 'ec3', type: 'freehand', x: 6 } }
+  ]);
+
+  // Verify each board has its own elements
+  assert.strictEqual(store.getBoard('srv-multi-a').elements.size, 1);
+  assert.strictEqual(store.getBoard('srv-multi-b').elements.size, 2);
+  assert.strictEqual(store.getBoard('srv-multi-c').elements.size, 3);
+
+  // Deleting from one board doesn't affect others
+  store.applyOps('srv-multi-b', [{ type: 'delete', elementId: 'eb1' }]);
+  assert.strictEqual(store.getBoard('srv-multi-a').elements.size, 1);
+  assert.strictEqual(store.getBoard('srv-multi-b').elements.size, 1);
+  assert.strictEqual(store.getBoard('srv-multi-c').elements.size, 3);
+
+  store.deleteBoard('srv-multi-a');
+  store.deleteBoard('srv-multi-b');
+  store.deleteBoard('srv-multi-c');
+});
+
+// 174. Test that deleteBoard cleans up completely
+test('174: deleteBoard cleans up completely', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-delete-test');
+  store.applyOps('srv-delete-test', [
+    { type: 'add', elementId: 'd1', element: { id: 'd1', type: 'rect' } }
+  ]);
+  store.addAnchor('srv-delete-test', { id: 'a1', name: 'anchor' });
+  store.addComment('srv-delete-test', { id: 'c1', text: 'comment' });
+
+  // Verify the board exists and has data
+  assert.ok(store.getBoard('srv-delete-test'));
+  assert.strictEqual(store.getBoard('srv-delete-test').elements.size, 1);
+
+  // Delete the board
+  store.deleteBoard('srv-delete-test');
+
+  // Verify it's completely gone
+  assert.strictEqual(store.getBoard('srv-delete-test'), null);
+  assert.ok(!store.getAllBoardIds().includes('srv-delete-test'));
+
+  // Deleting again should not throw
+  try {
+    store.deleteBoard('srv-delete-test');
+    assert.ok(true);
+  } catch (e) {
+    assert.fail('Double delete should not throw');
+  }
+});
+
+// 175. Test saveAll saves all boards without error
+test('175: saveAll saves all boards without error', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-saveall-1');
+  store.createBoard('srv-saveall-2');
+  store.applyOps('srv-saveall-1', [
+    { type: 'add', elementId: 'sa1', element: { id: 'sa1', type: 'rect', x: 0, y: 0 } }
+  ]);
+  store.applyOps('srv-saveall-2', [
+    { type: 'add', elementId: 'sa2', element: { id: 'sa2', type: 'sticky', x: 10, y: 20 } }
+  ]);
+
+  try {
+    store.saveAll();
+    assert.ok(true);
+  } catch (e) {
+    assert.fail('saveAll should not throw: ' + e.message);
+  }
+
+  // Verify boards still exist after save
+  assert.ok(store.getBoard('srv-saveall-1'));
+  assert.ok(store.getBoard('srv-saveall-2'));
+
+  // Clean up
+  store.deleteBoard('srv-saveall-1');
+  store.deleteBoard('srv-saveall-2');
+});
+
+// ============================================================
 // Summary
 // ============================================================
 

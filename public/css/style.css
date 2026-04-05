@@ -8,16 +8,18 @@
   /* Colors */
   --bg: #121212;
   --panel: #1e1e1e;
-  --panel-border: #333;
+  --panel-border: #3d3d3d; /* #R2-62 lightened from #333 for better dark theme contrast */
   --btn: #2a2a2a;
   --btn-hover: #3a3a3a;
   --btn-active: #4a9eff;
   --text: #e0e0e0;
-  --text-muted: #999;
+  --text-muted: #aaa; /* #R2-56 improved from #999 for WCAG AA contrast (4.5:1+) */
   --accent: #4a9eff;
+  --accent-dark: #3580d9; /* #R2-63 darker accent for hover states */
+  --accent-light: #6db3ff; /* #R2-63 lighter accent for active states */
   --danger: #e94560;
   --success: #4ecdc4;
-  --warning: #ffd966;
+  --warning: #f0b840; /* #R2-64 softer amber instead of harsh yellow */
   --info: #4a9eff;
   --canvas-bg: #121212;
   --grid-color: rgba(255, 255, 255, 0.05);
@@ -26,46 +28,72 @@
   --accent-10: rgba(74,158,255,0.1);
   --accent-20: rgba(74,158,255,0.2);
   --accent-40: rgba(74,158,255,0.4);
+  /* #R2-65 Semantic color tokens */
+  --color-positive: #4ecdc4;
+  --color-negative: #e94560;
+  --color-neutral: #8a8a9a;
   /* Surfaces */
   --surface-1: var(--panel);
   --surface-2: var(--btn);
   --surface-3: var(--btn-hover);
   /* Typography */
   --fs-xs: 10px; --fs-sm: 12px; --fs-md: 14px; --fs-lg: 16px; --fs-xl: 20px; --fs-2xl: 28px;
-  --fw-normal: 400; --fw-medium: 500; --fw-semibold: 600; --fw-bold: 700; --fw-extrabold: 800;
+  --fw-light: 300; --fw-normal: 400; --fw-medium: 500; --fw-semibold: 600; --fw-bold: 700; --fw-extrabold: 800; /* #R2-58 full weight scale */
   --lh-tight: 1.2; --lh-normal: 1.4; --lh-relaxed: 1.6;
-  --ls-tight: -0.5px; --ls-normal: 0px; --ls-wide: 0.5px;
-  --font-mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  --ls-tight: -0.5px; --ls-normal: 0px; --ls-wide: 0.5px; --ls-heading: 0.3px; /* #R2-52 heading letter-spacing */
+  --font-mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Source Code Pro', Consolas, 'Courier New', monospace; /* #R2-55 better monospace stack */
   /* Spacing */
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
   /* Radii */
   --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px; --radius-full: 9999px;
-  /* Shadows */
+  /* #R2-69 Shadow depth system: elevation-1 through elevation-4 */
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.2);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
   --shadow-lg: 0 8px 30px rgba(0,0,0,0.4);
   --shadow-xl: 0 16px 60px rgba(0,0,0,0.5);
   --shadow-inset: inset 0 1px 3px rgba(0,0,0,0.15);
+  --elevation-1: 0 1px 2px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.12);
+  --elevation-2: 0 2px 6px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.15);
+  --elevation-3: 0 6px 16px rgba(0,0,0,0.3), 0 3px 10px rgba(0,0,0,0.2);
+  --elevation-4: 0 12px 40px rgba(0,0,0,0.4), 0 6px 16px rgba(0,0,0,0.25);
+  /* #R2-78 Button size tokens */
+  --btn-size-sm: 28px;
+  --btn-size-md: 36px;
+  --btn-size-lg: 44px;
+  /* #R2-79 Icon size tokens */
+  --icon-inline: 16px;
+  --icon-toolbar: 20px;
+  --icon-large: 24px;
 }
 
 /* Light theme (day mode) */
 body.light-theme {
-  --bg: #f0f0f0;
-  --panel: #ffffff;
-  --panel-border: #ddd;
-  --btn: #e8e8e8;
-  --btn-hover: #d8d8d8;
+  --bg: #f2f1ef; /* #R2-66 subtle warmth added */
+  --panel: #fffffe; /* #R2-66 very slight warm white */
+  --panel-border: #e0ddd8; /* #R2-66 warm border */
+  --btn: #eae8e4; /* #R2-66 warm button bg */
+  --btn-hover: #dddad5;
   --text: #1a1a1a;
-  --text-muted: #666;
-  --canvas-bg: #f5f5f5;
+  --text-muted: #5c5c5c; /* #R2-56 better contrast for light theme WCAG AA */
+  --accent-dark: #2e72c7; /* #R2-63 */
+  --accent-light: #80bcff; /* #R2-63 */
+  --warning: #d9960a; /* #R2-64 amber for light theme */
+  --canvas-bg: #f5f4f2; /* #R2-66 warm canvas */
   --grid-color: rgba(0, 0, 0, 0.06);
   --text-on-canvas: #1a1a1a;
   --accent-10: rgba(74,158,255,0.08);
   --accent-20: rgba(74,158,255,0.15);
+  --color-positive: #2da89e; /* #R2-65 */
+  --color-negative: #cc3049; /* #R2-65 */
+  --color-neutral: #6e6e7a; /* #R2-65 */
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
   --shadow-lg: 0 8px 30px rgba(0,0,0,0.15);
   --shadow-xl: 0 16px 60px rgba(0,0,0,0.2);
+  --elevation-1: 0 1px 2px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.05);
+  --elevation-2: 0 2px 6px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.06);
+  --elevation-3: 0 6px 16px rgba(0,0,0,0.1), 0 3px 10px rgba(0,0,0,0.08);
+  --elevation-4: 0 12px 40px rgba(0,0,0,0.15), 0 6px 16px rgba(0,0,0,0.1);
 }
 
 /* Prefers color scheme auto-detection */
@@ -84,6 +112,19 @@ html, body {
   color: var(--text);
   user-select: none;
   -webkit-user-select: none;
+  text-rendering: optimizeLegibility; /* #R2-54 */
+  -webkit-font-smoothing: antialiased;
+}
+
+/* #R2-91 #R2-100 Smooth theme transition animation (200ms) */
+body, body * {
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: 0s;
+}
+body.theme-transitioning,
+body.theme-transitioning * {
+  transition-duration: 200ms !important;
+  transition-timing-function: ease !important;
 }
 
 /* Global transitions */
@@ -91,24 +132,31 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
   transition: all 0.15s ease;
 }
 
-/* Focus visible for accessibility */
+/* #R2-89 Improved focus ring with animation */
 *:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
+  animation: focusRingPulse 0.3s ease-out;
+}
+@keyframes focusRingPulse {
+  0% { outline-offset: 0px; outline-color: transparent; }
+  100% { outline-offset: 2px; outline-color: var(--accent); }
 }
 
-/* Custom scrollbars */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--btn-hover); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+/* #R2-85 #R2-98 Improved scrollbar appearance with theme-aware colors */
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: transparent; border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; border: 1px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
 
 /* Disabled state */
 .disabled, [disabled] { opacity: 0.4; pointer-events: none; }
 
-/* Text utilities */
+/* #R2-60 Text overflow handling with ellipsis */
 .text-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.text-clamp-2 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.text-clamp-3 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 
 /* Tabular nums for counters */
 .tabular-nums, #zoomLevel, .timer-time, .vote-bar-remaining, .users-count {
@@ -165,6 +213,8 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
   padding: var(--sp-8);
   min-width: 340px;
   max-width: 440px;
+  max-height: 85vh; /* #R2-73 modal max-height with scroll */
+  overflow-y: auto;
   text-align: center;
   box-shadow: var(--shadow-xl);
   animation: slideIn 0.25s ease;
@@ -375,22 +425,25 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
 .modal h2 {
   font-size: 22px;
   margin-bottom: 8px;
+  letter-spacing: var(--ls-heading); /* #R2-52 */
 }
 
 .modal p {
-  font-size: 14px;
+  font-size: var(--fs-md); /* #R2-59 consistent font-size scale */
   color: var(--text-muted);
   margin-bottom: 20px;
+  line-height: var(--lh-relaxed); /* #R2-53 improved line-height */
 }
 
+/* #R2-77 improved input field sizing */
 .modal input[type="text"],
 .modal input[type="number"] {
   background: var(--btn);
   border: 2px solid var(--panel-border);
   color: var(--text);
-  padding: 12px 16px;
-  font-size: 16px;
-  border-radius: 10px;
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-lg);
+  border-radius: var(--radius-lg);
   width: 100%;
   outline: none;
   transition: border-color 0.2s;
@@ -569,6 +622,7 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
   right: 3px;
   font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
+  font-family: var(--font-mono); /* #R2-55 monospace for shortcut labels */
   color: var(--text-muted);
   pointer-events: none;
   opacity: 0.7;
@@ -612,6 +666,7 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
   margin: 0 0 8px;
   color: var(--text);
   opacity: 0.5;
+  letter-spacing: var(--ls-heading); /* #R2-52 */
 }
 
 .empty-board-hint p {
@@ -627,7 +682,7 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
   border-radius: 4px;
   padding: 1px 6px;
   font-size: 12px;
-  font-family: system-ui, sans-serif;
+  font-family: var(--font-mono); /* #R2-55 better monospace font */
   color: var(--text);
 }
 
@@ -698,9 +753,23 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
+/* #R2-81 checkmark on active color swatch */
 .color-swatch.active {
   border-color: white;
   box-shadow: 0 0 0 2px var(--accent);
+  position: relative;
+}
+.color-swatch.active::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 6px;
+  border-left: 2px solid white;
+  border-bottom: 2px solid white;
+  transform: translate(-50%, -60%) rotate(-45deg);
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
 }
 
 /* Stroke width */
@@ -836,6 +905,7 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
 }
 
 /* User dropdown (for goto-user) */
+/* #R2-82 dropdown with subtle animation */
 .users-dropdown {
   position: absolute;
   top: 100%;
@@ -844,12 +914,17 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
   background: rgba(30, 30, 30, 0.95);
   backdrop-filter: blur(12px);
   border: 1px solid var(--panel-border);
-  border-radius: 10px;
-  padding: 8px 0;
+  border-radius: var(--radius-lg); /* #R2-74 */
+  padding: var(--sp-2) 0; /* #R2-72 */
   min-width: 220px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  box-shadow: var(--elevation-4); /* #R2-69 */
   z-index: 200;
-  animation: panelSlideIn 0.15s ease-out;
+  animation: dropdownSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top right;
+}
+@keyframes dropdownSlideIn {
+  from { opacity: 0; transform: scale(0.95) translateY(-4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .users-dropdown-item {
@@ -913,10 +988,10 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
   left: 12px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
-  border-radius: 10px;
-  padding: 8px;
+  border-radius: var(--radius-lg); /* #R2-74 consistent border-radius */
+  padding: var(--sp-3); /* #R2-72 consistent padding scale */
   z-index: 100;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  box-shadow: var(--elevation-3); /* #R2-69 */
   transition: all 0.2s ease;
 }
 
@@ -932,7 +1007,7 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
 .facilitator-controls {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--sp-2); /* #R2-76 better gap spacing (8px) */
 }
 
 .fctl-btn {
@@ -1526,15 +1601,22 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
 /* =========================
    CONTEXT MENU
    ========================= */
+/* #R2-67 glassmorphism on context menu */
 .context-menu {
   position: fixed;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 8px;
+  background: rgba(30, 30, 30, 0.85);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius-md);
   padding: 4px;
   z-index: 200;
   min-width: 160px;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  box-shadow: var(--elevation-4);
+}
+body.light-theme .context-menu {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(0,0,0,0.08);
 }
 
 .context-menu-item {
@@ -1559,10 +1641,11 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
   color: var(--text-muted);
 }
 
+/* #R2-87 gradient fade divider */
 .context-menu-separator {
   height: 1px;
-  background: var(--panel-border);
-  margin: 4px 0;
+  background: linear-gradient(to right, transparent, var(--panel-border), transparent);
+  margin: 4px 8px;
 }
 
 /* =========================
@@ -2112,14 +2195,16 @@ body.light-theme .kanban-card { background: white; }
   font-style: italic;
 }
 
+/* #R2-86 pill shape badge with subtle shadow */
 .tag-pill {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
-  border-radius: 10px;
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
   font-size: 11px;
   font-weight: 600;
+  box-shadow: var(--elevation-1);
 }
 
 .tag-remove {
@@ -2672,7 +2757,7 @@ body.light-theme .kanban-card { background: white; }
   border-radius: 4px;
   padding: 1px 6px;
   font-size: 11px;
-  font-family: inherit;
+  font-family: var(--font-mono); /* #R2-55 better monospace font */
   color: var(--text);
   white-space: nowrap;
   min-width: 20px;

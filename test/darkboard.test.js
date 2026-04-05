@@ -680,6 +680,472 @@ test('175: board creation and persistence (BoardStore)', () => {
 });
 
 // ============================================================
+// Iteration 151-168 Tests
+// ============================================================
+
+// 151. Test pointInRect for edge cases (zero-width, negative coords)
+test('151: pointInRect edge cases (zero-width, negative coords)', () => {
+  // Zero-width rect: a vertical line at x=10 from y=0 to y=100
+  assert.strictEqual(pointInRect(10, 50, 10, 0, 0, 100), true);  // on the line
+  assert.strictEqual(pointInRect(11, 50, 10, 0, 0, 100), false); // just off
+
+  // Zero-height rect: a horizontal line at y=20 from x=0 to x=100
+  assert.strictEqual(pointInRect(50, 20, 0, 20, 100, 0), true);
+  assert.strictEqual(pointInRect(50, 21, 0, 20, 100, 0), false);
+
+  // Zero-width and zero-height: a single point
+  assert.strictEqual(pointInRect(5, 5, 5, 5, 0, 0), true);
+  assert.strictEqual(pointInRect(6, 5, 5, 5, 0, 0), false);
+
+  // Negative coordinates
+  assert.strictEqual(pointInRect(-5, -5, -10, -10, 20, 20), true);
+  assert.strictEqual(pointInRect(-15, -15, -10, -10, 20, 20), false);
+
+  // Large negative coords
+  assert.strictEqual(pointInRect(-500, -500, -1000, -1000, 1000, 1000), true);
+});
+
+// 152. Test pointInCircle for edge cases (zero radius, boundary)
+test('152: pointInCircle edge cases (zero radius, boundary)', () => {
+  // Zero radius: only the center itself passes
+  assert.strictEqual(pointInCircle(5, 5, 5, 5, 0), true);
+  assert.strictEqual(pointInCircle(6, 5, 5, 5, 0), false);
+
+  // Exactly on boundary (distance^2 == r^2)
+  assert.strictEqual(pointInCircle(10, 0, 0, 0, 10), true);
+  assert.strictEqual(pointInCircle(0, 10, 0, 0, 10), true);
+
+  // Just outside boundary
+  assert.strictEqual(pointInCircle(11, 0, 0, 0, 10), false);
+
+  // Inside
+  assert.strictEqual(pointInCircle(3, 4, 0, 0, 10), true); // dist=5 < 10
+
+  // Negative center
+  assert.strictEqual(pointInCircle(-5, -5, -5, -5, 1), true);
+  assert.strictEqual(pointInCircle(-3, -5, -5, -5, 1), false);
+});
+
+// 153. Test distanceToSegment for horizontal/vertical/diagonal segments
+test('153: distanceToSegment for horizontal/vertical/diagonal segments', () => {
+  // Horizontal segment from (0,0) to (10,0)
+  assert.strictEqual(distanceToSegment(5, 0, 0, 0, 10, 0), 0);   // on segment
+  assert.strictEqual(distanceToSegment(5, 5, 0, 0, 10, 0), 5);   // perpendicular distance
+  assert.strictEqual(distanceToSegment(-1, 0, 0, 0, 10, 0), 1);  // past endpoint
+
+  // Vertical segment from (0,0) to (0,10)
+  assert.strictEqual(distanceToSegment(0, 5, 0, 0, 0, 10), 0);
+  assert.strictEqual(distanceToSegment(3, 5, 0, 0, 0, 10), 3);
+
+  // Diagonal segment from (0,0) to (10,10): distance from (0,10) should be ~7.07
+  const d = distanceToSegment(0, 10, 0, 0, 10, 10);
+  assert.ok(Math.abs(d - Math.SQRT2 * 5) < 0.001);
+
+  // Zero-length segment (point): distance to that point
+  assert.strictEqual(distanceToSegment(3, 4, 0, 0, 0, 0), 5);
+});
+
+// 154. Test distanceToPolyline with single point, two points, complex path
+test('154: distanceToPolyline with single point, two points, complex path', () => {
+  // Single point: no segments, should return Infinity
+  const d1 = distanceToPolyline(5, 5, [{ x: 0, y: 0 }]);
+  assert.strictEqual(d1, Infinity);
+
+  // Two points: one segment
+  const d2 = distanceToPolyline(5, 5, [{ x: 0, y: 0 }, { x: 10, y: 0 }]);
+  assert.strictEqual(d2, 5); // perpendicular distance to horizontal segment
+
+  // Complex path: L-shape from (0,0) to (10,0) to (10,10)
+  const d3 = distanceToPolyline(5, 5, [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }]);
+  assert.strictEqual(d3, 5); // closest to first or second segment, both at dist 5
+
+  // Point on the polyline itself
+  const d4 = distanceToPolyline(10, 5, [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }]);
+  assert.strictEqual(d4, 0);
+
+  // Empty points array
+  const d5 = distanceToPolyline(5, 5, []);
+  assert.strictEqual(d5, Infinity);
+});
+
+// 155. Test hitTestElement for sticky, text, frame, diamond, triangle types
+test('155: hitTestElement for sticky, text, frame, diamond, triangle types', () => {
+  // sticky uses pointInRect (same as rect)
+  const sticky = { type: 'sticky', x: 0, y: 0, width: 100, height: 100 };
+  assert.strictEqual(hitTestElement(sticky, 50, 50), true);
+  assert.strictEqual(hitTestElement(sticky, 150, 150), false);
+
+  // text falls to default -> returns false (not handled in hitTestElement)
+  const text = { type: 'text', x: 0, y: 0, width: 100, height: 30 };
+  assert.strictEqual(hitTestElement(text, 50, 15), false);
+
+  // frame falls to default -> returns false
+  const frame = { type: 'frame', x: 0, y: 0, width: 200, height: 200 };
+  assert.strictEqual(hitTestElement(frame, 100, 100), false);
+
+  // diamond falls to default -> returns false
+  const diamond = { type: 'diamond', x: 0, y: 0, width: 100, height: 100 };
+  assert.strictEqual(hitTestElement(diamond, 50, 50), false);
+
+  // triangle falls to default -> returns false
+  const triangle = { type: 'triangle', x: 0, y: 0, width: 100, height: 100 };
+  assert.strictEqual(hitTestElement(triangle, 50, 50), false);
+
+  // image uses pointInRect (same as rect)
+  const image = { type: 'image', x: 10, y: 10, width: 50, height: 50 };
+  assert.strictEqual(hitTestElement(image, 30, 30), true);
+  assert.strictEqual(hitTestElement(image, 5, 5), false);
+});
+
+// 156. Test hitTestElement for freehand with various point configurations
+test('156: hitTestElement for freehand with various point configurations', () => {
+  // No points: should return false
+  const fh1 = { type: 'freehand', x: 0, y: 0, points: [] };
+  assert.strictEqual(hitTestElement(fh1, 0, 0), false);
+
+  // Single point: less than 2 points, returns false
+  const fh2 = { type: 'freehand', x: 0, y: 0, points: [{ x: 5, y: 5 }] };
+  assert.strictEqual(hitTestElement(fh2, 5, 5), false);
+
+  // Two points forming a horizontal segment
+  const fh3 = { type: 'freehand', x: 0, y: 0, points: [{ x: 0, y: 0 }, { x: 100, y: 0 }] };
+  assert.strictEqual(hitTestElement(fh3, 50, 0), true);   // on the line
+  assert.strictEqual(hitTestElement(fh3, 50, 5), true);    // within threshold (8)
+  assert.strictEqual(hitTestElement(fh3, 50, 20), false);  // outside threshold
+
+  // Complex path
+  const fh4 = { type: 'freehand', x: 0, y: 0, points: [
+    { x: 0, y: 0 }, { x: 50, y: 0 }, { x: 50, y: 50 }, { x: 0, y: 50 }
+  ] };
+  assert.strictEqual(hitTestElement(fh4, 25, 0), true);    // on first segment
+  assert.strictEqual(hitTestElement(fh4, 50, 25), true);   // on second segment
+  assert.strictEqual(hitTestElement(fh4, 25, 25), false);  // inside box but not near line
+
+  // Undefined points
+  const fh5 = { type: 'freehand', x: 0, y: 0 };
+  assert.strictEqual(hitTestElement(fh5, 0, 0), false);
+});
+
+// 157. Test getElementBounds for all element types including mindmap and embed
+test('157: getElementBounds for all element types including mindmap and embed', () => {
+  // sticky
+  const sticky = { type: 'sticky', x: 10, y: 20, width: 200, height: 200 };
+  assert.deepStrictEqual(getElementBounds(sticky), { x: 10, y: 20, w: 200, h: 200 });
+
+  // text
+  const text = { type: 'text', x: 5, y: 10, width: 150, height: 30 };
+  assert.deepStrictEqual(getElementBounds(text), { x: 5, y: 10, w: 150, h: 30 });
+
+  // frame
+  const frame = { type: 'frame', x: 0, y: 0, width: 400, height: 300 };
+  assert.deepStrictEqual(getElementBounds(frame), { x: 0, y: 0, w: 400, h: 300 });
+
+  // diamond
+  const diamond = { type: 'diamond', x: 50, y: 50, width: 100, height: 80 };
+  assert.deepStrictEqual(getElementBounds(diamond), { x: 50, y: 50, w: 100, h: 80 });
+
+  // triangle
+  const triangle = { type: 'triangle', x: 0, y: 0, width: 60, height: 80 };
+  assert.deepStrictEqual(getElementBounds(triangle), { x: 0, y: 0, w: 60, h: 80 });
+
+  // envelope
+  const envelope = { type: 'envelope', x: 10, y: 10, width: 120, height: 80 };
+  assert.deepStrictEqual(getElementBounds(envelope), { x: 10, y: 10, w: 120, h: 80 });
+
+  // card
+  const card = { type: 'card', x: 0, y: 0, width: 200, height: 150 };
+  assert.deepStrictEqual(getElementBounds(card), { x: 0, y: 0, w: 200, h: 150 });
+
+  // list
+  const list = { type: 'list', x: 5, y: 5, width: 250, height: 300 };
+  assert.deepStrictEqual(getElementBounds(list), { x: 5, y: 5, w: 250, h: 300 });
+
+  // mindmap (falls to default case)
+  const mindmap = { type: 'mindmap', x: 100, y: 200, width: 160, height: 50 };
+  const mb = getElementBounds(mindmap);
+  assert.strictEqual(mb.x, 100);
+  assert.strictEqual(mb.y, 200);
+  assert.strictEqual(mb.w, 160);
+  assert.strictEqual(mb.h, 50);
+
+  // embed (falls to default case)
+  const embed = { type: 'embed', x: 0, y: 0, width: 480, height: 320 };
+  const eb = getElementBounds(embed);
+  assert.strictEqual(eb.x, 0);
+  assert.strictEqual(eb.y, 0);
+  assert.strictEqual(eb.w, 480);
+  assert.strictEqual(eb.h, 320);
+
+  // arrow
+  const arrow = { type: 'arrow', x: 0, y: 0, x2: 100, y2: 50 };
+  const ab = getElementBounds(arrow);
+  assert.strictEqual(ab.x, 0);
+  assert.strictEqual(ab.y, 0);
+  assert.strictEqual(ab.w, 100);
+  assert.strictEqual(ab.h, 50);
+
+  // freehand with no points
+  const fhNone = { type: 'freehand', x: 10, y: 20, points: null };
+  assert.deepStrictEqual(getElementBounds(fhNone), { x: 10, y: 20, w: 0, h: 0 });
+});
+
+// 158. Test normalizeRect with zero width/height
+test('158: normalizeRect with zero width/height', () => {
+  // Zero width
+  const r1 = normalizeRect(50, 50, 0, 100);
+  assert.strictEqual(r1.x, 50);
+  assert.strictEqual(r1.y, 50);
+  assert.strictEqual(r1.w, 0);
+  assert.strictEqual(r1.h, 100);
+
+  // Zero height
+  const r2 = normalizeRect(50, 50, 100, 0);
+  assert.strictEqual(r2.x, 50);
+  assert.strictEqual(r2.y, 50);
+  assert.strictEqual(r2.w, 100);
+  assert.strictEqual(r2.h, 0);
+
+  // Both zero
+  const r3 = normalizeRect(25, 75, 0, 0);
+  assert.strictEqual(r3.x, 25);
+  assert.strictEqual(r3.y, 75);
+  assert.strictEqual(r3.w, 0);
+  assert.strictEqual(r3.h, 0);
+
+  // Negative zero-ish: very small negative
+  const r4 = normalizeRect(100, 100, -0, -0);
+  assert.strictEqual(r4.w, 0);
+  assert.strictEqual(r4.h, 0);
+});
+
+// 159. Test createElement with override props replacing defaults
+test('159: createElement with override props replacing defaults', () => {
+  const el = createElement('rect', {
+    x: 100,
+    y: 200,
+    width: 50,
+    height: 75,
+    fill: '#ff0000',
+    stroke: '#00ff00',
+    strokeWidth: 5,
+    text: 'Hello',
+    fontSize: 24,
+    rotation: 45,
+    locked: true,
+    groupId: 'g1'
+  });
+  assert.strictEqual(el.x, 100);
+  assert.strictEqual(el.y, 200);
+  assert.strictEqual(el.width, 50);
+  assert.strictEqual(el.height, 75);
+  assert.strictEqual(el.fill, '#ff0000');
+  assert.strictEqual(el.stroke, '#00ff00');
+  assert.strictEqual(el.strokeWidth, 5);
+  assert.strictEqual(el.text, 'Hello');
+  assert.strictEqual(el.fontSize, 24);
+  assert.strictEqual(el.rotation, 45);
+  assert.strictEqual(el.locked, true);
+  assert.strictEqual(el.groupId, 'g1');
+  assert.strictEqual(el.type, 'rect');
+});
+
+// 160. Test that each factory function generates unique IDs
+test('160: Factory functions generate unique IDs', () => {
+  const ids = new Set();
+  for (let i = 0; i < 50; i++) {
+    ids.add(createSticky(0, 0).id);
+    ids.add(createFrame(0, 0).id);
+    ids.add(createConnector('a', 'b').id);
+    ids.add(createMindmapNode(0, 0).id);
+    ids.add(createEmbed(0, 0).id);
+    ids.add(createElement('rect', {}).id);
+  }
+  // 300 total IDs, all should be unique
+  assert.strictEqual(ids.size, 300);
+});
+
+// 161. Test createConnector with various styles
+test('161: createConnector with various styles (arrow, line, dashed)', () => {
+  const c1 = createConnector('s1', 't1', 'arrow');
+  assert.strictEqual(c1.connectorStyle, 'arrow');
+
+  const c2 = createConnector('s2', 't2', 'line');
+  assert.strictEqual(c2.connectorStyle, 'line');
+
+  const c3 = createConnector('s3', 't3', 'dashed');
+  assert.strictEqual(c3.connectorStyle, 'dashed');
+
+  // All have correct source/target
+  assert.strictEqual(c1.sourceId, 's1');
+  assert.strictEqual(c1.targetId, 't1');
+  assert.strictEqual(c2.sourceId, 's2');
+  assert.strictEqual(c3.targetId, 't3');
+
+  // All are connector type
+  assert.strictEqual(c1.type, 'connector');
+  assert.strictEqual(c2.type, 'connector');
+  assert.strictEqual(c3.type, 'connector');
+});
+
+// 162. Test that element zIndex is always a valid number
+test('162: Element zIndex is always a valid number', () => {
+  const el1 = createElement('rect', {});
+  assert.strictEqual(typeof el1.zIndex, 'number');
+  assert.ok(!isNaN(el1.zIndex));
+  assert.ok(isFinite(el1.zIndex));
+
+  const sticky = createSticky(0, 0);
+  assert.strictEqual(typeof sticky.zIndex, 'number');
+  assert.ok(!isNaN(sticky.zIndex));
+
+  const frame = createFrame(0, 0);
+  assert.strictEqual(frame.zIndex, 1); // frames have zIndex=1
+
+  const conn = createConnector('a', 'b');
+  assert.strictEqual(typeof conn.zIndex, 'number');
+  assert.ok(!isNaN(conn.zIndex));
+
+  const mindmap = createMindmapNode(0, 0);
+  assert.strictEqual(typeof mindmap.zIndex, 'number');
+
+  const embed = createEmbed(0, 0);
+  assert.strictEqual(typeof embed.zIndex, 'number');
+});
+
+// 163. Test createElement with nested props (tags array, points array)
+test('163: createElement with nested props (tags array, points array)', () => {
+  const el = createElement('sticky', {
+    tags: ['important', 'todo', 'review'],
+    points: [{ x: 0, y: 0 }, { x: 10, y: 20 }, { x: 30, y: 40 }]
+  });
+  assert.ok(Array.isArray(el.tags));
+  assert.strictEqual(el.tags.length, 3);
+  assert.strictEqual(el.tags[0], 'important');
+  assert.strictEqual(el.tags[2], 'review');
+
+  assert.ok(Array.isArray(el.points));
+  assert.strictEqual(el.points.length, 3);
+  assert.deepStrictEqual(el.points[1], { x: 10, y: 20 });
+
+  // Empty arrays
+  const el2 = createElement('rect', { tags: [], points: [] });
+  assert.ok(Array.isArray(el2.tags));
+  assert.strictEqual(el2.tags.length, 0);
+  assert.ok(Array.isArray(el2.points));
+  assert.strictEqual(el2.points.length, 0);
+});
+
+// 164. Test History with multiple sequential undo/redo operations
+test('164: History multiple sequential undo/redo', () => {
+  const h = new History();
+  const entries = [];
+  for (let i = 0; i < 5; i++) {
+    const ops = [{ type: 'add', elementId: `e${i}` }];
+    const inv = [{ type: 'delete', elementId: `e${i}` }];
+    entries.push({ ops, inv });
+    h.push(ops, inv);
+  }
+  assert.strictEqual(h.undoStack.length, 5);
+
+  // Undo all 5
+  for (let i = 4; i >= 0; i--) {
+    const result = h.undo();
+    assert.deepStrictEqual(result, entries[i].inv);
+  }
+  assert.strictEqual(h.undoStack.length, 0);
+  assert.strictEqual(h.redoStack.length, 5);
+
+  // Redo all 5
+  for (let i = 0; i < 5; i++) {
+    const result = h.redo();
+    assert.deepStrictEqual(result, entries[i].ops);
+  }
+  assert.strictEqual(h.undoStack.length, 5);
+  assert.strictEqual(h.redoStack.length, 0);
+
+  // Undo 3, then redo 2
+  h.undo(); h.undo(); h.undo();
+  assert.strictEqual(h.undoStack.length, 2);
+  assert.strictEqual(h.redoStack.length, 3);
+  h.redo(); h.redo();
+  assert.strictEqual(h.undoStack.length, 4);
+  assert.strictEqual(h.redoStack.length, 1);
+});
+
+// 165. Test History max size eviction (push 150, verify stack is 100)
+test('165: History max size eviction', () => {
+  const h = new History();
+  for (let i = 0; i < 150; i++) {
+    h.push([{ type: 'add', id: i }], [{ type: 'delete', id: i }]);
+  }
+  assert.strictEqual(h.undoStack.length, 100);
+
+  // The oldest entries (0-49) should have been evicted
+  // The newest entry should have id=149
+  const newest = h.undoStack[h.undoStack.length - 1];
+  assert.strictEqual(newest.ops[0].id, 149);
+
+  // The oldest remaining should have id=50
+  const oldest = h.undoStack[0];
+  assert.strictEqual(oldest.ops[0].id, 50);
+});
+
+// 166. Test that redo stack clears on new push after undo
+test('166: Redo stack clears on new push after undo', () => {
+  const h = new History();
+  h.push([{ type: 'add', id: 1 }], [{ type: 'delete', id: 1 }]);
+  h.push([{ type: 'add', id: 2 }], [{ type: 'delete', id: 2 }]);
+  h.push([{ type: 'add', id: 3 }], [{ type: 'delete', id: 3 }]);
+
+  // Undo twice
+  h.undo();
+  h.undo();
+  assert.strictEqual(h.redoStack.length, 2);
+  assert.strictEqual(h.undoStack.length, 1);
+
+  // Push a new operation - redo stack should clear
+  h.push([{ type: 'add', id: 4 }], [{ type: 'delete', id: 4 }]);
+  assert.strictEqual(h.redoStack.length, 0);
+  assert.strictEqual(h.undoStack.length, 2);
+
+  // The redo of the old entries is gone
+  assert.strictEqual(h.canRedo(), false);
+});
+
+// 167. Test History.clear() resets both stacks
+test('167: History.clear() resets both stacks', () => {
+  const h = new History();
+  for (let i = 0; i < 10; i++) {
+    h.push([{ type: 'add', id: i }], [{ type: 'delete', id: i }]);
+  }
+  h.undo(); h.undo(); h.undo();
+  assert.strictEqual(h.undoStack.length, 7);
+  assert.strictEqual(h.redoStack.length, 3);
+
+  h.clear();
+  assert.strictEqual(h.undoStack.length, 0);
+  assert.strictEqual(h.redoStack.length, 0);
+  assert.strictEqual(h.canUndo(), false);
+  assert.strictEqual(h.canRedo(), false);
+});
+
+// 168. Test History undo returns null when empty
+test('168: History undo/redo return null when empty', () => {
+  const h = new History();
+  assert.strictEqual(h.undo(), null);
+  assert.strictEqual(h.redo(), null);
+
+  // Push then undo to empty, verify undo returns null again
+  h.push([{ type: 'add' }], [{ type: 'delete' }]);
+  h.undo();
+  assert.strictEqual(h.undo(), null);
+
+  // Redo then redo again when empty
+  h.redo();
+  assert.strictEqual(h.redo(), null);
+});
+
+// ============================================================
 // Summary
 // ============================================================
 

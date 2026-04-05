@@ -46,6 +46,18 @@ function createElement(type, props) {
     rotation: 0, // degrees
     locked: false,
     groupId: null, // group membership
+    opacity: 1, // #R2-102: element opacity (0.0 to 1.0)
+    dashStyle: null, // #R2-104: 'dashed', 'dotted', or null
+    textAlign: 'left', // #R2-105: text alignment (left, center, right)
+    verticalAlign: 'top', // #R2-106: vertical text alignment (top, middle, bottom)
+    gradientFill: null, // #R2-103: gradient fill end color
+    linkedElementId: null, // #R2-107: linked element id for navigation
+    assignee: null, // #R2-138: assigned user
+    dueDate: null, // #R2-139: due date string
+    priority: null, // #R2-140: priority level (high, medium, low)
+    stickyTemplate: null, // #R2-147: sticky template (idea, question, action, risk)
+    category: null, // #R2-148: color-coded category
+    versionHistory: [], // #R2-126: last 5 modifications
     ...props
   };
   return base;
@@ -542,6 +554,33 @@ function renderElement(ctx, el, selected, camera) {
     ctx.shadowOffsetY = el.shadowOffsetY || 4;
   }
 
+  // #R2-148: Category color bar at top of element
+  if (el.category) {
+    const catColors = { red: '#e94560', blue: '#4a9eff', green: '#4ecdc4', yellow: '#ffd966', purple: '#DDA0DD', orange: '#F4A460' };
+    const catColor = catColors[el.category] || el.category;
+    const bounds = getElementBounds(el);
+    if (bounds) {
+      ctx.save();
+      ctx.fillStyle = catColor;
+      ctx.fillRect(bounds.x, bounds.y - 4, bounds.w, 4);
+      ctx.restore();
+    }
+  }
+
+  // #R2-107: Linked element indicator
+  if (el.linkedElementId) {
+    const bounds = getElementBounds(el);
+    if (bounds) {
+      ctx.save();
+      ctx.fillStyle = '#4a9eff';
+      ctx.font = '12px sans-serif';
+      ctx.textBaseline = 'top';
+      ctx.textAlign = 'left';
+      ctx.fillText('\u{1F517}', bounds.x + 4, bounds.y + 4);
+      ctx.restore();
+    }
+  }
+
   // Lock indicator
   if (el.locked) {
     const bounds = getElementBounds(el);
@@ -704,7 +743,15 @@ function drawRect(ctx, el) {
   ctx.beginPath();
   ctx.roundRect(el.x, el.y, el.width, el.height, r);
   if (el.fill && el.fill !== 'transparent') {
-    ctx.fillStyle = el.fill;
+    // #R2-103: Gradient fill support for rectangles
+    if (el.gradientFill) {
+      const grad = ctx.createLinearGradient(el.x, el.y, el.x, el.y + el.height);
+      grad.addColorStop(0, el.fill);
+      grad.addColorStop(1, el.gradientFill);
+      ctx.fillStyle = grad;
+    } else {
+      ctx.fillStyle = el.fill;
+    }
     ctx.fill();
   }
   // Clear shadow after fill so stroke isn't doubled
@@ -712,9 +759,24 @@ function drawRect(ctx, el) {
   if (el.stroke && el.stroke !== 'transparent' && el.strokeWidth > 0) {
     ctx.strokeStyle = el.stroke;
     ctx.lineWidth = el.strokeWidth;
-    if (el.dashStyle) { ctx.setLineDash([8, 4]); }
+    // #R2-104: Dashed/dotted stroke style
+    if (el.dashStyle === 'dotted') { ctx.setLineDash([2, 4]); }
+    else if (el.dashStyle === 'dashed' || el.dashStyle === true) { ctx.setLineDash([8, 4]); }
     ctx.stroke();
     if (el.dashStyle) { ctx.setLineDash([]); }
+  }
+  // #R2-140: Priority level indicator
+  if (el.priority) {
+    const pColors = { high: '#e94560', medium: '#ffd966', low: '#4ecdc4' };
+    const pColor = pColors[el.priority];
+    if (pColor) {
+      ctx.save();
+      ctx.fillStyle = pColor;
+      ctx.beginPath();
+      ctx.arc(el.x + el.width - 8, el.y + 8, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
   }
   const textContent = el.richText || el.text;
   if (textContent) {
@@ -723,14 +785,15 @@ function drawRect(ctx, el) {
       const segments = parseRichText(el.richText);
       const fs = el.fontSize || 16;
       const textH = segments.length * fs * 1.4;
-      renderRichText(ctx, segments, el.x + 8, el.y + (el.height - textH) / 2, el.width - 16, fs, textColor, 'center');
+      renderRichText(ctx, segments, el.x + 8, el.y + (el.height - textH) / 2, el.width - 16, fs, textColor, el.textAlign || 'center');
     } else {
       ctx.fillStyle = textColor;
       const fontFamily = el.fontFamily || '-apple-system, BlinkMacSystemFont, sans-serif';
       ctx.font = `${el.fontSize || 16}px ${fontFamily}`;
       ctx.textBaseline = 'middle';
-      ctx.textAlign = 'center';
-      ctx.fillText(el.text, el.x + el.width / 2, el.y + el.height / 2, el.width - 16);
+      ctx.textAlign = el.textAlign || 'center';
+      const txX = el.textAlign === 'left' ? el.x + 8 : el.textAlign === 'right' ? el.x + el.width - 8 : el.x + el.width / 2;
+      ctx.fillText(el.text, txX, el.y + el.height / 2, el.width - 16);
       ctx.textAlign = 'left';
     }
   }
@@ -744,14 +807,24 @@ function drawCircle(ctx, el) {
   ctx.beginPath();
   ctx.ellipse(el.x + rx, el.y + ry, Math.abs(rx), Math.abs(ry), 0, 0, Math.PI * 2);
   if (el.fill && el.fill !== 'transparent') {
-    ctx.fillStyle = el.fill;
+    // #R2-103: Gradient fill support for circles
+    if (el.gradientFill) {
+      const grad = ctx.createRadialGradient(el.x + rx, el.y + ry, 0, el.x + rx, el.y + ry, Math.max(Math.abs(rx), Math.abs(ry)));
+      grad.addColorStop(0, el.fill);
+      grad.addColorStop(1, el.gradientFill);
+      ctx.fillStyle = grad;
+    } else {
+      ctx.fillStyle = el.fill;
+    }
     ctx.fill();
   }
   if (el.shadowEnabled) { ctx.shadowColor = 'transparent'; }
   if (el.stroke && el.stroke !== 'transparent' && el.strokeWidth > 0) {
     ctx.strokeStyle = el.stroke;
     ctx.lineWidth = el.strokeWidth;
-    if (el.dashStyle) { ctx.setLineDash([8, 4]); }
+    // #R2-104: Dashed/dotted stroke style for circles
+    if (el.dashStyle === 'dotted') { ctx.setLineDash([2, 4]); }
+    else if (el.dashStyle === 'dashed' || el.dashStyle === true) { ctx.setLineDash([8, 4]); }
     ctx.stroke();
     if (el.dashStyle) { ctx.setLineDash([]); }
   }
@@ -761,13 +834,13 @@ function drawCircle(ctx, el) {
     if (el.richText) {
       const segments = parseRichText(el.richText);
       const fs = el.fontSize || 16;
-      renderRichText(ctx, segments, el.x + 16, el.y + 16, el.width - 32, fs, textColor, 'center');
+      renderRichText(ctx, segments, el.x + 16, el.y + 16, el.width - 32, fs, textColor, el.textAlign || 'center');
     } else {
       ctx.fillStyle = textColor;
       const fontFamily = el.fontFamily || '-apple-system, BlinkMacSystemFont, sans-serif';
       ctx.font = `${el.fontSize || 16}px ${fontFamily}`;
       ctx.textBaseline = 'middle';
-      ctx.textAlign = 'center';
+      ctx.textAlign = el.textAlign || 'center';
       ctx.fillText(el.text, el.x + el.width / 2, el.y + el.height / 2, el.width - 16);
       ctx.textAlign = 'left';
     }
@@ -863,12 +936,50 @@ function drawSticky(ctx, el) {
   ctx.roundRect(el.x, el.y, el.width, el.height, r);
   ctx.fill();
 
+  // #R2-140: Priority level indicator on stickies
+  if (el.priority) {
+    const pColors = { high: '#e94560', medium: '#ffd966', low: '#4ecdc4' };
+    const pLabels = { high: '!', medium: '-', low: '~' };
+    const pColor = pColors[el.priority];
+    if (pColor) {
+      ctx.save();
+      ctx.fillStyle = pColor;
+      ctx.beginPath();
+      ctx.arc(el.x + 14, el.y + 14, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center';
+      ctx.fillText(pLabels[el.priority], el.x + 14, el.y + 14);
+      ctx.textAlign = 'left';
+      ctx.restore();
+    }
+  }
+
+  // #R2-147: Sticky template indicator (idea, question, action, risk)
+  if (el.stickyTemplate) {
+    const tplIcons = { idea: '\u{1F4A1}', question: '\u{2753}', action: '\u{2705}', risk: '\u{26A0}' };
+    const icon = tplIcons[el.stickyTemplate];
+    if (icon) {
+      ctx.save();
+      ctx.font = '14px sans-serif';
+      ctx.textBaseline = 'top';
+      ctx.textAlign = 'right';
+      ctx.fillText(icon, el.x + el.width - 30, el.y + 6);
+      ctx.textAlign = 'left';
+      ctx.restore();
+    }
+  }
+
   // #103 - Zoom-dependent detail: hide text below zoom 0.3
   const _cameraZoom = camera ? camera.zoom : 1;
   const textContent = (_cameraZoom >= 0.3) ? (el.richText || el.text) : null;
   if (textContent) {
     const maxW = el.width - 28;
     const maxH = el.height - 28;
+    // #R2-106: Compute vertical offset based on verticalAlign
+    let vAlignOffset = 0;
     if (el.richText) {
       const segments = parseRichText(el.richText);
       // Auto-size: reduce font if text overflows
@@ -876,7 +987,6 @@ function drawSticky(ctx, el) {
       const minFs = 10;
       while (fs > minFs) {
         const testLineH = fs * 1.4;
-        // Rough estimate of lines needed
         let totalW = 0;
         for (const seg of segments) {
           if (seg.text) {
@@ -888,8 +998,12 @@ function drawSticky(ctx, el) {
         if (estLines * testLineH <= maxH) break;
         fs -= 1;
       }
+      // #R2-106: Vertical alignment for stickies
+      const estTextH = Math.ceil(fs * 1.4 * Math.max(1, Math.ceil(segments.reduce((w, s) => w + (s.text ? s.text.length : 0), 0) * fs * 0.6 / maxW)));
+      if (el.verticalAlign === 'middle') { vAlignOffset = Math.max(0, (maxH - estTextH) / 2); }
+      else if (el.verticalAlign === 'bottom') { vAlignOffset = Math.max(0, maxH - estTextH); }
       const stickyTextColor = el.textColor || '#1a1a1a';
-      renderRichText(ctx, segments, el.x + 14, el.y + 14, maxW, fs, stickyTextColor, el.textAlign || 'left');
+      renderRichText(ctx, segments, el.x + 14, el.y + 14 + vAlignOffset, maxW, fs, stickyTextColor, el.textAlign || 'left');
     } else {
       // Auto-size for plain text
       let fs = el.fontSize || 16;
@@ -901,11 +1015,40 @@ function drawSticky(ctx, el) {
         if (lines * fs * 1.4 <= maxH) break;
         fs -= 1;
       }
+      // #R2-106: Vertical alignment for plain text stickies
+      const lineCount = estimateWrapLines(ctx, el.text, maxW);
+      const textH = lineCount * fs * 1.4;
+      if (el.verticalAlign === 'middle') { vAlignOffset = Math.max(0, (maxH - textH) / 2); }
+      else if (el.verticalAlign === 'bottom') { vAlignOffset = Math.max(0, maxH - textH); }
       ctx.fillStyle = el.textColor || '#1a1a1a';
       ctx.font = `${fs}px ${fontFamily}`;
       ctx.textBaseline = 'top';
-      wrapText(ctx, el.text, el.x + 14, el.y + 14, maxW, fs * 1.4);
+      wrapText(ctx, el.text, el.x + 14, el.y + 14 + vAlignOffset, maxW, fs * 1.4);
     }
+  }
+
+  // #R2-138: Assignee display at bottom-left of sticky
+  if (el.assignee && _cameraZoom >= 0.5) {
+    ctx.save();
+    ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.textBaseline = 'bottom';
+    ctx.textAlign = 'left';
+    ctx.fillText('\u{1F464} ' + el.assignee, el.x + 10, el.y + el.height - 8);
+    ctx.textAlign = 'left';
+    ctx.restore();
+  }
+
+  // #R2-139: Due date display
+  if (el.dueDate && _cameraZoom >= 0.5) {
+    ctx.save();
+    ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.textBaseline = 'bottom';
+    ctx.textAlign = 'right';
+    ctx.fillText('\u{1F4C5} ' + el.dueDate, el.x + el.width - 10, el.y + el.height - 8);
+    ctx.textAlign = 'left';
+    ctx.restore();
   }
 
   // Draw tags at the bottom (#103 - hide below zoom 0.5)

@@ -181,14 +181,8 @@ class InputHandler {
 
   onPointerDown(e) {
     if (e.button === 1) {
-      // Middle click: paste at cursor position if clipboard has content, otherwise pan
+      // #R2-10: Middle-click drag for pan (always pan, not paste)
       e.preventDefault();
-      const world = this.getWorldPos(e);
-      if (this.app.clipboard && this.app.clipboard.length > 0) {
-        this.app.pasteAt(world.x, world.y);
-        return;
-      }
-      // Fallback to pan
       this.isPanning = true;
       this.lastPanX = e.clientX;
       this.lastPanY = e.clientY;
@@ -304,11 +298,34 @@ class InputHandler {
     e.preventDefault();
 
     if (e.ctrlKey || e.metaKey) {
-      // Ctrl+scroll = zoom (pinch on trackpad also sends ctrl+wheel)
+      // #R2-16: Smooth scroll-to-zoom with easing
       const delta = -e.deltaY * 0.005;
-      const newZoom = this.app.renderer.camera.zoom * (1 + delta);
-      this.app.renderer.setZoom(newZoom, e.clientX, e.clientY);
-      this.app.updateZoomDisplay();
+      const targetZoom = clamp(this.app.renderer.camera.zoom * (1 + delta), 0.1, 5);
+      // Use smooth animation for discrete wheel events (deltaMode 0 = pixel scroll from trackpad)
+      if (e.deltaMode === 0 && Math.abs(e.deltaY) < 20) {
+        // Trackpad: direct zoom for responsiveness
+        this.app.renderer.setZoom(targetZoom, e.clientX, e.clientY);
+        this.app.updateZoomDisplay();
+      } else {
+        // Mouse wheel: smooth animated zoom
+        if (this._wheelZoomRaf) cancelAnimationFrame(this._wheelZoomRaf);
+        const startZoom = this.app.renderer.camera.zoom;
+        const cx = e.clientX, cy = e.clientY;
+        const startTime = performance.now();
+        const duration = 120;
+        const app = this.app;
+        const self = this;
+        const step = (now) => {
+          const t = Math.min(1, (now - startTime) / duration);
+          const ease = 1 - Math.pow(1 - t, 2);
+          const z = startZoom + (targetZoom - startZoom) * ease;
+          app.renderer.setZoom(z, cx, cy);
+          app.updateZoomDisplay();
+          if (t < 1) self._wheelZoomRaf = requestAnimationFrame(step);
+          else self._wheelZoomRaf = null;
+        };
+        this._wheelZoomRaf = requestAnimationFrame(step);
+      }
     } else if (e.shiftKey) {
       // Shift+scroll = horizontal pan
       this.app.renderer.pan(-e.deltaY, 0);
@@ -462,6 +479,63 @@ class InputHandler {
         return;
       }
 
+      // #R2-33: Ctrl+L to lock/unlock selected
+      if (e.key === 'l' && !e.shiftKey) {
+        e.preventDefault();
+        this.app.toggleLockSelected();
+        return;
+      }
+
+      // #R2-34: Ctrl+] to bring forward, Ctrl+[ to send backward
+      if (e.key === ']' && !e.shiftKey) {
+        e.preventDefault();
+        this.app.bringForward();
+        return;
+      }
+      if (e.key === '[' && !e.shiftKey) {
+        e.preventDefault();
+        this.app.sendBackward();
+        return;
+      }
+
+      // #R2-35: Ctrl+Shift+] bring to front, Ctrl+Shift+[ send to back
+      if (e.key === ']' && e.shiftKey) {
+        e.preventDefault();
+        this.app.bringToFront();
+        return;
+      }
+      if (e.key === '[' && e.shiftKey) {
+        e.preventDefault();
+        this.app.sendToBack();
+        return;
+      }
+
+      // #R2-36: Ctrl+Shift+C copy style, Ctrl+Shift+V paste style
+      if (e.key === 'c' && e.shiftKey) {
+        e.preventDefault();
+        this.app.copyStyle();
+        return;
+      }
+      if (e.key === 'v' && e.shiftKey) {
+        e.preventDefault();
+        this.app.pasteStyle();
+        return;
+      }
+
+      // #R2-37: Ctrl+E to export as PNG
+      if (e.key === 'e' && !e.shiftKey) {
+        e.preventDefault();
+        this.app.exportAsPNG();
+        return;
+      }
+
+      // #R2-38: Ctrl+Shift+E to export as SVG (stub)
+      if (e.key === 'e' && e.shiftKey) {
+        e.preventDefault();
+        this.app.showToast('Export SVG: fonctionnalite a venir', 'info');
+        return;
+      }
+
       return;
     }
 
@@ -519,6 +593,25 @@ class InputHandler {
         return;
       }
       return; // Ignore all other keys during presentation
+    }
+
+    // #R2-39: F2 to rename/edit text of selected element
+    if (e.key === 'F2') {
+      e.preventDefault();
+      if (this.app.renderer.selectedIds.size === 1) {
+        const selId = [...this.app.renderer.selectedIds][0];
+        const selEl = this.app.renderer.elements.get(selId);
+        if (selEl) this.app.startTextEdit(selEl);
+      }
+      return;
+    }
+
+    // #R2-5: Tab cycles through elements (forward), Shift+Tab (backward)
+    if (e.key === 'Tab' && this.app.currentTool === 'select') {
+      // Only cycle when not in mindmap tool (mindmap uses Tab for child creation)
+      e.preventDefault();
+      this.app.cycleSelection(e.shiftKey ? -1 : 1);
+      return;
     }
 
     if (toolMap[lower]) {
