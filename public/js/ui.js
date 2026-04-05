@@ -1953,6 +1953,8 @@ class UI {
         document.body.removeChild(input);
         this.app.showToast('Lien copie !');
       };
+      // #R2-183: Track share for getting started checklist
+      localStorage.setItem('darkboard-shared', '1');
       if (navigator.clipboard) {
         navigator.clipboard.writeText(url).then(() => {
           this.app.showToast('Lien copie dans le presse-papier !');

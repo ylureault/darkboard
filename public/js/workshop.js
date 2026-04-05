@@ -161,6 +161,8 @@ class Workshop {
     if (duration <= 0) return;
 
     this.hideTimerModal();
+    // #R2-183: Track timer usage for getting started checklist
+    localStorage.setItem('darkboard-timer-used', '1');
     this.app.sync.send({
       type: 'timer-start',
       duration
@@ -281,6 +283,8 @@ class Workshop {
     const hideResults = document.getElementById('voteHideResults').checked;
 
     this.hideVoteModal();
+    // #R2-183: Track vote usage for getting started checklist
+    localStorage.setItem('darkboard-vote-used', '1');
     this.app.sync.send({
       type: 'vote-start',
       quota,
@@ -1233,5 +1237,245 @@ class Workshop {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  // #R2-111: ROTI (Return on Time Invested) quick poll
+  showROTIPoll() {
+    if (!this.isFacilitator) return;
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    const dlg = document.createElement('div');
+    dlg.className = 'confirm-dialog';
+    dlg.style.maxWidth = '400px';
+    dlg.innerHTML = `<h3 style="margin:0 0 12px">ROTI - Retour sur le temps investi</h3>
+      <p style="color:var(--text-muted);margin-bottom:12px">Notez de 1 (perte de temps) a 5 (excellent)</p>
+      <div class="roti-buttons" style="display:flex;gap:8px;justify-content:center;margin:16px 0">
+        ${[1,2,3,4,5].map(n => `<button class="roti-btn" data-score="${n}" style="width:48px;height:48px;border-radius:50%;border:2px solid var(--accent);background:var(--btn);color:var(--text);font-size:18px;cursor:pointer;font-weight:bold">${n}</button>`).join('')}
+      </div>
+      <div id="rotiResult" style="text-align:center;margin:8px 0;color:var(--text-muted)"></div>
+      <div class="confirm-actions"><button onclick="this.closest('.confirm-overlay').remove()">Fermer</button></div>`;
+    overlay.appendChild(dlg);
+    document.body.appendChild(overlay);
+    const resultEl = dlg.querySelector('#rotiResult');
+    const scores = [];
+    dlg.querySelectorAll('.roti-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        scores.push(parseInt(btn.dataset.score));
+        const avg = (scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(1);
+        resultEl.textContent = `Moyenne: ${avg}/5 (${scores.length} votes)`;
+        btn.style.background = 'var(--accent)';
+        btn.style.color = 'white';
+      });
+    });
+  }
+
+  // #R2-112: Fishbowl mode - only one user edits at a time
+  toggleFishbowl() {
+    if (!this.isFacilitator) return;
+    this._fishbowlActive = !this._fishbowlActive;
+    if (this._fishbowlActive) {
+      this._fishbowlQueue = [];
+      this._fishbowlCurrent = this.app.myUserId;
+      this.app.showToast('Mode Fishbowl active - vous etes le premier editeur');
+    } else {
+      this.app.showToast('Mode Fishbowl desactive');
+    }
+    this.app.renderer.markDirty();
+  }
+
+  fishbowlNext() {
+    if (!this._fishbowlActive || !this.isFacilitator) return;
+    if (this._fishbowlQueue.length > 0) {
+      this._fishbowlCurrent = this._fishbowlQueue.shift();
+      this.app.showToast('Prochain editeur dans le fishbowl');
+    } else {
+      this.app.showToast('Personne dans la file d\'attente');
+    }
+  }
+
+  // #R2-113: Dot voting results export as CSV
+  exportVoteResultsCSV() {
+    const results = this.voteResults || {};
+    const voterDetails = this.voterDetails || {};
+    if (Object.keys(results).length === 0) {
+      this.app.showToast('Pas de resultats de vote a exporter');
+      return;
+    }
+    const rows = ['id,text,votes,voters'];
+    for (const [elementId, count] of Object.entries(results)) {
+      if (count <= 0) continue;
+      const el = this.app.renderer.elements.get(elementId);
+      const text = el ? (el.text || '').replace(/"/g, '""') : '';
+      const voters = (voterDetails[elementId] || []).map(v => v.name).join('; ');
+      rows.push(`${elementId},"${text}",${count},"${voters}"`);
+    }
+    const csv = rows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.download = `darkboard-votes-${getBoardId()}.csv`;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    URL.revokeObjectURL(link.href);
+    this.app.showToast('Resultats du vote exportes en CSV !');
+  }
+
+  // #R2-114: Timer presets
+  showTimerPresets() {
+    const presets = [
+      { label: '1 min', duration: 60 },
+      { label: '3 min', duration: 180 },
+      { label: '5 min', duration: 300 },
+      { label: '10 min', duration: 600 },
+    ];
+    const self = this;
+    const buttons = presets.map(p => ({
+      label: p.label,
+      action: () => {
+        self.app.sync.send({ type: 'timer-start', duration: p.duration });
+        self.app.showToast('Timer lance: ' + p.label);
+      }
+    }));
+    buttons.push({ label: 'Personnalise', action: () => self.showTimerModal() });
+    buttons.push({ label: 'Annuler', action: () => {} });
+    this.app.showConfirmDialog('Timer rapide:', buttons);
+  }
+
+  // #R2-115: Break timer with stretch reminder
+  startBreakTimer(minutes) {
+    if (!this.isFacilitator) return;
+    const duration = (minutes || 5) * 60;
+    this.app.sync.send({ type: 'timer-start', duration: duration });
+    this.app.showToast('Pause de ' + (minutes || 5) + ' min - Levez-vous et etirez-vous !');
+  }
+
+  // #R2-116: Parking lot - dedicated frame for parked ideas
+  createParkingLot() {
+    const cam = this.app.renderer.camera;
+    const frame = createFrame(cam.x + 400, cam.y - 200, 500, 600, 'Parking Lot');
+    frame.stroke = '#ffd966';
+    frame.fill = 'rgba(255, 217, 102, 0.05)';
+    this.app.addElement(frame);
+    // Add instruction sticky
+    const sticky = createSticky(cam.x + 420, cam.y - 160);
+    sticky.text = 'Glissez ici les idees a traiter plus tard';
+    sticky.fill = '#ffd966';
+    sticky.width = 180;
+    sticky.height = 100;
+    sticky.fontSize = 12;
+    this.app.addElement(sticky);
+    this.app.showToast('Parking Lot cree !');
+  }
+
+  // #R2-117: Sentiment analysis summary
+  analyzeSentiment() {
+    const stickies = [];
+    for (const [, el] of this.app.renderer.elements) {
+      if (el.type === 'sticky' && el.text) stickies.push(el);
+    }
+    if (stickies.length === 0) { this.app.showToast('Aucun post-it avec du texte'); return; }
+    const positiveWords = ['bien', 'super', 'excellent', 'bravo', 'genial', 'top', 'merci', 'great', 'good', 'love', 'perfect', 'amazing', 'yes', 'oui', 'agree', 'like', 'happy', 'positif', 'ameliore'];
+    const negativeWords = ['mal', 'probleme', 'difficile', 'non', 'pas', 'manque', 'bad', 'issue', 'bug', 'error', 'slow', 'no', 'fail', 'wrong', 'frustrant', 'bloquant', 'negatif', 'pire'];
+    let positive = 0, negative = 0, neutral = 0;
+    for (const s of stickies) {
+      const words = s.text.toLowerCase().split(/\s+/);
+      const hasPos = words.some(w => positiveWords.includes(w));
+      const hasNeg = words.some(w => negativeWords.includes(w));
+      if (hasPos && !hasNeg) positive++;
+      else if (hasNeg && !hasPos) negative++;
+      else neutral++;
+    }
+    this.app.showConfirmDialog(
+      `Analyse de sentiment (${stickies.length} post-its):\n\n` +
+      `Positif: ${positive} | Neutre: ${neutral} | Negatif: ${negative}`,
+      [{ label: 'OK', action: () => {} }]
+    );
+  }
+
+  // #R2-118: Word cloud generation from sticky text
+  generateWordCloud() {
+    const words = {};
+    const stopWords = new Set(['le', 'la', 'les', 'de', 'du', 'des', 'un', 'une', 'et', 'en', 'a', 'au', 'aux', 'pour', 'par', 'sur', 'dans', 'avec', 'ce', 'que', 'qui', 'est', 'the', 'a', 'an', 'and', 'or', 'is', 'are', 'to', 'of', 'in', 'on', 'it', 'at', 'for']);
+    for (const [, el] of this.app.renderer.elements) {
+      if ((el.type === 'sticky' || el.type === 'text') && el.text) {
+        const ws = el.text.toLowerCase().split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
+        for (const w of ws) words[w] = (words[w] || 0) + 1;
+      }
+    }
+    const sorted = Object.entries(words).sort((a, b) => b[1] - a[1]).slice(0, 30);
+    if (sorted.length === 0) { this.app.showToast('Pas assez de texte pour un nuage de mots'); return; }
+    // Create word cloud as text elements on canvas
+    const cam = this.app.renderer.camera;
+    const maxCount = sorted[0][1];
+    let x = cam.x - 300, y = cam.y - 200;
+    for (const [word, count] of sorted) {
+      const fontSize = Math.max(14, Math.round((count / maxCount) * 48));
+      const textEl = createTextElement(x, y);
+      textEl.text = word;
+      textEl.fontSize = fontSize;
+      textEl.fill = STICKY_COLORS[Math.floor(Math.random() * STICKY_COLORS.length)];
+      textEl.width = word.length * fontSize * 0.6 + 20;
+      textEl.height = fontSize + 10;
+      this.app.addElement(textEl);
+      x += textEl.width + 10;
+      if (x > cam.x + 300) { x = cam.x - 300; y += 60; }
+    }
+    this.app.showToast('Nuage de mots genere avec ' + sorted.length + ' mots');
+  }
+
+  // #R2-119: Voting heat map overlay
+  showVotingHeatmap() {
+    const results = Object.keys(this.voteResults).length > 0 ? this.voteResults : (this._lastVoteResults || {});
+    if (Object.keys(results).length === 0) { this.app.showToast('Pas de resultats de vote'); return; }
+    // Toggle heatmap overlay
+    this._heatmapActive = !this._heatmapActive;
+    if (this._heatmapActive) {
+      const maxVotes = Math.max(1, ...Object.values(results));
+      for (const [elementId, count] of Object.entries(results)) {
+        const el = this.app.renderer.elements.get(elementId);
+        if (!el) continue;
+        const intensity = count / maxVotes;
+        // Store original opacity and set heat-based opacity
+        el._origOpacity = el.opacity;
+        el.opacity = 0.3 + intensity * 0.7;
+      }
+      this.app.showToast('Heatmap de vote activee');
+    } else {
+      // Restore original opacities
+      for (const [elementId] of Object.entries(results)) {
+        const el = this.app.renderer.elements.get(elementId);
+        if (el && el._origOpacity !== undefined) { el.opacity = el._origOpacity; delete el._origOpacity; }
+      }
+      this.app.showToast('Heatmap de vote desactivee');
+    }
+    this.app.renderer.markDirty();
+  }
+
+  // #R2-120: Retro template with columns
+  generateRetroTemplate() {
+    const cam = this.app.renderer.camera;
+    const colW = 350, colH = 600, gap = 20;
+    const startX = cam.x - (colW * 3 + gap * 2) / 2;
+    const startY = cam.y - colH / 2;
+    const columns = [
+      { title: 'Ce qui va bien', color: '#4ecdc4' },
+      { title: 'A ameliorer', color: '#ff6b6b' },
+      { title: 'Actions', color: '#4a9eff' }
+    ];
+    for (let i = 0; i < columns.length; i++) {
+      const col = columns[i];
+      const x = startX + i * (colW + gap);
+      const frame = createFrame(x, startY, colW, colH, col.title);
+      frame.stroke = col.color;
+      frame.fill = col.color + '08';
+      this.app.addElement(frame);
+      // Add a starter sticky
+      const sticky = createSticky(x + 20, startY + 50);
+      sticky.fill = col.color + '40';
+      sticky.text = '';
+      sticky.width = 150;
+      sticky.height = 150;
+      this.app.addElement(sticky);
+    }
+    this.app.showToast('Template retrospective cree !');
   }
 }

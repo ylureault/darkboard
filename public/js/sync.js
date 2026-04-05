@@ -153,6 +153,10 @@ class SyncClient {
           if (msg.roundRobin) this.app.workshop.syncRoundRobin(msg.roundRobin);
           if (msg.checkin) this.app.workshop.syncCheckin(msg.checkin);
         }
+        // #R2-182: Show activity summary on reconnect
+        if (msg.activitySummary && this.app.showActivitySummary) {
+          this.app.showActivitySummary(msg.activitySummary);
+        }
         break;
 
       case 'op':

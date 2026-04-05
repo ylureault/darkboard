@@ -683,9 +683,14 @@ class InputHandler {
       tool.onKeyDown(this.app, e);
     }
 
-    // ? key: open help overlay
+    // ? key: open cheat sheet (#R2-176) or help overlay
     if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
-      if (this.app.ui) {
+      // #R2-176: Show cheat sheet if available, fall back to help overlay
+      var existing = document.querySelector('.cheat-sheet-overlay');
+      if (existing) { existing.remove(); return; }
+      if (this.app.showCheatSheet) {
+        this.app.showCheatSheet();
+      } else if (this.app.ui) {
         const helpOverlay = document.getElementById('helpOverlay');
         if (helpOverlay && helpOverlay.style.display !== 'none') {
           this.app.ui.hideHelp();

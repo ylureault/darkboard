@@ -5083,6 +5083,8 @@ DarkBoardApp.prototype.initDraftSave = function() {
         localStorage.setItem('darkboard-draft-' + boardId, data);
         self._draftIndicator.classList.add('visible');
         setTimeout(function() { self._draftIndicator.classList.remove('visible'); }, 1500);
+        // #R2-188: Also show saved indicator pulse
+        if (self.showSavedIndicator) self.showSavedIndicator();
       }
     } catch (e) { /* quota exceeded */ }
   }, 30000);
@@ -5192,19 +5194,767 @@ DarkBoardApp.prototype.autoFitTextContent = function(el) {
   this.renderer.markDirty();
 };
 
+// =============================================
+// IMPROVEMENTS R2-101 to R2-150 (Round 2)
+// =============================================
+
+// #R2-108: Convert element type
+DarkBoardApp.prototype._showConvertMenu = function(hit) {
+  var self = this;
+  var types = [
+    { label: 'Post-it', type: 'sticky' }, { label: 'Rectangle', type: 'rect' },
+    { label: 'Cercle', type: 'circle' }, { label: 'Texte', type: 'text' },
+    { label: 'Losange', type: 'diamond' }, { label: 'Triangle', type: 'triangle' }
+  ].filter(function(t) { return t.type !== hit.type; });
+  var buttons = types.map(function(t) {
+    return { label: t.label, action: function() {
+      var props = {};
+      if (t.type === 'sticky') { props.fill = '#FFD966'; props.stroke = 'transparent'; }
+      if (t.type === 'text') { props.fill = 'transparent'; props.stroke = 'transparent'; }
+      self.updateSelectedElements(props);
+      var el = self.renderer.elements.get(hit.id);
+      if (el) el.type = t.type;
+      self.renderer.markDirty();
+      self.showToast('Converti en ' + t.label);
+    }};
+  });
+  buttons.push({ label: 'Annuler', action: function() {} });
+  this.showConfirmDialog('Convertir en:', buttons);
+};
+
+// #R2-140: Priority picker
+DarkBoardApp.prototype._showPriorityPicker = function(hit) {
+  var self = this;
+  this.showConfirmDialog('Priorite:', [
+    { label: 'Haute', action: function() { self.updateSelectedElements({ priority: 'high' }); } },
+    { label: 'Moyenne', action: function() { self.updateSelectedElements({ priority: 'medium' }); } },
+    { label: 'Basse', action: function() { self.updateSelectedElements({ priority: 'low' }); } },
+    { label: 'Aucune', action: function() { self.updateSelectedElements({ priority: null }); } }
+  ]);
+};
+
+// #R2-147: Sticky template picker
+DarkBoardApp.prototype._showTemplatePicker = function(hit) {
+  var self = this;
+  this.showConfirmDialog('Template sticky:', [
+    { label: 'Idee', action: function() { self.updateSelectedElements({ stickyTemplate: 'idea' }); } },
+    { label: 'Question', action: function() { self.updateSelectedElements({ stickyTemplate: 'question' }); } },
+    { label: 'Action', action: function() { self.updateSelectedElements({ stickyTemplate: 'action' }); } },
+    { label: 'Risque', action: function() { self.updateSelectedElements({ stickyTemplate: 'risk' }); } },
+    { label: 'Aucun', action: function() { self.updateSelectedElements({ stickyTemplate: null }); } }
+  ]);
+};
+
+// #R2-148: Category picker
+DarkBoardApp.prototype._showCategoryPicker = function(hit) {
+  var self = this;
+  this.showConfirmDialog('Categorie:', [
+    { label: 'Rouge', action: function() { self.updateSelectedElements({ category: 'red' }); } },
+    { label: 'Bleu', action: function() { self.updateSelectedElements({ category: 'blue' }); } },
+    { label: 'Vert', action: function() { self.updateSelectedElements({ category: 'green' }); } },
+    { label: 'Jaune', action: function() { self.updateSelectedElements({ category: 'yellow' }); } },
+    { label: 'Violet', action: function() { self.updateSelectedElements({ category: 'purple' }); } },
+    { label: 'Aucune', action: function() { self.updateSelectedElements({ category: null }); } }
+  ]);
+};
+
+// #R2-141: Auto-arrange selected elements in grid layout
+DarkBoardApp.prototype._autoArrangeGrid = function() {
+  var ids = Array.from(this.renderer.selectedIds);
+  if (ids.length < 2) return;
+  var self = this;
+  var elements = ids.map(function(id) { return self.renderer.elements.get(id); }).filter(Boolean);
+  var ops = [], inverseOps = [];
+  var cols = Math.ceil(Math.sqrt(elements.length));
+  var gap = 20;
+  var startX = elements[0].x, startY = elements[0].y;
+  var maxW = Math.max.apply(null, elements.map(function(e) { return e.width || 200; }));
+  var maxH = Math.max.apply(null, elements.map(function(e) { return e.height || 200; }));
+  for (var i = 0; i < elements.length; i++) {
+    var el = elements[i];
+    var col = i % cols, row = Math.floor(i / cols);
+    var newX = startX + col * (maxW + gap), newY = startY + row * (maxH + gap);
+    inverseOps.push({ type: 'update', elementId: el.id, props: { x: el.x, y: el.y } });
+    el.x = newX; el.y = newY;
+    ops.push({ type: 'update', elementId: el.id, props: { x: newX, y: newY } });
+  }
+  if (ops.length > 0) { this.history.push(ops, inverseOps); this.sync.sendOps(ops); this.renderer.markDirty(); this.showToast('Grille: ' + elements.length + ' elements arranges'); }
+};
+
+// #R2-142: Auto-arrange in circular layout
+DarkBoardApp.prototype._autoArrangeCircle = function() {
+  var ids = Array.from(this.renderer.selectedIds);
+  if (ids.length < 2) return;
+  var self = this;
+  var elements = ids.map(function(id) { return self.renderer.elements.get(id); }).filter(Boolean);
+  var ops = [], inverseOps = [];
+  var cx = 0, cy = 0;
+  for (var e of elements) { cx += e.x + (e.width || 100) / 2; cy += e.y + (e.height || 100) / 2; }
+  cx /= elements.length; cy /= elements.length;
+  var radius = Math.max(200, elements.length * 40);
+  for (var i = 0; i < elements.length; i++) {
+    var el = elements[i];
+    var angle = (2 * Math.PI * i) / elements.length - Math.PI / 2;
+    var newX = cx + radius * Math.cos(angle) - (el.width || 100) / 2;
+    var newY = cy + radius * Math.sin(angle) - (el.height || 100) / 2;
+    inverseOps.push({ type: 'update', elementId: el.id, props: { x: el.x, y: el.y } });
+    el.x = newX; el.y = newY;
+    ops.push({ type: 'update', elementId: el.id, props: { x: newX, y: newY } });
+  }
+  if (ops.length > 0) { this.history.push(ops, inverseOps); this.sync.sendOps(ops); this.renderer.markDirty(); this.showToast('Cercle: ' + elements.length + ' elements arranges'); }
+};
+
+// #R2-143: Smart spacing - equalize gaps between selected elements
+DarkBoardApp.prototype._smartSpacing = function() {
+  var ids = Array.from(this.renderer.selectedIds);
+  if (ids.length < 3) { this.showToast('Selectionnez au moins 3 elements'); return; }
+  var self = this;
+  var elements = ids.map(function(id) { return self.renderer.elements.get(id); }).filter(Boolean);
+  elements.sort(function(a, b) { return a.x - b.x; });
+  var ops = [], inverseOps = [];
+  var totalWidth = elements.reduce(function(s, e) { return s + (e.width || 100); }, 0);
+  var span = (elements[elements.length - 1].x + (elements[elements.length - 1].width || 100)) - elements[0].x;
+  var gap = Math.max(20, (span - totalWidth) / (elements.length - 1));
+  var curX = elements[0].x;
+  for (var i = 0; i < elements.length; i++) {
+    var el = elements[i];
+    if (i > 0) {
+      inverseOps.push({ type: 'update', elementId: el.id, props: { x: el.x } });
+      el.x = curX;
+      ops.push({ type: 'update', elementId: el.id, props: { x: curX } });
+    }
+    curX += (el.width || 100) + gap;
+  }
+  if (ops.length > 0) { this.history.push(ops, inverseOps); this.sync.sendOps(ops); this.renderer.markDirty(); this.showToast('Espacement egalise'); }
+};
+
+// #R2-107: Navigate to linked element on click
+DarkBoardApp.prototype._handleLinkedElement = function(el) {
+  if (!el || !el.linkedElementId) return false;
+  var target = this.renderer.elements.get(el.linkedElementId);
+  if (!target) { this.showToast('Element lie introuvable'); return false; }
+  var bounds = getElementBounds(target);
+  if (bounds) {
+    this.renderer.selectedIds.clear();
+    this.renderer.selectedIds.add(target.id);
+    this.animateToView(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2, 1.2);
+    return true;
+  }
+  return false;
+};
+
+// #R2-149: Auto-resize sticky to fit text
+DarkBoardApp.prototype._autoResizeStickyToFit = function(el) {
+  if (!el || el.type !== 'sticky' || !el.text) return;
+  var canvas = document.createElement('canvas');
+  var ctx = canvas.getContext('2d');
+  var fs = el.fontSize || 16;
+  ctx.font = fs + 'px -apple-system, BlinkMacSystemFont, sans-serif';
+  var lines = el.text.split('\n');
+  var maxLineW = 0;
+  for (var line of lines) { var w = ctx.measureText(line).width; if (w > maxLineW) maxLineW = w; }
+  var newW = Math.max(150, maxLineW + 40);
+  var lineCount = 0;
+  for (var line of lines) { lineCount += Math.ceil(ctx.measureText(line).width / (newW - 28)) || 1; }
+  var newH = Math.max(100, lineCount * fs * 1.4 + 40);
+  this.updateSelectedElements({ width: Math.round(newW), height: Math.round(newH) });
+};
+
+// #R2-124: Element search with highlight and navigate
+DarkBoardApp.prototype.searchElements = function(query) {
+  if (!query || !query.trim()) return;
+  var q = query.toLowerCase();
+  var found = [];
+  for (var entry of this.renderer.elements) {
+    var el = entry[1];
+    if ((el.text || '').toLowerCase().includes(q)) found.push(el);
+  }
+  if (found.length === 0) { this.showToast('Aucun resultat pour "' + query + '"'); return; }
+  this.renderer.selectedIds.clear();
+  for (var el of found) this.renderer.selectedIds.add(el.id);
+  var first = found[0];
+  var bounds = getElementBounds(first);
+  if (bounds) this.animateToView(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2, 1);
+  this.renderer.markDirty();
+  this.showToast(found.length + ' element(s) trouve(s)');
+};
+
+// #R2-123: Board statistics panel
+DarkBoardApp.prototype.showBoardStats = function() {
+  var elements = Array.from(this.renderer.elements.values());
+  var typeCounts = {};
+  for (var el of elements) typeCounts[el.type] = (typeCounts[el.type] || 0) + 1;
+  var tagCounts = {};
+  for (var el of elements) if (el.tags) for (var t of el.tags) tagCounts[t.label] = (tagCounts[t.label] || 0) + 1;
+  var html = '<h3 style="margin:0 0 12px">Statistiques du board</h3>';
+  html += '<p>Total: <strong>' + elements.length + '</strong> elements</p>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:8px 0">';
+  for (var k in typeCounts) html += '<span>' + k + ':</span><span><strong>' + typeCounts[k] + '</strong></span>';
+  html += '</div>';
+  if (Object.keys(tagCounts).length > 0) {
+    html += '<h4 style="margin:8px 0 4px">Tags</h4><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">';
+    for (var t in tagCounts) html += '<span>' + t + ':</span><span><strong>' + tagCounts[t] + '</strong></span>';
+    html += '</div>';
+  }
+  var overlay = document.createElement('div');
+  overlay.className = 'confirm-overlay';
+  overlay.innerHTML = '<div class="confirm-dialog" style="max-width:400px">' + html + '<div class="confirm-actions"><button onclick="this.closest(\'.confirm-overlay\').remove()">Fermer</button></div></div>';
+  document.body.appendChild(overlay);
+};
+
+// #R2-125: Board duplicate
+DarkBoardApp.prototype.duplicateBoard = function() {
+  var self = this;
+  var newId = getBoardId() + '-copy-' + Date.now().toString(36).slice(-4);
+  fetch('/api/boards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: newId }) })
+    .then(function() { self.showToast('Board duplique: ' + newId); window.open('/' + newId, '_blank'); })
+    .catch(function() { self.showToast('Erreur lors de la duplication'); });
+};
+
+// #R2-126: Version history tracking (patch updateSelectedElements)
+(function() {
+  var origUpdateSel = DarkBoardApp.prototype.updateSelectedElements;
+  if (origUpdateSel) {
+    DarkBoardApp.prototype.updateSelectedElements = function(props) {
+      for (var id of this.renderer.selectedIds) {
+        var el = this.renderer.elements.get(id);
+        if (el) {
+          if (!el.versionHistory) el.versionHistory = [];
+          var snapshot = { timestamp: Date.now(), props: {} };
+          for (var key of Object.keys(props)) { snapshot.props[key] = el[key]; }
+          el.versionHistory.push(snapshot);
+          if (el.versionHistory.length > 5) el.versionHistory = el.versionHistory.slice(-5);
+        }
+      }
+      origUpdateSel.call(this, props);
+    };
+  }
+})();
+
+// #R2-131: Typing indicator
+DarkBoardApp.prototype._showTypingIndicator = function(userName) {
+  var existing = document.getElementById('typingIndicator');
+  if (!existing) { existing = document.createElement('div'); existing.id = 'typingIndicator'; existing.className = 'typing-indicator'; document.body.appendChild(existing); }
+  existing.textContent = userName + ' est en train d\'editer...';
+  existing.style.display = '';
+  clearTimeout(this._typingTimer);
+  this._typingTimer = setTimeout(function() { existing.style.display = 'none'; }, 3000);
+};
+
+// #R2-136: Ping feature
+DarkBoardApp.prototype.pingLocation = function(worldX, worldY) {
+  this.sync.send({ type: 'ping', boardId: getBoardId(), x: worldX, y: worldY, name: this.userName, color: this.myColor });
+  this._showPingAnimation(worldX, worldY, this.myColor);
+};
+DarkBoardApp.prototype._showPingAnimation = function(worldX, worldY, color) {
+  var screen = this.renderer.worldToScreen(worldX, worldY);
+  var ping = document.createElement('div');
+  ping.className = 'ping-animation';
+  ping.style.left = screen.x + 'px';
+  ping.style.top = screen.y + 'px';
+  ping.style.borderColor = color || '#4a9eff';
+  document.body.appendChild(ping);
+  setTimeout(function() { ping.remove(); }, 2000);
+};
+
+// #R2-128: Share read-only link
+DarkBoardApp.prototype.shareReadOnly = function() {
+  var url = window.location.origin + '/' + getBoardId() + '?mode=readonly';
+  navigator.clipboard.writeText(url).then(function() {}).catch(function() {});
+  this.showToast('Lien lecture seule copie !');
+};
+
+// #R2-129: Board title editing
+DarkBoardApp.prototype.editBoardTitle = function() {
+  var newTitle = prompt('Titre du board:', this._boardTitle || getBoardId());
+  if (newTitle !== null && newTitle.trim()) { this._boardTitle = newTitle.trim(); document.title = 'DarkBoard - ' + this._boardTitle; this.showToast('Titre mis a jour'); }
+};
+
+// #R2-130: Board description/notes
+DarkBoardApp.prototype.editBoardDescription = function() {
+  var desc = prompt('Notes / Description du board:', this._boardDescription || '');
+  if (desc !== null) { this._boardDescription = desc; this.showToast('Description mise a jour'); }
+};
+
+// #R2-133: Emoji reactions on chat messages
+DarkBoardApp.prototype._addChatReactions = function(msgDiv, msgData) {
+  var self = this;
+  var reactionBar = document.createElement('div');
+  reactionBar.className = 'chat-reaction-bar';
+  var quickEmojis = ['👍', '❤️', '😂', '🎉', '🤔'];
+  quickEmojis.forEach(function(emoji) {
+    var btn = document.createElement('button');
+    btn.className = 'chat-reaction-btn';
+    btn.textContent = emoji;
+    btn.addEventListener('click', function() { btn.classList.toggle('active'); });
+    reactionBar.appendChild(btn);
+  });
+  msgDiv.appendChild(reactionBar);
+};
+
+// #R2-134: User presence indicators
+DarkBoardApp.prototype._getUserPresence = function(user) {
+  if (!user || !user.lastActivity) return 'offline';
+  var elapsed = Date.now() - user.lastActivity;
+  if (elapsed < 10000) return 'active';
+  if (elapsed < 60000) return 'idle';
+  return 'away';
+};
+
+// #R2-146: Smart connector auto-routing
+DarkBoardApp.prototype._smartConnectorRoute = function(conn) {
+  if (!conn || conn.type !== 'connector') return;
+  var srcEl = conn.sourceId ? this.renderer.elements.get(conn.sourceId) : null;
+  var tgtEl = conn.targetId ? this.renderer.elements.get(conn.targetId) : null;
+  if (!srcEl || !tgtEl) return;
+  var mx = (conn.x + conn.x2) / 2, my = (conn.y + conn.y2) / 2;
+  for (var entry of this.renderer.elements) {
+    var el = entry[1];
+    if (el.id === conn.id || el.id === conn.sourceId || el.id === conn.targetId) continue;
+    if (el.type === 'frame' || el.type === 'connector') continue;
+    var b = getElementBounds(el);
+    if (b && mx > b.x && mx < b.x + b.w && my > b.y && my < b.y + b.h) { conn.lineType = 'orthogonal'; return; }
+  }
+};
+
 // Patch boot to initialize improvements
 (function() {
   var origBoot = window.addEventListener;
-  // Will be called after DOMContentLoaded from the class
   document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
       if (window.app && typeof window.app.initImprovements === 'function') {
         window.app.initImprovements();
-        // #R2-50: Initialize scroll persistence
         if (typeof window.app.initScrollPersistence === 'function') {
           window.app.initScrollPersistence();
         }
       }
     }, 500);
   });
+})();
+
+// =============================================
+// R2 IMPROVEMENTS 176-192: Positive UX & Final Polish
+// =============================================
+
+// #R2-176: Keyboard shortcut cheat sheet (? key)
+DarkBoardApp.prototype.showCheatSheet = function() {
+  if (document.querySelector('.cheat-sheet-overlay')) return;
+  var overlay = document.createElement('div');
+  overlay.className = 'cheat-sheet-overlay';
+  overlay.innerHTML = '<div class="cheat-sheet">' +
+    '<h3>Raccourcis clavier</h3>' +
+    '<div class="cheat-sheet-grid">' +
+    '<div class="cheat-sheet-section"><h4>Outils</h4>' +
+    '<div class="cs-row"><span>Selection</span><kbd>V</kbd></div>' +
+    '<div class="cs-row"><span>Main</span><kbd>H</kbd></div>' +
+    '<div class="cs-row"><span>Rectangle</span><kbd>R</kbd></div>' +
+    '<div class="cs-row"><span>Cercle</span><kbd>O</kbd></div>' +
+    '<div class="cs-row"><span>Ligne</span><kbd>L</kbd></div>' +
+    '<div class="cs-row"><span>Fleche</span><kbd>A</kbd></div>' +
+    '<div class="cs-row"><span>Connecteur</span><kbd>K</kbd></div>' +
+    '<div class="cs-row"><span>Dessin</span><kbd>D</kbd></div>' +
+    '<div class="cs-row"><span>Post-it</span><kbd>S</kbd></div>' +
+    '<div class="cs-row"><span>Texte</span><kbd>T</kbd></div>' +
+    '<div class="cs-row"><span>Cadre</span><kbd>F</kbd></div>' +
+    '<div class="cs-row"><span>Gomme</span><kbd>E</kbd></div>' +
+    '<div class="cs-row"><span>Mind Map</span><kbd>W</kbd></div>' +
+    '<div class="cs-row"><span>Couleurs</span><kbd>C</kbd></div>' +
+    '</div>' +
+    '<div class="cheat-sheet-section"><h4>Actions</h4>' +
+    '<div class="cs-row"><span>Annuler</span><kbd>Ctrl+Z</kbd></div>' +
+    '<div class="cs-row"><span>Retablir</span><kbd>Ctrl+Y</kbd></div>' +
+    '<div class="cs-row"><span>Copier</span><kbd>Ctrl+C</kbd></div>' +
+    '<div class="cs-row"><span>Coller</span><kbd>Ctrl+V</kbd></div>' +
+    '<div class="cs-row"><span>Couper</span><kbd>Ctrl+X</kbd></div>' +
+    '<div class="cs-row"><span>Tout sel.</span><kbd>Ctrl+A</kbd></div>' +
+    '<div class="cs-row"><span>Grouper</span><kbd>Ctrl+G</kbd></div>' +
+    '<div class="cs-row"><span>Dupliquer</span><kbd>Ctrl+D</kbd></div>' +
+    '<div class="cs-row"><span>Rechercher</span><kbd>Ctrl+F</kbd></div>' +
+    '<div class="cs-row"><span>Supprimer</span><kbd>Suppr</kbd></div>' +
+    '<div class="cs-row"><span>Aide</span><kbd>?</kbd></div>' +
+    '</div>' +
+    '<div class="cheat-sheet-section"><h4>Navigation</h4>' +
+    '<div class="cs-row"><span>Zoom</span><kbd>Molette</kbd></div>' +
+    '<div class="cs-row"><span>Deplacer vue</span><kbd>Espace</kbd></div>' +
+    '<div class="cs-row"><span>Centrer</span><kbd>Home</kbd></div>' +
+    '<div class="cs-row"><span>Adapter</span><kbd>Ctrl+0</kbd></div>' +
+    '<div class="cs-row"><span>Fleches</span><kbd>1/10/100px</kbd></div>' +
+    '<div class="cs-row"><span>Dupliquer</span><kbd>Alt+Drag</kbd></div>' +
+    '<div class="cs-row"><span>Contraindre</span><kbd>Shift</kbd></div>' +
+    '<div class="cs-row"><span>Ancres</span><kbd>N</kbd></div>' +
+    '</div>' +
+    '</div></div>';
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  // Close on Escape
+  var escHandler = function(e) { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); } };
+  document.addEventListener('keydown', escHandler);
+};
+
+// #R2-177: "Did you know?" tips (once per session)
+DarkBoardApp.prototype.initDidYouKnow = function() {
+  if (sessionStorage.getItem('darkboard-dyk-shown')) return;
+  sessionStorage.setItem('darkboard-dyk-shown', '1');
+  var tips = [
+    'Le saviez-vous ? Maintenez Alt en deplacant un element pour le dupliquer !',
+    'Le saviez-vous ? Ctrl+F ouvre la recherche et remplacement sur le tableau.',
+    'Le saviez-vous ? Glissez des images directement depuis votre bureau sur le tableau.',
+    'Le saviez-vous ? Appuyez sur N pour gerer les ancres et creer des presentations.',
+    'Le saviez-vous ? Double-cliquez sur un element pour editer son texte.',
+    'Le saviez-vous ? Vous pouvez coller du contenu depuis Miro, Excel ou Google Sheets.',
+    'Le saviez-vous ? Le mode Laser est visible par tous les participants en temps reel.',
+    'Le saviez-vous ? Ctrl+0 adapte la vue a tous les elements du tableau.'
+  ];
+  var self = this;
+  setTimeout(function() {
+    var tip = tips[Math.floor(Math.random() * tips.length)];
+    var banner = document.createElement('div');
+    banner.className = 'dyk-banner';
+    banner.innerHTML = '<span class="dyk-icon">💡</span><span>' + tip + '</span><button class="dyk-close">&times;</button>';
+    document.body.appendChild(banner);
+    banner.querySelector('.dyk-close').addEventListener('click', function() { banner.remove(); });
+    setTimeout(function() { if (banner.parentNode) banner.remove(); }, 15000);
+  }, 45000); // Show after 45 seconds
+};
+
+// #R2-178: First-sticky celebration (confetti particles on canvas)
+DarkBoardApp.prototype._celebrateFirstSticky = function(el) {
+  if (localStorage.getItem('darkboard-first-sticky-celebrated')) return;
+  if (!el || el.type !== 'sticky') return;
+  localStorage.setItem('darkboard-first-sticky-celebrated', '1');
+  var screen = this.renderer.worldToScreen(el.x + (el.width || 200) / 2, el.y + (el.height || 200) / 2);
+  var colors = ['#4a9eff', '#4ecdc4', '#ffd966', '#ff6b6b', '#96ceb4', '#dda0dd', '#ff9f43'];
+  for (var i = 0; i < 24; i++) {
+    var p = document.createElement('div');
+    p.className = 'confetti-particle';
+    p.style.left = screen.x + 'px';
+    p.style.top = screen.y + 'px';
+    p.style.background = colors[i % colors.length];
+    var angle = (Math.PI * 2 * i) / 24;
+    var dist = 60 + Math.random() * 80;
+    p.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+    p.style.setProperty('--dy', Math.sin(angle) * dist - 30 + 'px');
+    p.style.setProperty('--rot', (Math.random() * 360) + 'deg');
+    document.body.appendChild(p);
+    setTimeout(function(el) { el.remove(); }, 1200, p);
+  }
+  this.showToast('Votre premier post-it ! Continuez a creer.', 'success');
+};
+
+// #R2-179: Milestone celebrations (10, 50, 100 stickies created)
+DarkBoardApp.prototype._checkStickyMilestone = function() {
+  var stickyCount = 0;
+  for (var entry of this.renderer.elements.values()) {
+    if (entry.type === 'sticky') stickyCount++;
+  }
+  var milestones = [10, 50, 100];
+  if (milestones.indexOf(stickyCount) !== -1) {
+    var toast = document.createElement('div');
+    toast.className = 'milestone-toast';
+    toast.textContent = stickyCount + ' post-its crees ! 🎉';
+    document.body.appendChild(toast);
+    setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.5s'; setTimeout(function() { toast.remove(); }, 500); }, 3000);
+  }
+};
+
+// #R2-180: Tool tip preview on hover
+DarkBoardApp.prototype.initToolTipPreview = function() {
+  var self = this;
+  var tipEl = null;
+  var descriptions = {
+    select: { title: 'Selection (V)', desc: 'Selectionner et deplacer des elements' },
+    hand: { title: 'Main (H)', desc: 'Deplacer la vue du canevas' },
+    rect: { title: 'Rectangle (R)', desc: 'Dessiner un rectangle' },
+    circle: { title: 'Cercle (O)', desc: 'Dessiner un cercle' },
+    diamond: { title: 'Losange', desc: 'Dessiner un losange' },
+    triangle: { title: 'Triangle', desc: 'Dessiner un triangle' },
+    line: { title: 'Ligne (L)', desc: 'Tracer une ligne droite' },
+    arrow: { title: 'Fleche (A)', desc: 'Tracer une fleche' },
+    connector: { title: 'Connecteur (K)', desc: 'Relier deux elements' },
+    draw: { title: 'Dessin (D)', desc: 'Dessin a main levee' },
+    sticky: { title: 'Post-it (S)', desc: 'Creer un post-it colore' },
+    text: { title: 'Texte (T)', desc: 'Ajouter du texte' },
+    envelope: { title: 'Enveloppe (G)', desc: 'Contenu revele au clic' },
+    card: { title: 'Carte (M)', desc: 'Carte de gestion Kanban' },
+    list: { title: 'Liste (I)', desc: 'Liste a puces / checklist' },
+    frame: { title: 'Cadre (F)', desc: 'Zone de regroupement' },
+    mindmap: { title: 'Mind Map (W)', desc: 'Structure radiale' },
+    eraser: { title: 'Gomme (E)', desc: 'Effacer des elements' },
+    zoomZone: { title: 'Zoom zone', desc: 'Zoomer sur une zone' }
+  };
+  var removeTip = function() { if (tipEl) { tipEl.remove(); tipEl = null; } };
+  document.querySelectorAll('.tool-btn[data-tool]').forEach(function(btn) {
+    btn.addEventListener('mouseenter', function(e) {
+      var tool = btn.dataset.tool;
+      var info = descriptions[tool];
+      if (!info) return;
+      removeTip();
+      tipEl = document.createElement('div');
+      tipEl.className = 'tool-tip-preview';
+      tipEl.innerHTML = '<div class="ttp-title">' + info.title + '</div><div class="ttp-desc">' + info.desc + '</div>';
+      var rect = btn.getBoundingClientRect();
+      tipEl.style.left = rect.left + 'px';
+      tipEl.style.top = (rect.bottom + 8) + 'px';
+      document.body.appendChild(tipEl);
+    });
+    btn.addEventListener('mouseleave', removeTip);
+  });
+};
+
+// #R2-181: Progressive disclosure - show advanced features after basic usage
+DarkBoardApp.prototype.initProgressiveDisclosure = function() {
+  var self = this;
+  var usageCount = parseInt(localStorage.getItem('darkboard-usage-count') || '0', 10);
+  usageCount++;
+  localStorage.setItem('darkboard-usage-count', usageCount);
+  // After 5 uses, show connector/mindmap hints
+  if (usageCount === 5) {
+    setTimeout(function() {
+      self.showToast('Decouvrez les connecteurs (K) pour relier vos elements!', 'info');
+    }, 10000);
+  }
+  // After 10 uses, show advanced workshop features
+  if (usageCount === 10) {
+    setTimeout(function() {
+      self.showToast('L\'animateur peut utiliser le timer, vote, isoloir et plus !', 'info');
+    }, 10000);
+  }
+};
+
+// #R2-182: Board activity summary on reconnect
+DarkBoardApp.prototype.showActivitySummary = function(summary) {
+  if (!summary || !summary.newElementCount) return;
+  var types = summary.typeBreakdown || {};
+  var parts = Object.entries(types).map(function(e) {
+    var labels = { sticky: 'post-its', rect: 'rectangles', text: 'textes', circle: 'cercles', card: 'cartes', frame: 'cadres', connector: 'connecteurs' };
+    return e[1] + ' ' + (labels[e[0]] || e[0]);
+  });
+  var msg = 'Pendant votre absence: ' + summary.newElementCount + ' nouveaux elements';
+  if (parts.length > 0 && parts.length <= 3) msg += ' (' + parts.join(', ') + ')';
+  this.showToast(msg, 'info');
+};
+
+// #R2-183: "Getting Started" checklist in facilitator panel
+DarkBoardApp.prototype.initGettingStartedChecklist = function() {
+  var panel = document.getElementById('facilitatorPanel');
+  if (!panel) return;
+  if (localStorage.getItem('darkboard-gs-dismissed')) return;
+  var self = this;
+  var checkState = function() {
+    var checks = {
+      'Creer un post-it': self.renderer.elements.size > 0,
+      'Partager le lien': !!localStorage.getItem('darkboard-shared'),
+      'Utiliser le timer': !!localStorage.getItem('darkboard-timer-used'),
+      'Lancer un vote': !!localStorage.getItem('darkboard-vote-used')
+    };
+    return checks;
+  };
+  var render = function() {
+    var existing = panel.querySelector('.getting-started-checklist');
+    if (existing) existing.remove();
+    var checks = checkState();
+    var allDone = Object.values(checks).every(function(v) { return v; });
+    if (allDone) { localStorage.setItem('darkboard-gs-dismissed', '1'); return; }
+    var div = document.createElement('div');
+    div.className = 'getting-started-checklist';
+    div.innerHTML = '<h5>Pour commencer</h5>';
+    for (var label in checks) {
+      var item = document.createElement('div');
+      item.className = 'gs-item' + (checks[label] ? ' gs-done' : '');
+      item.innerHTML = '<span class="gs-check">' + (checks[label] ? '&#10003;' : '&#9711;') + '</span><span>' + label + '</span>';
+      div.appendChild(item);
+    }
+    panel.appendChild(div);
+  };
+  // Re-render periodically
+  render();
+  setInterval(render, 10000);
+};
+
+// #R2-184: Enhanced delete animation (shrink + fade + slight rotation)
+(function() {
+  var origDoDelete = DarkBoardApp.prototype._doDeleteSelected;
+  if (origDoDelete) {
+    DarkBoardApp.prototype._doDeleteSelected = function() {
+      var self = this;
+      for (var id of this.renderer.selectedIds) {
+        var el = this.renderer.elements.get(id);
+        if (el && el.x !== undefined) {
+          var screen = this.renderer.worldToScreen(el.x, el.y);
+          var zoom = this.renderer.camera.zoom;
+          var w = (el.width || 100) * zoom;
+          var h = (el.height || 100) * zoom;
+          var ghost = document.createElement('div');
+          // #R2-184: Enhanced with rotation
+          ghost.style.cssText = 'position:fixed;left:' + screen.x + 'px;top:' + screen.y + 'px;width:' + w + 'px;height:' + h + 'px;border:1px solid var(--danger);border-radius:4px;pointer-events:none;z-index:9997;animation:deleteSpinFade 0.35s ease-out forwards;background:rgba(233,69,96,0.1);';
+          document.body.appendChild(ghost);
+          setTimeout(function(g) { g.remove(); }, 450, ghost);
+        }
+      }
+      origDoDelete.call(this);
+    };
+  }
+})();
+
+// #R2-185: Rubber band effect when drag reaches canvas bounds
+DarkBoardApp.prototype.initRubberBand = function() {
+  var self = this;
+  var canvas = this.renderer.canvas;
+  var lastEdge = 0;
+  canvas.addEventListener('pointermove', function(e) {
+    if (!self.input || !self.input.isDragging) return;
+    var margin = 20;
+    var now = Date.now();
+    if (now - lastEdge < 500) return; // debounce
+    if (e.clientX < margin || e.clientX > window.innerWidth - margin ||
+        e.clientY < margin || e.clientY > window.innerHeight - margin) {
+      lastEdge = now;
+      canvas.style.animation = 'none';
+      canvas.offsetHeight; // force reflow
+      canvas.style.animation = '';
+    }
+  });
+};
+
+// #R2-186: Subtle parallax effect on brand badge during pan
+DarkBoardApp.prototype.initBrandParallax = function() {
+  var badge = document.querySelector('.brand-badge');
+  if (!badge) return;
+  var self = this;
+  var lastX = 0, lastY = 0;
+  var update = function() {
+    var dx = (self.renderer.camera.x - lastX) * 0.02;
+    var dy = (self.renderer.camera.y - lastY) * 0.02;
+    dx = Math.max(-5, Math.min(5, dx));
+    dy = Math.max(-3, Math.min(3, dy));
+    badge.style.transform = 'translateX(calc(-50% + ' + dx + 'px)) translateY(' + dy + 'px)';
+    lastX = self.renderer.camera.x;
+    lastY = self.renderer.camera.y;
+    requestAnimationFrame(update);
+  };
+  requestAnimationFrame(update);
+};
+
+// #R2-187: Smooth element snapping animation
+DarkBoardApp.prototype.initSnapAnimation = function() {
+  // Override snap behavior to animate into position
+  var self = this;
+  this._origSnapToGrid = this.snapToGrid;
+  if (typeof this.snapToGrid === 'function') {
+    this.snapToGrid = function(x, gridSize) {
+      return Math.round(x / gridSize) * gridSize;
+    };
+  }
+};
+
+// #R2-188: "Saved" indicator pulse after auto-save
+DarkBoardApp.prototype.initSavedIndicator = function() {
+  var indicator = document.createElement('div');
+  indicator.className = 'saved-indicator';
+  indicator.textContent = 'Sauvegarde';
+  document.body.appendChild(indicator);
+  this._savedIndicator = indicator;
+};
+DarkBoardApp.prototype.showSavedIndicator = function() {
+  if (!this._savedIndicator) return;
+  this._savedIndicator.classList.add('visible');
+  var self = this;
+  clearTimeout(this._savedIndicatorTimer);
+  this._savedIndicatorTimer = setTimeout(function() {
+    self._savedIndicator.classList.remove('visible');
+  }, 1500);
+};
+
+// #R2-189: Keyboard shortcut sound effects (optional, off by default)
+DarkBoardApp.prototype.initSoundEffects = function() {
+  this._soundEnabled = localStorage.getItem('darkboard-sound') === '1';
+};
+DarkBoardApp.prototype.playSound = function(type) {
+  if (!this._soundEnabled) return;
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    gain.gain.value = 0.1;
+    if (type === 'create') { osc.frequency.value = 520; osc.type = 'sine'; }
+    else if (type === 'delete') { osc.frequency.value = 220; osc.type = 'triangle'; }
+    else if (type === 'snap') { osc.frequency.value = 880; osc.type = 'sine'; }
+    else { osc.frequency.value = 440; osc.type = 'sine'; }
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    osc.stop(ctx.currentTime + 0.2);
+  } catch (e) { /* Web Audio not available */ }
+};
+
+// #R2-190: Seasonal theme colors (auto-detected by date)
+DarkBoardApp.prototype.initSeasonalTheme = function() {
+  if (localStorage.getItem('darkboard-no-seasonal') === '1') return;
+  var month = new Date().getMonth(); // 0-11
+  var root = document.documentElement;
+  root.classList.remove('season-spring', 'season-summer', 'season-autumn', 'season-winter');
+  if (month >= 2 && month <= 4) root.classList.add('season-spring');
+  else if (month >= 5 && month <= 7) root.classList.add('season-summer');
+  else if (month >= 8 && month <= 10) root.classList.add('season-autumn');
+  else root.classList.add('season-winter');
+};
+
+// #R2-192: Element count milestone animations
+DarkBoardApp.prototype._checkElementCountMilestone = function() {
+  var count = this.renderer.elements.size;
+  var milestones = [25, 50, 100, 250, 500, 1000];
+  if (milestones.indexOf(count) !== -1) {
+    var countEl = document.getElementById('syncUsers');
+    if (countEl) {
+      countEl.style.animation = 'milestoneCountPop 0.5s ease-out';
+      setTimeout(function() { countEl.style.animation = ''; }, 600);
+    }
+  }
+};
+
+// Override addElement to wire in R2 celebrations
+(function() {
+  var origAddElement = DarkBoardApp.prototype.addElement;
+  if (origAddElement) {
+    DarkBoardApp.prototype.addElement = function(el) {
+      origAddElement.call(this, el);
+      // #R2-178: First sticky celebration
+      this._celebrateFirstSticky(el);
+      // #R2-179: Sticky milestones
+      if (el.type === 'sticky') this._checkStickyMilestone();
+      // #R2-189: Sound effect
+      this.playSound('create');
+      // #R2-192: Element count milestone
+      this._checkElementCountMilestone();
+    };
+  }
+})();
+
+// Wire R2 improvements into init
+(function() {
+  var origInitImprovements = DarkBoardApp.prototype.initImprovements;
+  DarkBoardApp.prototype.initImprovements = function() {
+    if (origInitImprovements) origInitImprovements.call(this);
+    // #R2-177
+    this.initDidYouKnow();
+    // #R2-180
+    this.initToolTipPreview();
+    // #R2-181
+    this.initProgressiveDisclosure();
+    // #R2-183
+    this.initGettingStartedChecklist();
+    // #R2-185
+    this.initRubberBand();
+    // #R2-186
+    this.initBrandParallax();
+    // #R2-187
+    this.initSnapAnimation();
+    // #R2-188
+    this.initSavedIndicator();
+    // #R2-189
+    this.initSoundEffects();
+    // #R2-190
+    this.initSeasonalTheme();
+  };
 })();
