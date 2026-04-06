@@ -2815,15 +2815,6 @@ body.light-theme .search-panel {
 /* Old help-btn replaced by bb-btn inside bottom-bar-left */
 .help-btn {
   display: none;
-  transition: all 0.2s;
-  z-index: 100;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
-}
-
-.help-btn:hover {
-  background: var(--accent);
-  color: white;
-  transform: scale(1.1);
 }
 
 /* MODAL ANIMATIONS - already defined above, removed duplicate */
