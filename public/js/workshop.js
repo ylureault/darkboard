@@ -786,7 +786,7 @@ class Workshop {
     }
 
     if (votedElements.length === 0) {
-      this.app.showToast('Aucun element avec des votes. Lancez d\'abord un vote.');
+      this.app.showToast('Aucun élément avec des votes. Lancez d\'abord un vote.');
       return;
     }
 
@@ -1092,7 +1092,7 @@ class Workshop {
     ];
 
     if (allClusters.length === 0) {
-      this.app.showToast('Pas de groupes detectes.');
+      this.app.showToast('Pas de groupes détectés.');
       return;
     }
 
@@ -1269,7 +1269,7 @@ class Workshop {
     }
 
     if (total === 0) {
-      body.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:12px;">En attente des reponses...</div>';
+      body.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:12px;">En attente des réponses...</div>';
     }
   }
 
@@ -1316,9 +1316,9 @@ class Workshop {
     if (this._fishbowlActive) {
       this._fishbowlQueue = [];
       this._fishbowlCurrent = this.app.myUserId;
-      this.app.showToast('Mode Fishbowl active - vous etes le premier editeur');
+      this.app.showToast('Mode Fishbowl activé - vous êtes le premier éditeur');
     } else {
-      this.app.showToast('Mode Fishbowl desactive');
+      this.app.showToast('Mode Fishbowl désactivé');
     }
     this.app.renderer.markDirty();
   }
@@ -1327,7 +1327,7 @@ class Workshop {
     if (!this._fishbowlActive || !this.isFacilitator) return;
     if (this._fishbowlQueue.length > 0) {
       this._fishbowlCurrent = this._fishbowlQueue.shift();
-      this.app.showToast('Prochain editeur dans le fishbowl');
+      this.app.showToast('Prochain éditeur dans le fishbowl');
     } else {
       this.app.showToast('Personne dans la file d\'attente');
     }

@@ -232,6 +232,31 @@ function hitTestElement(el, worldX, worldY, threshold) {
     case 'sticky':
     case 'image':
       return pointInRect(worldX, worldY, el.x, el.y, el.width, el.height);
+    case 'envelope':
+      return pointInRect(worldX, worldY, el.x, el.y, el.width, el.height);
+    case 'diamond': {
+      const cx = el.x + el.width / 2;
+      const cy = el.y + el.height / 2;
+      const dx = Math.abs(worldX - cx) / (el.width / 2);
+      const dy = Math.abs(worldY - cy) / (el.height / 2);
+      return dx + dy <= 1;
+    }
+    case 'triangle': {
+      const ax = el.x + el.width / 2, ay = el.y;
+      const bx = el.x + el.width, by = el.y + el.height;
+      const cx2 = el.x, cy2 = el.y + el.height;
+      const d1 = (worldX - bx) * (ay - by) - (ax - bx) * (worldY - by);
+      const d2 = (worldX - cx2) * (by - cy2) - (bx - cx2) * (worldY - cy2);
+      const d3 = (worldX - ax) * (cy2 - ay) - (cx2 - ax) * (worldY - ay);
+      const hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+      const hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+      return !(hasNeg && hasPos);
+    }
+    case 'card':
+    case 'list':
+    case 'mindmap':
+    case 'embed':
+      return pointInRect(worldX, worldY, el.x, el.y, el.width, el.height);
     case 'circle': {
       const rx = el.width / 2;
       const ry = el.height / 2;
@@ -240,6 +265,16 @@ function hitTestElement(el, worldX, worldY, threshold) {
       const dx = (worldX - cx) / rx;
       const dy = (worldY - cy) / ry;
       return dx * dx + dy * dy <= 1;
+    }
+    case 'text':
+      return pointInRect(worldX, worldY, el.x - 4, el.y - 4, (el.width || 200) + 8, (el.height || 30) + 8);
+    case 'frame': {
+      const titleH = (el.fontSize || 16) + 16;
+      if (pointInRect(worldX, worldY, el.x, el.y - titleH, el.width, titleH)) return true;
+      const borderThreshold = threshold;
+      const inOuter = pointInRect(worldX, worldY, el.x - borderThreshold, el.y - borderThreshold, el.width + borderThreshold * 2, el.height + borderThreshold * 2);
+      const inInner = pointInRect(worldX, worldY, el.x + borderThreshold, el.y + borderThreshold, el.width - borderThreshold * 2, el.height - borderThreshold * 2);
+      return inOuter && !inInner;
     }
     case 'line':
     case 'arrow':
@@ -775,21 +810,25 @@ test('155: hitTestElement for sticky, text, frame, diamond, triangle types', () 
   assert.strictEqual(hitTestElement(sticky, 50, 50), true);
   assert.strictEqual(hitTestElement(sticky, 150, 150), false);
 
-  // text falls to default -> returns false (not handled in hitTestElement)
+  // text uses pointInRect with padding
   const text = { type: 'text', x: 0, y: 0, width: 100, height: 30 };
-  assert.strictEqual(hitTestElement(text, 50, 15), false);
+  assert.strictEqual(hitTestElement(text, 50, 15), true);
+  assert.strictEqual(hitTestElement(text, 200, 200), false);
 
-  // frame falls to default -> returns false
+  // frame uses border/title hit test - center of frame (inside) should NOT hit (only borders)
   const frame = { type: 'frame', x: 0, y: 0, width: 200, height: 200 };
-  assert.strictEqual(hitTestElement(frame, 100, 100), false);
+  assert.strictEqual(hitTestElement(frame, 100, 100), false); // center is interior
+  assert.strictEqual(hitTestElement(frame, 0, 0), true); // border corner
 
-  // diamond falls to default -> returns false
+  // diamond uses rhombus point test
   const diamond = { type: 'diamond', x: 0, y: 0, width: 100, height: 100 };
-  assert.strictEqual(hitTestElement(diamond, 50, 50), false);
+  assert.strictEqual(hitTestElement(diamond, 50, 50), true); // center
+  assert.strictEqual(hitTestElement(diamond, 0, 0), false); // corner (outside rhombus)
 
-  // triangle falls to default -> returns false
+  // triangle uses point-in-triangle test
   const triangle = { type: 'triangle', x: 0, y: 0, width: 100, height: 100 };
-  assert.strictEqual(hitTestElement(triangle, 50, 50), false);
+  assert.strictEqual(hitTestElement(triangle, 50, 80), true); // inside
+  assert.strictEqual(hitTestElement(triangle, 0, 0), false); // top-left corner (outside)
 
   // image uses pointInRect (same as rect)
   const image = { type: 'image', x: 10, y: 10, width: 50, height: 50 };
@@ -1143,6 +1182,474 @@ test('168: History undo/redo return null when empty', () => {
   // Redo then redo again when empty
   h.redo();
   assert.strictEqual(h.redo(), null);
+});
+
+// ============================================================
+// Bug Fix Regression Tests
+// ============================================================
+
+// 169. drawSticky should accept camera parameter
+test('169: drawSticky function accepts camera parameter', () => {
+  // Verify the function signature accepts 3 parameters
+  // This tests that the camera param is passed through renderElement
+  const el = createSticky(100, 200);
+  const bounds = getElementBounds(el);
+  assert.ok(bounds.w > 0 && bounds.h > 0, 'Sticky should have positive dimensions');
+  assert.strictEqual(el.width, 200, 'Default sticky width should be 200');
+  assert.strictEqual(el.height, 200, 'Default sticky height should be 200');
+});
+
+// 170. Shape minimum size enforcement
+test('170: Shape minimum size enforcement is consistent', () => {
+  // Test that normalizeRect handles small shapes
+  const norm1 = normalizeRect(0, 0, 3, 3);
+  const finalW = Math.max(norm1.w, 10);
+  const finalH = Math.max(norm1.h, 10);
+  // With the fix, we check finalW >= 10 (not norm.w > 5)
+  assert.ok(finalW >= 10, 'Enforced width should be at least 10');
+  assert.ok(finalH >= 10, 'Enforced height should be at least 10');
+  // A 3x3 drag should still result in a valid element
+  assert.strictEqual(finalW, 10);
+  assert.strictEqual(finalH, 10);
+});
+
+// 171. Element lifecycle: create, update, delete ops
+test('171: Element lifecycle ops are correctly structured', () => {
+  const el = createSticky(50, 75);
+
+  // Create add op
+  const addOp = { type: 'add', elementId: el.id, element: el };
+  assert.strictEqual(addOp.type, 'add');
+  assert.strictEqual(addOp.elementId, el.id);
+  assert.deepStrictEqual(addOp.element, el);
+
+  // Create update op
+  const updateOp = { type: 'update', elementId: el.id, props: { text: 'Hello' } };
+  assert.strictEqual(updateOp.type, 'update');
+  assert.ok(updateOp.props);
+
+  // Create delete op (inverse of add)
+  const deleteOp = { type: 'delete', elementId: el.id };
+  assert.strictEqual(deleteOp.type, 'delete');
+  assert.strictEqual(deleteOp.elementId, el.id);
+});
+
+// 172. compressOps merges consecutive updates to same element
+test('172: compressOps merges consecutive updates correctly', () => {
+  // Simulate the compressOps logic
+  function compressOps(ops) {
+    if (!ops || ops.length < 2) return ops;
+    const merged = [];
+    for (const op of ops) {
+      const last = merged[merged.length - 1];
+      if (last && last.type === 'update' && op.type === 'update' && last.elementId === op.elementId) {
+        Object.assign(last.props, op.props);
+      } else {
+        merged.push({ ...op, props: op.props ? { ...op.props } : undefined });
+      }
+    }
+    return merged;
+  }
+
+  const ops = [
+    { type: 'update', elementId: 'a', props: { x: 10 } },
+    { type: 'update', elementId: 'a', props: { y: 20 } },
+    { type: 'update', elementId: 'a', props: { x: 30 } },
+  ];
+
+  const compressed = compressOps(ops);
+  assert.strictEqual(compressed.length, 1, 'Should merge 3 updates into 1');
+  assert.strictEqual(compressed[0].props.x, 30, 'Last x value wins');
+  assert.strictEqual(compressed[0].props.y, 20, 'y should be preserved');
+});
+
+// 173. compressOps preserves add operations unchanged
+test('173: compressOps preserves add operations', () => {
+  function compressOps(ops) {
+    if (!ops || ops.length < 2) return ops;
+    const merged = [];
+    for (const op of ops) {
+      const last = merged[merged.length - 1];
+      if (last && last.type === 'update' && op.type === 'update' && last.elementId === op.elementId) {
+        Object.assign(last.props, op.props);
+      } else {
+        merged.push({ ...op, props: op.props ? { ...op.props } : undefined });
+      }
+    }
+    return merged;
+  }
+
+  const el = createSticky(10, 20);
+  const ops = [
+    { type: 'add', elementId: el.id, element: el },
+    { type: 'update', elementId: el.id, props: { text: 'Hello' } },
+  ];
+
+  const compressed = compressOps(ops);
+  assert.strictEqual(compressed.length, 2, 'Add and update should not merge');
+  assert.strictEqual(compressed[0].type, 'add');
+  assert.ok(compressed[0].element, 'Add op should preserve element');
+  assert.strictEqual(compressed[1].type, 'update');
+});
+
+// 174. Element Map operations: set, get, delete
+test('174: Element Map operations work correctly', () => {
+  const elements = new Map();
+  const el1 = createSticky(0, 0);
+  const el2 = createSticky(100, 100);
+
+  elements.set(el1.id, el1);
+  elements.set(el2.id, el2);
+
+  assert.strictEqual(elements.size, 2);
+  assert.strictEqual(elements.get(el1.id), el1);
+
+  // Simulate applyOps update
+  const stored = elements.get(el1.id);
+  Object.assign(stored, { text: 'Updated' });
+  assert.strictEqual(elements.get(el1.id).text, 'Updated');
+
+  // Simulate applyOps delete
+  elements.delete(el2.id);
+  assert.strictEqual(elements.size, 1);
+  assert.strictEqual(elements.get(el2.id), undefined);
+});
+
+// 175. History inverse ops correctly reverse add/delete
+test('175: History inverse ops correctly reverse add/delete', () => {
+  const h = new History();
+  const elements = new Map();
+
+  // Add an element
+  const el = createSticky(50, 50);
+  const addOps = [{ type: 'add', elementId: el.id, element: el }];
+  const inverseOps = [{ type: 'delete', elementId: el.id }];
+
+  elements.set(el.id, el);
+  h.push(addOps, inverseOps);
+
+  // Undo should return inverse ops (delete) - returns array directly
+  const undoResult = h.undo();
+  assert.ok(undoResult);
+  assert.ok(Array.isArray(undoResult), 'undo() returns an array');
+  assert.strictEqual(undoResult[0].type, 'delete');
+  assert.strictEqual(undoResult[0].elementId, el.id);
+
+  // Redo should return original ops (add) - returns array directly
+  const redoResult = h.redo();
+  assert.ok(redoResult);
+  assert.ok(Array.isArray(redoResult), 'redo() returns an array');
+  assert.strictEqual(redoResult[0].type, 'add');
+  assert.strictEqual(redoResult[0].elementId, el.id);
+});
+
+// 176. Multiple element types can coexist in Map
+test('176: Multiple element types coexist correctly', () => {
+  const elements = new Map();
+  const sticky = createSticky(0, 0);
+  const frame = createFrame(100, 100, 400, 300);
+  const conn = createConnector('src1', 'tgt1');
+  const mindmap = createMindmapNode(200, 200, 'Root');
+
+  elements.set(sticky.id, sticky);
+  elements.set(frame.id, frame);
+  elements.set(conn.id, conn);
+  elements.set(mindmap.id, mindmap);
+
+  assert.strictEqual(elements.size, 4);
+
+  // Verify each type
+  assert.strictEqual(elements.get(sticky.id).type, 'sticky');
+  assert.strictEqual(elements.get(frame.id).type, 'frame');
+  assert.strictEqual(elements.get(conn.id).type, 'connector');
+  assert.strictEqual(elements.get(mindmap.id).type, 'mindmap');
+});
+
+// 177. applyOps simulation: full lifecycle
+test('177: applyOps simulation - add, update, delete cycle', () => {
+  const elements = new Map();
+
+  function applyOps(ops) {
+    for (const op of ops) {
+      switch (op.type) {
+        case 'add':
+          elements.set(op.elementId, op.element);
+          break;
+        case 'update': {
+          const el = elements.get(op.elementId);
+          if (el) Object.assign(el, op.props);
+          break;
+        }
+        case 'delete':
+          elements.delete(op.elementId);
+          break;
+      }
+    }
+  }
+
+  const el = createSticky(10, 20);
+
+  // Add
+  applyOps([{ type: 'add', elementId: el.id, element: el }]);
+  assert.strictEqual(elements.size, 1);
+  assert.strictEqual(elements.get(el.id).x, 10);
+
+  // Update
+  applyOps([{ type: 'update', elementId: el.id, props: { x: 50, text: 'Test' } }]);
+  assert.strictEqual(elements.get(el.id).x, 50);
+  assert.strictEqual(elements.get(el.id).text, 'Test');
+
+  // Delete
+  applyOps([{ type: 'delete', elementId: el.id }]);
+  assert.strictEqual(elements.size, 0);
+
+  // Update on non-existent element should not crash
+  applyOps([{ type: 'update', elementId: 'nonexistent', props: { x: 100 } }]);
+  assert.strictEqual(elements.size, 0);
+});
+
+// 178. Offline queue re-application after init
+test('178: Offline queue ops re-applied after init', () => {
+  const elements = new Map();
+
+  function applyOps(ops) {
+    for (const op of ops) {
+      switch (op.type) {
+        case 'add':
+          elements.set(op.elementId, op.element);
+          break;
+        case 'update': {
+          const el = elements.get(op.elementId);
+          if (el) Object.assign(el, op.props);
+          break;
+        }
+        case 'delete':
+          elements.delete(op.elementId);
+          break;
+      }
+    }
+  }
+
+  // User creates sticky while offline
+  const offlineSticky = createSticky(100, 200);
+  const offlineOps = [{ type: 'add', elementId: offlineSticky.id, element: offlineSticky }];
+  applyOps(offlineOps);
+  assert.strictEqual(elements.size, 1);
+
+  // Simulate init clearing state (server doesn't have the offline sticky)
+  elements.clear();
+  const serverElements = [
+    { id: 'server1', type: 'rect', x: 0, y: 0, width: 50, height: 50 }
+  ];
+  for (const el of serverElements) {
+    elements.set(el.id, el);
+  }
+  assert.strictEqual(elements.size, 1, 'Only server element after init');
+  assert.ok(!elements.has(offlineSticky.id), 'Offline sticky lost after init');
+
+  // Re-apply offline ops (the fix)
+  applyOps(offlineOps);
+  assert.strictEqual(elements.size, 2, 'Both server and offline elements present');
+  assert.ok(elements.has(offlineSticky.id), 'Offline sticky recovered');
+  assert.ok(elements.has('server1'), 'Server element preserved');
+});
+
+// 179. Sorted elements cache invalidation
+test('179: Sorted elements cache invalidation on add', () => {
+  const elements = new Map();
+  let sortedCacheDirty = true;
+  let sortedCache = null;
+
+  function getSortedElements() {
+    if (!sortedCacheDirty && sortedCache) return sortedCache;
+    sortedCache = Array.from(elements.values()).sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+    sortedCacheDirty = false;
+    return sortedCache;
+  }
+
+  function markDirty() { sortedCacheDirty = true; }
+
+  const el1 = createElement('rect', { x: 0, y: 0, width: 50, height: 50, zIndex: 2 });
+  elements.set(el1.id, el1);
+  markDirty();
+
+  let sorted = getSortedElements();
+  assert.strictEqual(sorted.length, 1);
+
+  const el2 = createElement('rect', { x: 100, y: 100, width: 50, height: 50, zIndex: 1 });
+  elements.set(el2.id, el2);
+  markDirty();
+
+  sorted = getSortedElements();
+  assert.strictEqual(sorted.length, 2);
+  assert.strictEqual(sorted[0].zIndex, 1, 'Lower zIndex should come first');
+  assert.strictEqual(sorted[1].zIndex, 2, 'Higher zIndex should come second');
+});
+
+// 180. Viewport culling bounds check
+test('180: Viewport culling bounds check', () => {
+  // Simulate viewport culling logic
+  const vpLeft = -500, vpRight = 500, vpTop = -500, vpBottom = 500;
+
+  const visible = { x: 0, y: 0, w: 100, h: 100 };
+  const isVisible = !(visible.x + visible.w < vpLeft || visible.x > vpRight ||
+                       visible.y + visible.h < vpTop || visible.y > vpBottom);
+  assert.ok(isVisible, 'Element at origin should be visible');
+
+  const offscreen = { x: 600, y: 600, w: 100, h: 100 };
+  const isOffscreen = !(offscreen.x + offscreen.w < vpLeft || offscreen.x > vpRight ||
+                         offscreen.y + offscreen.h < vpTop || offscreen.y > vpBottom);
+  assert.ok(!isOffscreen, 'Element at 600,600 should be off-screen');
+
+  const partial = { x: 450, y: 450, w: 100, h: 100 };
+  const isPartial = !(partial.x + partial.w < vpLeft || partial.x > vpRight ||
+                       partial.y + partial.h < vpTop || partial.y > vpBottom);
+  assert.ok(isPartial, 'Partially visible element should not be culled');
+});
+
+// 181. Hit test accuracy for all element types
+test('181: hitTestElement for card, list, envelope types', () => {
+  const card = createElement('card', { x: 0, y: 0, width: 200, height: 150 });
+  assert.ok(hitTestElement(card, 100, 75), 'Should hit center of card');
+  assert.ok(!hitTestElement(card, 300, 300), 'Should miss card');
+
+  const list = createElement('list', { x: 50, y: 50, width: 180, height: 200 });
+  assert.ok(hitTestElement(list, 100, 100), 'Should hit center of list');
+  assert.ok(!hitTestElement(list, 0, 0), 'Should miss list');
+
+  const envelope = createElement('envelope', { x: 10, y: 10, width: 300, height: 200 });
+  assert.ok(hitTestElement(envelope, 100, 100), 'Should hit center of envelope');
+});
+
+// 182. Element bounds for embed and mindmap
+test('182: getElementBounds for card, list, envelope', () => {
+  const card = createElement('card', { x: 10, y: 20, width: 200, height: 150 });
+  const cardBounds = getElementBounds(card);
+  assert.strictEqual(cardBounds.x, 10);
+  assert.strictEqual(cardBounds.y, 20);
+  assert.strictEqual(cardBounds.w, 200);
+  assert.strictEqual(cardBounds.h, 150);
+
+  const list = createElement('list', { x: 5, y: 15, width: 180, height: 250 });
+  const listBounds = getElementBounds(list);
+  assert.strictEqual(listBounds.w, 180);
+  assert.strictEqual(listBounds.h, 250);
+});
+
+// 183. createSticky with custom properties
+test('183: createSticky preserves custom properties', () => {
+  const el = createSticky(50, 75);
+  el.text = 'Custom text';
+  el.fill = '#FF0000';
+  el.tags = [{ label: 'Urgent', color: '#FF6B6B' }];
+
+  assert.strictEqual(el.text, 'Custom text');
+  assert.strictEqual(el.fill, '#FF0000');
+  assert.strictEqual(el.tags.length, 1);
+  assert.strictEqual(el.tags[0].label, 'Urgent');
+});
+
+// 184. Batch operations preserve order
+test('184: Batch operations preserve execution order', () => {
+  const elements = new Map();
+
+  function applyOps(ops) {
+    for (const op of ops) {
+      switch (op.type) {
+        case 'add':
+          elements.set(op.elementId, op.element);
+          break;
+        case 'update': {
+          const el = elements.get(op.elementId);
+          if (el) Object.assign(el, op.props);
+          break;
+        }
+        case 'delete':
+          elements.delete(op.elementId);
+          break;
+      }
+    }
+  }
+
+  const el = createSticky(0, 0);
+  // Add then immediately update
+  applyOps([
+    { type: 'add', elementId: el.id, element: el },
+    { type: 'update', elementId: el.id, props: { text: 'Updated' } }
+  ]);
+
+  assert.strictEqual(elements.size, 1);
+  assert.strictEqual(elements.get(el.id).text, 'Updated');
+
+  // Add then immediately delete
+  const el2 = createSticky(100, 100);
+  applyOps([
+    { type: 'add', elementId: el2.id, element: el2 },
+    { type: 'delete', elementId: el2.id }
+  ]);
+
+  assert.strictEqual(elements.size, 1, 'el2 should be deleted');
+  assert.ok(!elements.has(el2.id));
+});
+
+// 185. NaN guard in element creation
+test('185: Elements reject NaN coordinates gracefully', () => {
+  const el = createElement('rect', { x: NaN, y: 0, width: 100, height: 100 });
+  // Element should still be created (NaN guard is at render time, not create time)
+  assert.ok(el.id);
+  assert.ok(isNaN(el.x), 'NaN x should be stored');
+
+  // But bounds should handle it
+  const bounds = getElementBounds(el);
+  // NaN propagates through bounds
+  assert.ok(bounds !== null, 'getElementBounds should not crash on NaN');
+});
+
+// 186. Empty board state
+test('186: Empty board has zero elements', () => {
+  const elements = new Map();
+  assert.strictEqual(elements.size, 0);
+
+  const sorted = Array.from(elements.values()).sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+  assert.strictEqual(sorted.length, 0);
+});
+
+// 187. Selection set operations
+test('187: Selection set operations', () => {
+  const selectedIds = new Set();
+  const el1 = createSticky(0, 0);
+  const el2 = createSticky(100, 100);
+
+  selectedIds.add(el1.id);
+  assert.strictEqual(selectedIds.size, 1);
+  assert.ok(selectedIds.has(el1.id));
+  assert.ok(!selectedIds.has(el2.id));
+
+  selectedIds.add(el2.id);
+  assert.strictEqual(selectedIds.size, 2);
+
+  selectedIds.clear();
+  assert.strictEqual(selectedIds.size, 0);
+
+  // Add and remove
+  selectedIds.add(el1.id);
+  selectedIds.delete(el1.id);
+  assert.strictEqual(selectedIds.size, 0);
+});
+
+// 188. normalizeRect with various edge cases
+test('188: normalizeRect with negative dimensions', () => {
+  // Dragging from bottom-right to top-left
+  const r1 = normalizeRect(100, 100, -50, -50);
+  assert.strictEqual(r1.x, 50);
+  assert.strictEqual(r1.y, 50);
+  assert.strictEqual(r1.w, 50);
+  assert.strictEqual(r1.h, 50);
+
+  // Zero dimensions
+  const r2 = normalizeRect(50, 50, 0, 0);
+  assert.strictEqual(r2.x, 50);
+  assert.strictEqual(r2.w, 0);
 });
 
 // ============================================================

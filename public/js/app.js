@@ -277,7 +277,7 @@ class DarkBoardApp {
         .then(res => res.json())
         .then(() => {
           notFoundDialog.style.display = 'none';
-          this.showToast('Board cree !');
+          this.showToast('Board créé !');
           const savedName = localStorage.getItem('darkboard-name');
           if (savedName) {
             onCreated();
@@ -287,7 +287,7 @@ class DarkBoardApp {
           }
         })
         .catch(() => {
-          this.showToast('Erreur lors de la creation du board');
+          this.showToast('Erreur lors de la création du board');
         });
     });
   }
@@ -307,11 +307,11 @@ class DarkBoardApp {
       if (allFiles.length === 0) return;
       const files = allFiles.filter(f => f.type.startsWith('image/'));
       if (files.length === 0) {
-        this.showToast('Format de fichier non supporte. Utilisez une image (PNG, JPG, GIF, SVG).');
+        this.showToast('Format de fichier non supporté. Utilisez une image (PNG, JPG, GIF, SVG).');
         return;
       }
       if (files.length < allFiles.length) {
-        this.showToast('Certains fichiers ignores (format non supporte)');
+        this.showToast('Certains fichiers ignorés (format non supporté)');
       }
 
       // Check file size (max 5MB)
@@ -458,7 +458,7 @@ class DarkBoardApp {
             this.renderer.selectedIds.add(el.id);
           }
           if (parsed.length > 1) {
-            this.showToast(`${parsed.length} post-its colles`);
+            this.showToast(`${parsed.length} post-its collés`);
           }
         } else if (text) {
           // #118 - Detect image URL paste and create image element
@@ -479,7 +479,7 @@ class DarkBoardApp {
               this.renderer.selectedIds.clear();
               this.renderer.selectedIds.add(imgEl.id);
               this.renderer.markDirty();
-              this.showToast('Image collee depuis URL');
+              this.showToast('Image collée depuis URL');
             };
             img.onerror = () => {
               // Fallback to sticky if image fails to load
@@ -769,7 +769,7 @@ class DarkBoardApp {
     // #112 - Element count limit warning at 4000
     const elCount = this.renderer.elements.size;
     if (elCount === 4000) {
-      this.showToast('Attention: 4000 elements sur le tableau. Performances potentiellement degradees.');
+      this.showToast('Attention : 4000 éléments sur le tableau. Performances potentiellement dégradées.');
     }
   }
 
@@ -862,7 +862,7 @@ class DarkBoardApp {
       }
     }
     if (ops.length === 0) {
-      this.showToast('Objets verrouilles');
+      this.showToast('Objets verrouillés');
       return;
     }
     this.applyOps(ops);
@@ -903,7 +903,7 @@ class DarkBoardApp {
       this.sync.sendOps(ops);
       // #87 - Multi-level undo info: describe what was undone
       const desc = this._describeOps(ops);
-      this.showToast(desc ? `Annule: ${desc}` : 'Annule');
+      this.showToast(desc ? `Annulé : ${desc}` : 'Annulé');
       this.updateTitle();
       this.flashUndoRedoButton('undo'); // #R2-46
     }
@@ -916,7 +916,7 @@ class DarkBoardApp {
     const deletes = ops.filter(o => o.type === 'delete');
     const adds = ops.filter(o => o.type === 'add');
     const updates = ops.filter(o => o.type === 'update');
-    if (deletes.length > 0) return `suppression de ${deletes.length} element${deletes.length > 1 ? 's' : ''}`;
+    if (deletes.length > 0) return `suppression de ${deletes.length} élément${deletes.length > 1 ? 's' : ''}`;
     if (adds.length > 0) return `ajout de ${adds.length} element${adds.length > 1 ? 's' : ''}`;
     if (updates.length > 0) return `modification de ${updates.length} element${updates.length > 1 ? 's' : ''}`;
     return '';
@@ -949,7 +949,7 @@ class DarkBoardApp {
       if (el) this.clipboard.push(deepClone(el));
     }
     if (this.clipboard.length > 0) {
-      this.showToast(`${this.clipboard.length} elements copies`, 'success');
+      this.showToast(`${this.clipboard.length} éléments copiés`, 'success');
       // #133 - Show "Copie!" near cursor
       this._showCursorFeedback('Copie!');
     }
@@ -1760,7 +1760,7 @@ class DarkBoardApp {
             hiliteColor: document.queryCommandValue('hiliteColor')
           };
           btn.classList.add('active');
-          this.showToast('Format copie - selectionnez du texte pour appliquer');
+          this.showToast('Format copié - sélectionnez du texte pour appliquer');
         }
       }
     });
@@ -1952,7 +1952,7 @@ class DarkBoardApp {
       }
     }
     if (ops.length > 0) { this.history.push(ops, inverseOps); this.sync.sendOps(ops); }
-    this.showToast(`${count} remplacement(s) effectue(s)`);
+    this.showToast(`${count} remplacement(s) effectué(s)`);
     this.performSearch(search);
     this.searchPanel.querySelector('.search-count').textContent = '0/0';
     this.renderer.markDirty();
@@ -1981,7 +1981,7 @@ class DarkBoardApp {
     this.sync.sendOps(ops);
     this.renderer.markDirty();
     // #134 - Group feedback with count
-    this.showToast(`Groupe cree (${this.renderer.selectedIds.size} elements)`, 'success');
+    this.showToast(`Groupe créé (${this.renderer.selectedIds.size} éléments)`, 'success');
   }
 
   ungroupSelected() {
@@ -2004,7 +2004,7 @@ class DarkBoardApp {
     this.sync.sendOps(ops);
     this.renderer.markDirty();
     // #134 - Ungroup feedback
-    this.showToast('Degroupe', 'success');
+    this.showToast('Dégroupé', 'success');
   }
 
   // Select entire group when one element is clicked
@@ -2031,7 +2031,7 @@ class DarkBoardApp {
     }
     this.renderer.markDirty();
     const count = this.renderer.selectedIds.size;
-    this.showToast(`${count} element${count > 1 ? 's' : ''} similaire${count > 1 ? 's' : ''} selectionne${count > 1 ? 's' : ''}`);
+    this.showToast(`${count} élément${count > 1 ? 's' : ''} similaire${count > 1 ? 's' : ''} sélectionné${count > 1 ? 's' : ''}`);
     if (this.updateUrlHash) this.updateUrlHash();
   }
 
@@ -2286,7 +2286,7 @@ class DarkBoardApp {
         this.sync.sendCommentUpdate(existing.id, { resolved: existing.resolved });
         this.renderer.markDirty();
         overlay.remove();
-        this.showToast(existing.resolved ? 'Commentaire resolu' : 'Commentaire rouvert');
+        this.showToast(existing.resolved ? 'Commentaire résolu' : 'Commentaire réouvert');
       });
       actions.appendChild(resolveBtn);
     }
@@ -2326,7 +2326,7 @@ class DarkBoardApp {
       }
       this.renderer.markDirty();
       overlay.remove();
-      this.showToast('Commentaire ajoute');
+      this.showToast('Commentaire ajouté');
     });
 
     actions.appendChild(submitBtn);
@@ -3217,7 +3217,7 @@ class DarkBoardApp {
         case 'toggleGridPattern':
           this.renderer.gridPattern = this.renderer.gridPattern === 'dots' ? 'lines' : 'dots';
           this.renderer.markDirty();
-          this.showToast(this.renderer.gridPattern === 'dots' ? 'Grille: points' : 'Grille: lignes');
+          this.showToast(this.renderer.gridPattern === 'dots' ? 'Grille : points' : 'Grille : lignes');
           break;
         case 'toggleGrid':
           this.renderer.gridEnabled = !this.renderer.gridEnabled;
@@ -3247,11 +3247,11 @@ class DarkBoardApp {
           break;
         case 'lock':
           this.updateSelectedElements({ locked: true });
-          this.showToast('Objet verrouille');
+          this.showToast('Objet verrouillé');
           break;
         case 'unlock':
           this.updateSelectedElements({ locked: false });
-          this.showToast('Objet deverrouille');
+          this.showToast('Objet déverrouillé');
           break;
         case 'group':
           this.groupSelected();
@@ -3356,7 +3356,7 @@ class DarkBoardApp {
           const linkId = prompt('ID de l\'element cible (ou copiez-collez depuis l\'URL #id):');
           if (linkId) {
             this.updateSelectedElements({ linkedElementId: linkId.replace('#', '') });
-            this.showToast('Element lie !');
+            this.showToast('Élément lié !');
           }
           break;
         }
@@ -3524,7 +3524,7 @@ class DarkBoardApp {
       this.addElement(el);
       this.renderer.selectedIds.add(el.id);
     }
-    this.showToast('Duplique sur place');
+    this.showToast('Dupliqué sur place');
     this.renderer.markDirty();
   }
 
@@ -3792,21 +3792,21 @@ class DarkBoardApp {
       this.audioEnabled = false;
       const btn = document.getElementById('audioToggle');
       if (btn) btn.classList.remove('active');
-      this.showToast('Audio desactive');
+      this.showToast('Audio désactivé');
       return;
     }
 
     try {
       this.audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     } catch (e) {
-      this.showToast('Impossible d\'acceder au micro');
+      this.showToast('Impossible d\'accéder au micro');
       return;
     }
 
     this.audioEnabled = true;
     const btn = document.getElementById('audioToggle');
     if (btn) btn.classList.add('active');
-    this.showToast('Audio active');
+    this.showToast('Audio activé');
 
     // Create peer connections with all remote users
     this.renderer.remoteUsers.forEach((user, uid) => {
@@ -4464,7 +4464,7 @@ class DarkBoardApp {
       borderRadius: el.borderRadius,
       shadowEnabled: el.shadowEnabled
     };
-    this.showToast('Style copie', 'success');
+    this.showToast('Style copié', 'success');
     this._showCursorFeedback('Style copie!');
   }
 
@@ -4476,13 +4476,13 @@ class DarkBoardApp {
       if (val !== undefined && val !== null) props[key] = val;
     }
     this.updateSelectedElements(props);
-    this.showToast('Style applique', 'success');
+    this.showToast('Style appliqué', 'success');
   }
 
   // #R2-37: Export as PNG
   exportAsPNG() {
     const elements = Array.from(this.renderer.elements.values());
-    if (elements.length === 0) { this.showToast('Rien a exporter'); return; }
+    if (elements.length === 0) { this.showToast('Rien à exporter'); return; }
     // Calculate bounds
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const el of elements) {
@@ -4517,7 +4517,7 @@ class DarkBoardApp {
       a.download = 'darkboard-export.png';
       a.click();
       URL.revokeObjectURL(url);
-      this.showToast('Export PNG telecharge', 'success');
+      this.showToast('Export PNG téléchargé', 'success');
     }, 'image/png');
   }
 
@@ -4525,7 +4525,7 @@ class DarkBoardApp {
   setBackgroundColor(color) {
     this.renderer.bgColor = color;
     this.renderer.markDirty();
-    this.showToast('Fond modifie');
+    this.showToast('Fond modifié');
   }
 
   // #R2-40: Reset zoom to 100%
@@ -4620,12 +4620,12 @@ DarkBoardApp.prototype.initWelcomeTour = function() {
   if (localStorage.getItem('darkboard-tour-done')) return;
   localStorage.setItem('darkboard-tour-done', '1');
   var steps = [
-    { selector: '.tool-btn[data-tool="select"]', title: 'Selection', desc: 'Cliquez pour selectionner et deplacer des elements.' },
-    { selector: '.tool-btn[data-tool="sticky"]', title: 'Post-it', desc: 'Creez des post-its pour capturer vos idees. Double-cliquez aussi sur le canevas!' },
-    { selector: '.tool-btn[data-tool="draw"]', title: 'Dessin libre', desc: 'Dessinez a main levee sur le tableau.' },
+    { selector: '.tool-btn[data-tool="select"]', title: 'Sélection', desc: 'Cliquez pour sélectionner et déplacer des éléments.' },
+    { selector: '.tool-btn[data-tool="sticky"]', title: 'Post-it', desc: 'Créez des post-its pour capturer vos idées. Double-cliquez aussi sur le canevas !' },
+    { selector: '.tool-btn[data-tool="draw"]', title: 'Dessin libre', desc: 'Dessinez à main levée sur le tableau.' },
     { selector: '.tool-btn[data-tool="rect"]', title: 'Formes', desc: 'Rectangles, cercles, losanges, triangles et plus.' },
-    { selector: '.tool-btn[data-tool="connector"]', title: 'Connecteurs', desc: 'Reliez des elements entre eux avec des fleches.' },
-    { selector: '#shareBtn', title: 'Partager', desc: 'Partagez le lien avec votre equipe pour collaborer en temps reel!' }
+    { selector: '.tool-btn[data-tool="connector"]', title: 'Connecteurs', desc: 'Reliez des éléments entre eux avec des flèches.' },
+    { selector: '#shareBtn', title: 'Partager', desc: 'Partagez le lien avec votre équipe pour collaborer en temps réel !' }
   ];
   var stepIdx = 0;
   var self = this;
@@ -4695,7 +4695,7 @@ DarkBoardApp.prototype.initWhatsNew = function() {
   var lastVersion = localStorage.getItem('darkboard-version');
   if (lastVersion && lastVersion !== currentVersion) {
     setTimeout(function() {
-      self.showToast('Nouveautes: tour de bienvenue, astuces, animations, et plus!', 'info');
+      self.showToast('Nouveautés : tour de bienvenue, astuces, animations, et plus !', 'info');
     }, 3000);
   }
   localStorage.setItem('darkboard-version', currentVersion);
@@ -4828,11 +4828,11 @@ DarkBoardApp.prototype.onConnectionStatusChange = function(status) {
   if (status === 'disconnected') {
     if (dot) dot.classList.add('warning');
     if (text) text.textContent = 'Reconnexion...';
-    this.showToast('Connexion perdue, reconnexion...', 'error');
+    this.showToast('Connexion perdue, reconnexion…', 'error');
   } else if (status === 'reconnected') {
     if (dot) { dot.classList.remove('warning'); dot.classList.remove('error'); }
     if (text) text.textContent = 'En ligne';
-    this.showToast('Reconnecte!', 'success');
+    this.showToast('Reconnecté !', 'success');
   } else if (status === 'connected') {
     if (dot) { dot.classList.remove('warning'); dot.classList.remove('error'); }
     if (text) text.textContent = 'En ligne';
@@ -4862,7 +4862,7 @@ DarkBoardApp.prototype.onTimerEnd = function() {
     beep(880, 0);
     beep(880, 0.3);
   } catch (e) { /* Web Audio not available */ }
-  this.showToast('Temps ecoule!', 'info');
+  this.showToast('Temps écoulé !', 'info');
 };
 
 // #139 - Element count milestone
@@ -4870,7 +4870,7 @@ DarkBoardApp.prototype._checkElementMilestone = function() {
   var count = this.renderer.elements.size;
   var milestones = [50, 100, 200, 500, 1000];
   if (milestones.indexOf(count) !== -1) {
-    this.showToast(count + ' elements sur le tableau!', 'success');
+    this.showToast(count + ' éléments sur le tableau !', 'success');
   }
 };
 
@@ -4943,7 +4943,7 @@ DarkBoardApp.prototype.showSmartPasteDialog = function(text, cx, cy) {
           self.renderer.selectedIds.add(el.id);
         }
         self.renderer.markDirty();
-        self.showToast(cells.length + ' post-its crees', 'success');
+        self.showToast(cells.length + ' post-its créés', 'success');
       }},
       { label: 'Texte brut', action: function() {
         var el = createSticky(cx - 100, cy - 100);
@@ -5016,7 +5016,7 @@ DarkBoardApp.prototype.confirmSelectAllDelete = function() {
   if (count > 20 && count === this.renderer.elements.size) {
     var self = this;
     this.showConfirmDialog(
-      'Vous allez supprimer TOUS les ' + count + ' elements du tableau. Continuer?',
+      'Vous allez supprimer TOUS les ' + count + ' éléments du tableau. Continuer ?',
       [
         { label: 'Supprimer tout', className: 'confirm-danger', action: function() { self._doDeleteSelected(); } },
         { label: 'Annuler', action: function() {} }
@@ -5042,13 +5042,13 @@ DarkBoardApp.prototype.initOfflineMode = function() {
   this._offlineMode = false;
   window.addEventListener('offline', function() {
     self._offlineMode = true;
-    self.showToast('Mode hors-ligne: modifications locales uniquement', 'error');
+    self.showToast('Mode hors-ligne : modifications locales uniquement', 'error');
     var dot = document.getElementById('syncDot');
     if (dot) dot.classList.add('error');
   });
   window.addEventListener('online', function() {
     self._offlineMode = false;
-    self.showToast('Connexion retablie', 'success');
+    self.showToast('Connexion rétablie', 'success');
     var dot = document.getElementById('syncDot');
     if (dot) dot.classList.remove('error');
   });
@@ -5061,7 +5061,7 @@ DarkBoardApp.prototype.checkBoardSize = function() {
     var json = JSON.stringify(elements);
     var sizeMB = new Blob([json]).size / (1024 * 1024);
     if (sizeMB > 10) {
-      this.showToast('Attention: le tableau fait ' + sizeMB.toFixed(1) + ' Mo. Pensez a exporter.', 'error');
+      this.showToast('Attention: le tableau fait ' + sizeMB.toFixed(1) + ' Mo. Pensez à exporter.', 'error');
     }
   } catch (e) { /* ignore */ }
 };
@@ -5278,7 +5278,7 @@ DarkBoardApp.prototype._autoArrangeGrid = function() {
     el.x = newX; el.y = newY;
     ops.push({ type: 'update', elementId: el.id, props: { x: newX, y: newY } });
   }
-  if (ops.length > 0) { this.history.push(ops, inverseOps); this.sync.sendOps(ops); this.renderer.markDirty(); this.showToast('Grille: ' + elements.length + ' elements arranges'); }
+  if (ops.length > 0) { this.history.push(ops, inverseOps); this.sync.sendOps(ops); this.renderer.markDirty(); this.showToast('Grille : ' + elements.length + ' éléments arrangés'); }
 };
 
 // #R2-142: Auto-arrange in circular layout
@@ -5301,7 +5301,7 @@ DarkBoardApp.prototype._autoArrangeCircle = function() {
     el.x = newX; el.y = newY;
     ops.push({ type: 'update', elementId: el.id, props: { x: newX, y: newY } });
   }
-  if (ops.length > 0) { this.history.push(ops, inverseOps); this.sync.sendOps(ops); this.renderer.markDirty(); this.showToast('Cercle: ' + elements.length + ' elements arranges'); }
+  if (ops.length > 0) { this.history.push(ops, inverseOps); this.sync.sendOps(ops); this.renderer.markDirty(); this.showToast('Cercle : ' + elements.length + ' éléments arrangés'); }
 };
 
 // #R2-143: Smart spacing - equalize gaps between selected elements
@@ -5651,7 +5651,7 @@ DarkBoardApp.prototype._checkStickyMilestone = function() {
   if (milestones.indexOf(stickyCount) !== -1) {
     var toast = document.createElement('div');
     toast.className = 'milestone-toast';
-    toast.textContent = stickyCount + ' post-its crees ! 🎉';
+    toast.textContent = stickyCount + ' post-its créés ! 🎉';
     document.body.appendChild(toast);
     setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.5s'; setTimeout(function() { toast.remove(); }, 500); }, 3000);
   }
@@ -5960,7 +5960,7 @@ DarkBoardApp.prototype.csvPasteToStickies = function(csvText) {
     this.history.push(ops, inverseOps);
     this.sync.sendOps(ops);
     this.renderer.markDirty();
-    this.showToast(ops.length + ' post-its crees depuis CSV');
+    this.showToast(ops.length + ' post-its créés depuis le CSV');
   }
 };
 

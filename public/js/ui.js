@@ -246,7 +246,7 @@ class UI {
   fitToScreen() {
     const elements = Array.from(this.app.renderer.elements.values());
     if (elements.length === 0) {
-      this.app.showToast('Aucun element sur le tableau');
+      this.app.showToast('Aucun élément sur le tableau');
       return;
     }
 
@@ -280,7 +280,7 @@ class UI {
   exportPNG() {
     const elements = Array.from(this.app.renderer.elements.values());
     if (elements.length === 0) {
-      this.app.showToast('Rien a exporter');
+      this.app.showToast('Rien à exporter');
       return;
     }
 
@@ -351,7 +351,7 @@ class UI {
   exportCSV() {
     const elements = Array.from(this.app.renderer.elements.values());
     if (elements.length === 0) {
-      this.app.showToast('Rien a exporter');
+      this.app.showToast('Rien à exporter');
       return;
     }
 
@@ -382,7 +382,7 @@ class UI {
     link.href = URL.createObjectURL(blob);
     link.click();
     URL.revokeObjectURL(link.href);
-    this.app.showToast('Export CSV termine !', 'success');
+    this.app.showToast('Export CSV terminé !', 'success');
   }
 
   initJSONExport() {
@@ -404,7 +404,7 @@ class UI {
     const elements = Array.from(this.app.renderer.elements.values());
     const anchors = this.app.workshop && this.app.workshop.anchors ? Array.from(this.app.workshop.anchors.values()) : [];
     if (elements.length === 0) {
-      this.app.showToast('Rien a exporter');
+      this.app.showToast('Rien à exporter');
       return;
     }
 
@@ -520,7 +520,7 @@ class UI {
   importDarkBoard(data) {
     const elements = data.elements || [];
     if (elements.length === 0) {
-      this.app.showToast('Aucun element a importer');
+      this.app.showToast('Aucun élément a importer');
       return;
     }
 
@@ -635,7 +635,7 @@ class UI {
     }
 
     if (elements.length === 0) {
-      this.app.showToast('Aucun element trouve dans le fichier');
+      this.app.showToast('Aucun élément trouvé dans le fichier');
       return;
     }
 
@@ -756,7 +756,7 @@ class UI {
     const dataRows = rows.slice(1).filter(r => r.length >= 2);
 
     if (dataRows.length === 0) {
-      this.app.showToast('Aucune donnee dans le CSV');
+      this.app.showToast('Aucune donnée dans le CSV');
       return;
     }
 
@@ -913,7 +913,7 @@ class UI {
     }
 
     if (elements.length === 0) {
-      this.app.showToast('Aucun element trouve dans le CSV');
+      this.app.showToast('Aucun élément trouvé dans le CSV');
       return;
     }
 
@@ -1040,7 +1040,7 @@ class UI {
       try {
         boardData = JSON.parse(jsonFiles[0].text);
       } catch(e) {
-        this.app.showToast('Aucune donnee trouvee dans le fichier .rtb');
+        this.app.showToast('Aucune donnée trouvee dans le fichier .rtb');
         return;
       }
     }
@@ -1110,7 +1110,7 @@ class UI {
       if (arrays.length > 0) {
         this.importMiroWidgets(arrays.sort((a, b) => b.length - a.length)[0]);
       } else {
-        this.app.showToast('Aucun element trouve dans le fichier Miro');
+        this.app.showToast('Aucun élément trouvé dans le fichier Miro');
       }
       return;
     }
@@ -1204,7 +1204,7 @@ class UI {
     }
 
     if (elements.length === 0) {
-      this.app.showToast('Aucun element trouve dans le fichier Miro');
+      this.app.showToast('Aucun élément trouvé dans le fichier Miro');
       return;
     }
 
@@ -1432,7 +1432,7 @@ class UI {
         const cy = this.app.renderer.camera.y;
         tpl.generate(cx, cy);
         modal.style.display = 'none';
-        this.app.showToast(`Modele "${tpl.name}" ajoute !`);
+        this.app.showToast(`Modèle "${tpl.name}" ajouté !`);
       });
       grid.appendChild(card);
     }
@@ -1981,13 +1981,13 @@ class UI {
         input.select();
         document.execCommand('copy');
         document.body.removeChild(input);
-        this.app.showToast('Lien copie !');
+        this.app.showToast('Lien copié !');
       };
       // #R2-183: Track share for getting started checklist
       localStorage.setItem('darkboard-shared', '1');
       if (navigator.clipboard) {
         navigator.clipboard.writeText(url).then(() => {
-          this.app.showToast('Lien copie dans le presse-papier !');
+          this.app.showToast('Lien copié dans le presse-papier !');
         }).catch(() => {
           fallbackCopy();
         });
@@ -2086,7 +2086,7 @@ class UI {
 
   startPresentation() {
     if (!this.app.workshop || !this.app.workshop.anchors || this.app.workshop.anchors.size === 0) {
-      this.app.showToast('Ajoutez des ancres pour le mode presentation');
+      this.app.showToast('Ajoutez des ancres pour le mode présentation');
       return;
     }
     this.presentationActive = true;

@@ -560,7 +560,7 @@ class InputHandler {
       // #R2-38: Ctrl+Shift+E to export as SVG (stub)
       if (e.key === 'e' && e.shiftKey) {
         e.preventDefault();
-        this.app.showToast('Export SVG: fonctionnalite a venir', 'info');
+        this.app.showToast('Export SVG : fonctionnalité à venir', 'info');
         return;
       }
 

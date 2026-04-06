@@ -610,7 +610,7 @@ function renderElement(ctx, el, selected, camera) {
       drawArrow(ctx, el);
       break;
     case 'sticky':
-      drawSticky(ctx, el);
+      drawSticky(ctx, el, camera);
       break;
     case 'text':
       drawText(ctx, el);
@@ -883,7 +883,7 @@ function drawArrow(ctx, el) {
   ctx.stroke();
 }
 
-function drawSticky(ctx, el) {
+function drawSticky(ctx, el, camera) {
   // #188: null/NaN guard
   if (!el || !isFinite(el.width) || !isFinite(el.height) || !isFinite(el.x) || !isFinite(el.y)) return;
   const r = 6;
@@ -1210,6 +1210,7 @@ function drawFrame(ctx, el) {
 }
 
 function drawEnvelope(ctx, el) {
+  if (!el || !isFinite(el.width) || !isFinite(el.height) || !isFinite(el.x) || !isFinite(el.y)) return;
   const r = 12;
   const headerH = 36;
   const color = el.stroke || '#4a9eff';
@@ -1436,6 +1437,7 @@ function drawConnector(ctx, el) {
 }
 
 function drawDiamond(ctx, el) {
+  if (!el || !isFinite(el.width) || !isFinite(el.height) || !isFinite(el.x) || !isFinite(el.y)) return;
   const cx = el.x + el.width / 2;
   const cy = el.y + el.height / 2;
   ctx.beginPath();
@@ -1493,6 +1495,7 @@ function drawDiamond(ctx, el) {
 }
 
 function drawTriangle(ctx, el) {
+  if (!el || !isFinite(el.width) || !isFinite(el.height) || !isFinite(el.x) || !isFinite(el.y)) return;
   const cx = el.x + el.width / 2;
   ctx.beginPath();
   ctx.moveTo(cx, el.y);

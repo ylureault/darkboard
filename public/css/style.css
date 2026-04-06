@@ -571,6 +571,14 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
   z-index: 100;
   box-shadow: var(--shadow-lg), inset 0 -1px 0 var(--accent-10);
   transition: all 0.2s ease;
+  max-width: calc(100vw - 24px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.toolbar::-webkit-scrollbar {
+  display: none;
 }
 
 .toolbar .divider {
@@ -578,11 +586,13 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
   height: 28px;
   background: linear-gradient(to bottom, transparent, var(--panel-border), transparent);
   margin: 0 var(--sp-1);
+  flex-shrink: 0;
 }
 
 .tool-btn {
   width: 40px;
   height: 40px;
+  min-width: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -593,6 +603,7 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
   color: var(--text);
   transition: all 0.15s ease;
   position: relative;
+  flex-shrink: 0;
 }
 
 .tool-btn:hover {
@@ -2815,26 +2826,7 @@ body.light-theme .search-panel {
   transform: scale(1.1);
 }
 
-/* =========================
-   MODAL ANIMATIONS
-   ========================= */
-.modal-overlay {
-  animation: fadeIn 0.2s ease-out;
-}
-
-.modal {
-  animation: slideUp 0.25s ease-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+/* MODAL ANIMATIONS - already defined above, removed duplicate */
 
 /* =========================
    BETTER TOAST
@@ -2979,13 +2971,14 @@ body.light-theme .tag-editor-panel {
   }
 
   .toolbar {
-    gap: 2px;
+    gap: 1px;
     padding: 4px 6px;
   }
 
   .tool-btn {
     width: 36px;
     height: 36px;
+    min-width: 36px;
   }
 
   .bb-btn-label span:not(.bb-btn-icon) {
@@ -3118,192 +3111,8 @@ body.tool-vote #canvas { cursor: pointer; }
   to { transform: rotate(360deg); }
 }
 
-/* =========================
-   21. CHAT PANEL
-   ========================= */
-.chat-panel {
-  position: fixed;
-  right: 12px;
-  bottom: 60px;
-  width: 300px;
-  height: 400px;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  z-index: 200;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-  overflow: hidden;
-}
-
-.chat-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--panel-border);
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.chat-header span:first-child {
-  flex: 1;
-}
-
-.chat-badge {
-  background: var(--danger);
-  color: white;
-  font-size: 11px;
-  font-weight: bold;
-  padding: 1px 6px;
-  border-radius: 10px;
-  min-width: 18px;
-  text-align: center;
-}
-
-.chat-close {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 18px;
-  cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
-}
-
-.chat-close:hover {
-  color: var(--text);
-}
-
-.chat-messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.chat-msg {
-  font-size: 13px;
-}
-
-.chat-msg-name {
-  font-weight: 600;
-  font-size: 12px;
-}
-
-.chat-msg-time {
-  font-size: 10px;
-  color: var(--text-muted);
-  margin-left: 4px;
-}
-
-.chat-msg-text {
-  margin-top: 2px;
-  background: var(--btn);
-  padding: 6px 10px;
-  border-radius: 8px;
-  word-wrap: break-word;
-}
-
-.chat-input-row {
-  display: flex;
-  gap: 6px;
-  padding: 8px 12px;
-  border-top: 1px solid var(--panel-border);
-}
-
-.chat-input-row input {
-  flex: 1;
-  background: var(--btn);
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
-  color: var(--text);
-  padding: 6px 10px;
-  font-size: 13px;
-  outline: none;
-}
-
-.chat-input-row input:focus {
-  border-color: var(--accent);
-}
-
-.chat-send {
-  background: var(--accent);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.chat-send:hover {
-  opacity: 0.9;
-}
-
-/* =========================
-   22. REACTION PICKER & BAR
-   ========================= */
-.reaction-picker {
-  position: fixed;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 10px;
-  padding: 6px 8px;
-  display: flex;
-  gap: 4px;
-  z-index: 300;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-  transform: translateX(-50%);
-}
-
-.reaction-picker-item {
-  font-size: 20px;
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 6px;
-  transition: background 0.15s;
-}
-
-.reaction-picker-item:hover {
-  background: var(--btn-hover);
-}
-
-.reaction-bar {
-  display: flex;
-  gap: 4px;
-  margin-top: 4px;
-}
-
-/* =========================
-   23. @MENTION DROPDOWN
-   ========================= */
-.mention-dropdown {
-  position: absolute;
-  bottom: 100%;
-  left: 0;
-  right: 0;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 8px;
-  max-height: 150px;
-  overflow-y: auto;
-  z-index: 400;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-  margin-bottom: 4px;
-}
-
-.mention-dropdown-item {
-  padding: 6px 12px;
-  font-size: 13px;
-  cursor: pointer;
-  color: var(--text);
-}
-
+/* Sections 21-23 (Chat, Reaction, Mention) - duplicates removed, see definitions below */
+/* Old .mention-dropdown-item:hover kept for compatibility */
 .mention-dropdown-item:hover {
   background: var(--btn-hover);
 }

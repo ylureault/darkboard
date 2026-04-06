@@ -44,16 +44,9 @@ class SyncClient {
         name: this.app.userName
       }));
 
-      // Flush offline queue
-      if (this.offlineQueue.length > 0) {
-        console.log('Flushing ' + this.offlineQueue.length + ' queued operations');
-        const queue = this.offlineQueue.slice();
-        this.offlineQueue = [];
-        for (const msg of queue) {
-          this.ws.send(JSON.stringify(msg));
-        }
-        this.showSaved();
-      }
+      // Save offline queue for re-application after init
+      this._pendingFlush = this.offlineQueue.slice();
+      this.offlineQueue = [];
     };
 
     this.ws.onmessage = (event) => {
@@ -108,7 +101,7 @@ class SyncClient {
   showSaved() {
     const now = new Date();
     const time = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    this.updateSyncIndicator('online', 'Sauvegarde a ' + time);
+    this.updateSyncIndicator('online', 'Sauvegardé à ' + time);
   }
 
   handleMessage(msg) {
@@ -156,6 +149,26 @@ class SyncClient {
         // #R2-182: Show activity summary on reconnect
         if (msg.activitySummary && this.app.showActivitySummary) {
           this.app.showActivitySummary(msg.activitySummary);
+        }
+
+        // Flush offline queue AFTER init state is applied
+        // This ensures ops are sent to server AND applied locally
+        if (this._pendingFlush && this._pendingFlush.length > 0) {
+          console.log('Flushing ' + this._pendingFlush.length + ' queued operations after init');
+          for (const msg of this._pendingFlush) {
+            try {
+              this.ws.send(JSON.stringify(msg));
+              // Re-apply ops locally since init replaced our state
+              if (msg.type === 'op' && msg.ops) {
+                this.app.applyOps(msg.ops);
+              }
+            } catch (e) {
+              console.error('SyncClient: flush failed', e);
+              this.offlineQueue.push(msg);
+            }
+          }
+          this._pendingFlush = null;
+          this.showSaved();
         }
         break;
 
@@ -219,7 +232,7 @@ class SyncClient {
         });
         this.app.updateUsersPanel();
         if (this.app.isFacilitator) {
-          this.app.showToast('Vous etes maintenant animateur');
+          this.app.showToast('Vous êtes maintenant animateur');
         }
         break;
 
@@ -347,12 +360,12 @@ class SyncClient {
             this.app.workshop.fishbowlEditorName = msg.editorName;
             // If not the active editor, disable editing
             if (msg.editorId !== this.app.myUserId) {
-              this.app.showToast(msg.editorName + ' est maintenant l\'editeur actif (Fishbowl)');
+              this.app.showToast(msg.editorName + ' est maintenant l\'éditeur actif (Fishbowl)');
             }
           } else {
             this.app.workshop.fishbowlActive = false;
             this.app.workshop.fishbowlEditorId = null;
-            this.app.showToast('Mode Fishbowl desactive');
+            this.app.showToast('Mode Fishbowl désactivé');
           }
           this.app.renderer.markDirty();
         }
@@ -378,7 +391,7 @@ class SyncClient {
         this.app.renderer.markDirty();
         // Check if current user is mentioned
         if (c.mentions && c.mentions.includes(this.app.myUserId)) {
-          this.app.showToast(`${c.author} vous a mentionne dans un commentaire`);
+          this.app.showToast(`${c.author} vous a mentionné dans un commentaire`);
         }
         break;
       }
@@ -393,7 +406,7 @@ class SyncClient {
         if (msg.props && msg.props.replies) {
           const lastReply = msg.props.replies[msg.props.replies.length - 1];
           if (lastReply && lastReply.mentions && lastReply.mentions.includes(this.app.myUserId)) {
-            this.app.showToast(`${lastReply.author} vous a mentionne dans une reponse`);
+            this.app.showToast(`${lastReply.author} vous a mentionné dans une réponse`);
           }
         }
         break;

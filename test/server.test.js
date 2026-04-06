@@ -2,6 +2,7 @@
 // Run with: node test/server.test.js
 const assert = require('assert');
 const path = require('path');
+const { MESSAGE_VALIDATORS } = require(path.join(__dirname, '..', 'lib', 'ws-handler'));
 
 let passed = 0;
 let failed = 0;
@@ -494,6 +495,148 @@ test('175: saveAll saves all boards without error', () => {
   // Clean up
   store.deleteBoard('srv-saveall-1');
   store.deleteBoard('srv-saveall-2');
+});
+
+// 176. Test MESSAGE_VALIDATORS for new message types
+test('176: MESSAGE_VALIDATORS - ping', () => {
+  assert.ok(MESSAGE_VALIDATORS['ping']({ x: 100, y: 200 }), 'Valid ping');
+  assert.ok(!MESSAGE_VALIDATORS['ping']({ x: 'bad', y: 200 }), 'Invalid ping x');
+  assert.ok(!MESSAGE_VALIDATORS['ping']({ x: 100 }), 'Missing ping y');
+});
+
+test('177: MESSAGE_VALIDATORS - typing', () => {
+  assert.ok(MESSAGE_VALIDATORS['typing']({}), 'Typing has no required fields');
+});
+
+test('178: MESSAGE_VALIDATORS - fishbowl', () => {
+  assert.ok(MESSAGE_VALIDATORS['fishbowl']({ active: true }), 'Valid fishbowl');
+  assert.ok(MESSAGE_VALIDATORS['fishbowl']({ active: false }), 'Valid fishbowl false');
+  assert.ok(!MESSAGE_VALIDATORS['fishbowl']({ active: 'yes' }), 'Invalid fishbowl type');
+});
+
+test('179: MESSAGE_VALIDATORS - presence', () => {
+  assert.ok(MESSAGE_VALIDATORS['presence']({ status: 'active' }), 'Valid presence');
+  assert.ok(!MESSAGE_VALIDATORS['presence']({ status: 123 }), 'Invalid presence type');
+  assert.ok(!MESSAGE_VALIDATORS['presence']({}), 'Missing presence status');
+});
+
+// 180. Test board operations with many element types
+test('180: applyOps with all element types', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-all-types');
+  const types = ['rect', 'circle', 'sticky', 'text', 'frame', 'line', 'arrow',
+                 'connector', 'diamond', 'triangle', 'card', 'list', 'envelope',
+                 'mindmap', 'embed', 'image', 'freehand'];
+
+  const ops = types.map((type, i) => ({
+    type: 'add',
+    elementId: `type-${type}`,
+    element: { id: `type-${type}`, type, x: i * 100, y: 0, width: 50, height: 50 }
+  }));
+
+  store.applyOps('srv-all-types', ops);
+  const board = store.getBoard('srv-all-types');
+  assert.strictEqual(board.elements.size, types.length, `Should have ${types.length} elements`);
+
+  for (const type of types) {
+    assert.ok(board.elements.has(`type-${type}`), `Should have ${type} element`);
+    assert.strictEqual(board.elements.get(`type-${type}`).type, type);
+  }
+
+  store.deleteBoard('srv-all-types');
+});
+
+// 181. Test concurrent operations on same element
+test('181: Concurrent update operations on same element', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-concurrent');
+  store.applyOps('srv-concurrent', [
+    { type: 'add', elementId: 'cc1', element: { id: 'cc1', type: 'sticky', x: 0, y: 0, width: 200, height: 200, text: '' } }
+  ]);
+
+  // Simulate rapid concurrent updates (like dragging)
+  for (let i = 0; i < 100; i++) {
+    store.applyOps('srv-concurrent', [
+      { type: 'update', elementId: 'cc1', props: { x: i * 10, y: i * 5 } }
+    ]);
+  }
+
+  const board = store.getBoard('srv-concurrent');
+  const el = board.elements.get('cc1');
+  assert.strictEqual(el.x, 990, 'x should be final value');
+  assert.strictEqual(el.y, 495, 'y should be final value');
+
+  store.deleteBoard('srv-concurrent');
+});
+
+// 182. Test add then delete then add with same ID
+test('182: Add-delete-readd with same element ID', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-readd');
+  store.applyOps('srv-readd', [
+    { type: 'add', elementId: 're1', element: { id: 're1', type: 'rect', x: 0, y: 0, text: 'original' } }
+  ]);
+  store.applyOps('srv-readd', [
+    { type: 'delete', elementId: 're1' }
+  ]);
+  store.applyOps('srv-readd', [
+    { type: 'add', elementId: 're1', element: { id: 're1', type: 'rect', x: 100, y: 100, text: 'new' } }
+  ]);
+
+  const board = store.getBoard('srv-readd');
+  assert.strictEqual(board.elements.size, 1);
+  assert.strictEqual(board.elements.get('re1').text, 'new');
+  assert.strictEqual(board.elements.get('re1').x, 100);
+
+  store.deleteBoard('srv-readd');
+});
+
+// 183. Test update on non-existent element doesn't crash
+test('183: Update on non-existent element is silently ignored', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-nocrash');
+  // Should not throw
+  store.applyOps('srv-nocrash', [
+    { type: 'update', elementId: 'nonexistent', props: { x: 100 } }
+  ]);
+  store.applyOps('srv-nocrash', [
+    { type: 'delete', elementId: 'nonexistent' }
+  ]);
+
+  const board = store.getBoard('srv-nocrash');
+  assert.strictEqual(board.elements.size, 0);
+
+  store.deleteBoard('srv-nocrash');
+});
+
+// 184. Test tag registry persistence
+test('184: Tag registry update and retrieval', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-tags2');
+  const board = store.getBoard('srv-tags2');
+
+  const tags = [
+    { label: 'Urgent', color: '#FF6B6B' },
+    { label: 'Done', color: '#4ECDC4' },
+    { label: 'Question', color: '#DDA0DD' }
+  ];
+  board.tagRegistry = tags;
+
+  assert.strictEqual(board.tagRegistry.length, 3);
+  assert.strictEqual(board.tagRegistry[0].label, 'Urgent');
+  assert.strictEqual(board.tagRegistry[2].color, '#DDA0DD');
+
+  store.deleteBoard('srv-tags2');
 });
 
 // ============================================================
