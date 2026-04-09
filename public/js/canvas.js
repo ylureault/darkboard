@@ -141,11 +141,10 @@ class CanvasRenderer {
     ctx.font = font;
     const m = ctx.measureText(text);
     if (this._textMeasureCache.size >= this._textMeasureCacheMax) {
-      // Evict oldest entries (first 100)
-      const keys = this._textMeasureCache.keys();
-      for (let i = 0; i < 100; i++) keys.next();
-      // Simple strategy: clear all
-      this._textMeasureCache.clear();
+      // Evict oldest entries (first half)
+      const keys = [...this._textMeasureCache.keys()];
+      const toRemove = Math.floor(keys.length / 2);
+      for (let i = 0; i < toRemove; i++) this._textMeasureCache.delete(keys[i]);
     }
     this._textMeasureCache.set(key, m);
     return m;

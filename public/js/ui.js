@@ -1315,9 +1315,9 @@ class UI {
         generate: (cx, cy) => this.generateBrainstorming(cx, cy)
       },
       {
-        name: 'Retrospective',
+        name: 'Rétrospective',
         icon: '🔄',
-        desc: '3 colonnes: Ce qui va bien, A ameliorer, Actions',
+        desc: '3 colonnes: Ce qui va bien, À améliorer, Actions',
         generate: (cx, cy) => this.generateRetro(cx, cy)
       },
       {
@@ -1341,25 +1341,25 @@ class UI {
       {
         name: 'SWOT',
         icon: '⚡',
-        desc: 'Forces, Faiblesses, Opportunites, Menaces',
+        desc: 'Forces, Faiblesses, Opportunités, Menaces',
         generate: (cx, cy) => this.generateSWOT(cx, cy)
       },
       {
         name: 'Timeline',
         icon: '📅',
-        desc: 'Ligne du temps avec etapes cles',
+        desc: 'Ligne du temps avec étapes clés',
         generate: (cx, cy) => this.generateTimeline(cx, cy)
       },
       {
         name: 'User Journey',
         icon: '🚶',
-        desc: 'Parcours utilisateur en 5 etapes',
+        desc: 'Parcours utilisateur en 5 étapes',
         generate: (cx, cy) => this.generateUserJourney(cx, cy)
       },
       {
         name: 'Carte d\'empathie',
         icon: '🧠',
-        desc: 'Comprendre les pensees, emotions et comportements d\'un utilisateur',
+        desc: 'Comprendre les pensées, émotions et comportements d\'un utilisateur',
         generate: (cx, cy) => this.generateEmpathyMap(cx, cy)
       },
       {
@@ -1371,25 +1371,25 @@ class UI {
       {
         name: 'Business Model Canvas',
         icon: '📈',
-        desc: 'Les 9 blocs cles de votre modele economique',
+        desc: 'Les 9 blocs clés de votre modèle économique',
         generate: (cx, cy) => this.generateBusinessModelCanvas(cx, cy)
       },
       {
         name: 'Lean Canvas',
         icon: '🚀',
-        desc: 'Modele d\'affaires pour les startups',
+        desc: 'Modèle d\'affaires pour les startups',
         generate: (cx, cy) => this.generateLeanCanvas(cx, cy)
       },
       {
         name: 'Speed Boat',
         icon: '⛵',
-        desc: 'Moteurs, ancres, objectif — retrospective ludique',
+        desc: 'Moteurs, ancres, objectif — rétrospective ludique',
         generate: (cx, cy) => this.generateSpeedBoat(cx, cy)
       },
       {
         name: 'Starfish',
         icon: '⭐',
-        desc: 'Plus, Moins, Commencer, Arreter, Continuer',
+        desc: 'Plus, Moins, Commencer, Arrêter, Continuer',
         generate: (cx, cy) => this.generateStarfish(cx, cy)
       },
       {
@@ -1399,7 +1399,7 @@ class UI {
         generate: (cx, cy) => this.generateImpactEffort(cx, cy)
       },
       {
-        name: 'Retrospective 4L',
+        name: 'Rétrospective 4L',
         icon: '❤️',
         desc: 'Liked, Learned, Lacked, Longed for',
         generate: (cx, cy) => this.generateRetro4L(cx, cy)
@@ -1413,7 +1413,7 @@ class UI {
       {
         name: 'Stakeholder Map',
         icon: '🎯',
-        desc: 'Cartographier les parties prenantes par influence et interet',
+        desc: 'Cartographier les parties prenantes par influence et intérêt',
         generate: (cx, cy) => this.generateStakeholderMap(cx, cy)
       }
     ];
@@ -1462,13 +1462,13 @@ class UI {
       const row = Math.floor(i / 3);
       const s = createSticky(cx - 330 + col * 220, cy - 200 + row * 220);
       s.fill = colors[i % colors.length];
-      s.text = 'Idee ' + (i + 1);
+      s.text = 'Idée ' + (i + 1);
       this.app.addElement(s);
     }
   }
 
   generateRetro(cx, cy) {
-    const labels = ['Ce qui va bien', 'A ameliorer', 'Actions'];
+    const labels = ['Ce qui va bien', 'À améliorer', 'Actions'];
     const frameColors = ['#4ecdc4', '#ff6b6b', '#4a9eff'];
     for (let i = 0; i < 3; i++) {
       const f = createFrame(cx - 480 + i * 320, cy - 250, 300, 500, labels[i]);
@@ -1509,7 +1509,7 @@ class UI {
   }
 
   generateKanban(cx, cy) {
-    const cols = ['A faire', 'En cours', 'Fait'];
+    const cols = ['À faire', 'En cours', 'Fait'];
     const colors = ['#ff6b6b', '#ffd966', '#4ecdc4'];
     for (let i = 0; i < 3; i++) {
       const f = createFrame(cx - 480 + i * 320, cy - 300, 300, 600, cols[i]);
@@ -1527,7 +1527,7 @@ class UI {
     });
     this.app.addElement(center);
 
-    const branches = ['Idee 1', 'Idee 2', 'Idee 3', 'Idee 4', 'Idee 5'];
+    const branches = ['Idée 1', 'Idée 2', 'Idée 3', 'Idée 4', 'Idée 5'];
     const angles = branches.map((_, i) => (i * 2 * Math.PI / branches.length) - Math.PI / 2);
     const dist = 250;
 
@@ -1596,7 +1596,7 @@ class UI {
   }
 
   generateUserJourney(cx, cy) {
-    const phases = ['Decouverte', 'Consideration', 'Decision', 'Utilisation', 'Fidelisation'];
+    const phases = ['Découverte', 'Considération', 'Décision', 'Utilisation', 'Fidélisation'];
     const colors = ['#45B7D1', '#4ECDC4', '#96CEB4', '#FFD966', '#FF6B6B'];
 
     for (let i = 0; i < phases.length; i++) {
@@ -1726,14 +1726,14 @@ class UI {
 
     // 9 blocks of the BMC
     const blocks = [
-      { label: 'Partenaires Cles', x: startX, y: startY, w: colW, h: rowH * 2, color: '#DDA0DD' },
-      { label: 'Activites Cles', x: startX + colW, y: startY, w: colW, h: rowH, color: '#45B7D1' },
-      { label: 'Ressources Cles', x: startX + colW, y: startY + rowH, w: colW, h: rowH, color: '#45B7D1' },
+      { label: 'Partenaires Clés', x: startX, y: startY, w: colW, h: rowH * 2, color: '#DDA0DD' },
+      { label: 'Activités Clés', x: startX + colW, y: startY, w: colW, h: rowH, color: '#45B7D1' },
+      { label: 'Ressources Clés', x: startX + colW, y: startY + rowH, w: colW, h: rowH, color: '#45B7D1' },
       { label: 'Propositions de Valeur', x: startX + colW * 2, y: startY, w: colW, h: rowH * 2, color: '#FFD966' },
       { label: 'Relations Clients', x: startX + colW * 3, y: startY, w: colW, h: rowH, color: '#4ECDC4' },
       { label: 'Canaux', x: startX + colW * 3, y: startY + rowH, w: colW, h: rowH, color: '#4ECDC4' },
       { label: 'Segments Clients', x: startX + colW * 4, y: startY, w: colW, h: rowH * 2, color: '#FF6B6B' },
-      { label: 'Structure de Couts', x: startX, y: startY + rowH * 2, w: colW * 2.5, h: rowH, color: '#F4A460' },
+      { label: 'Structure de Coûts', x: startX, y: startY + rowH * 2, w: colW * 2.5, h: rowH, color: '#F4A460' },
       { label: 'Sources de Revenus', x: startX + colW * 2.5, y: startY + rowH * 2, w: colW * 2.5, h: rowH, color: '#96CEB4' },
     ];
 
@@ -1758,16 +1758,16 @@ class UI {
     const startY = cy - 420;
 
     const blocks = [
-      { label: 'Probleme', x: startX, y: startY, w: colW, h: rowH, color: '#FF6B6B' },
+      { label: 'Problème', x: startX, y: startY, w: colW, h: rowH, color: '#FF6B6B' },
       { label: 'Alternatives existantes', x: startX, y: startY + rowH, w: colW, h: rowH, color: '#FF6B6B' },
       { label: 'Solution', x: startX + colW, y: startY, w: colW, h: rowH, color: '#4ECDC4' },
-      { label: 'Metriques cles', x: startX + colW, y: startY + rowH, w: colW, h: rowH, color: '#45B7D1' },
+      { label: 'Métriques clés', x: startX + colW, y: startY + rowH, w: colW, h: rowH, color: '#45B7D1' },
       { label: 'Proposition de Valeur Unique', x: startX + colW * 2, y: startY, w: colW, h: rowH * 2, color: '#FFD966' },
-      { label: 'Avantage Competitif', x: startX + colW * 3, y: startY, w: colW, h: rowH, color: '#DDA0DD' },
+      { label: 'Avantage Compétitif', x: startX + colW * 3, y: startY, w: colW, h: rowH, color: '#DDA0DD' },
       { label: 'Canaux', x: startX + colW * 3, y: startY + rowH, w: colW, h: rowH, color: '#96CEB4' },
       { label: 'Segments Clients', x: startX + colW * 4, y: startY, w: colW, h: rowH, color: '#F4A460' },
       { label: 'Early Adopters', x: startX + colW * 4, y: startY + rowH, w: colW, h: rowH, color: '#F4A460' },
-      { label: 'Structure de Couts', x: startX, y: startY + rowH * 2, w: colW * 2.5, h: 200, color: '#e94560' },
+      { label: 'Structure de Coûts', x: startX, y: startY + rowH * 2, w: colW * 2.5, h: 200, color: '#e94560' },
       { label: 'Sources de Revenus', x: startX + colW * 2.5, y: startY + rowH * 2, w: colW * 2.5, h: 200, color: '#4a9eff' },
     ];
 
@@ -1787,7 +1787,7 @@ class UI {
     this.app.addElement(title);
 
     // Destination (right)
-    const dest = createFrame(cx + 300, cy - 200, 250, 300, 'Objectif / Ile');
+    const dest = createFrame(cx + 300, cy - 200, 250, 300, 'Objectif / Île');
     dest.stroke = '#4ECDC4';
     dest.fill = '#4ECDC4' + '10';
     this.app.addElement(dest);
@@ -1809,7 +1809,7 @@ class UI {
     boat.width = 120;
     boat.height = 120;
     boat.fill = '#FFD966';
-    boat.text = 'Notre equipe';
+    boat.text = 'Notre équipe';
     boat.fontSize = 14;
     this.app.addElement(boat);
 
@@ -1832,7 +1832,7 @@ class UI {
       { label: 'Plus de', color: '#96CEB4' },
       { label: 'Commencer', color: '#4a9eff' },
       { label: 'Moins de', color: '#FFD966' },
-      { label: 'Arreter', color: '#FF6B6B' },
+      { label: 'Arrêter', color: '#FF6B6B' },
     ];
 
     const radius = 300;
@@ -1859,7 +1859,7 @@ class UI {
     const quads = [
       { label: 'Quick Wins', desc: 'Fort impact, faible effort', x: cx - size, y: cy - size, color: '#4ECDC4' },
       { label: 'Projets majeurs', desc: 'Fort impact, fort effort', x: cx, y: cy - size, color: '#FFD966' },
-      { label: 'Petites taches', desc: 'Faible impact, faible effort', x: cx - size, y: cy, color: '#96CEB4' },
+      { label: 'Petites tâches', desc: 'Faible impact, faible effort', x: cx - size, y: cy, color: '#96CEB4' },
       { label: 'Ingrat', desc: 'Faible impact, fort effort', x: cx, y: cy, color: '#FF6B6B' },
     ];
 
@@ -1944,10 +1944,10 @@ class UI {
 
     const size = 400;
     const quads = [
-      { label: 'Gerer de pres', desc: 'Fort pouvoir, fort interet', x: cx - size, y: cy - size, color: '#FF6B6B' },
-      { label: 'Satisfaire', desc: 'Fort pouvoir, faible interet', x: cx, y: cy - size, color: '#FFD966' },
-      { label: 'Informer', desc: 'Faible pouvoir, fort interet', x: cx - size, y: cy, color: '#4ECDC4' },
-      { label: 'Surveiller', desc: 'Faible pouvoir, faible interet', x: cx, y: cy, color: '#96CEB4' },
+      { label: 'Gérer de près', desc: 'Fort pouvoir, fort intérêt', x: cx - size, y: cy - size, color: '#FF6B6B' },
+      { label: 'Satisfaire', desc: 'Fort pouvoir, faible intérêt', x: cx, y: cy - size, color: '#FFD966' },
+      { label: 'Informer', desc: 'Faible pouvoir, fort intérêt', x: cx - size, y: cy, color: '#4ECDC4' },
+      { label: 'Surveiller', desc: 'Faible pouvoir, faible intérêt', x: cx, y: cy, color: '#96CEB4' },
     ];
 
     for (const q of quads) {
@@ -2015,7 +2015,7 @@ class UI {
     btn.addEventListener('click', () => {
       this.app.renderer.snapToGrid = !this.app.renderer.snapToGrid;
       btn.classList.toggle('active', this.app.renderer.snapToGrid);
-      this.app.showToast(this.app.renderer.snapToGrid ? 'Grille magnetique activee' : 'Grille magnetique desactivee');
+      this.app.showToast(this.app.renderer.snapToGrid ? 'Grille magnétique activée' : 'Grille magnétique désactivée');
     });
   }
 
