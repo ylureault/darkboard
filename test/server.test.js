@@ -640,6 +640,498 @@ test('184: Tag registry update and retrieval', () => {
 });
 
 // ============================================================
+// BoardStore: disk persistence
+// ============================================================
+
+test('185: saveToDisk and loadFromDisk round-trip', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-disk-roundtrip');
+  store.applyOps('srv-disk-roundtrip', [
+    { type: 'add', elementId: 'disk1', element: { id: 'disk1', type: 'sticky', x: 10, y: 20, width: 200, height: 200, text: 'Persist me' } },
+    { type: 'add', elementId: 'disk2', element: { id: 'disk2', type: 'rect', x: 100, y: 100, width: 50, height: 50 } },
+  ]);
+
+  // Force save
+  store.saveToDisk('srv-disk-roundtrip');
+
+  // Create a new store that loads from disk
+  const store2 = new BoardStore();
+  const loaded = store2.getBoard('srv-disk-roundtrip');
+  assert.ok(loaded, 'Board should be loaded from disk');
+  assert.strictEqual(loaded.elements.size, 2);
+  assert.strictEqual(loaded.elements.get('disk1').text, 'Persist me');
+  assert.strictEqual(loaded.elements.get('disk2').type, 'rect');
+
+  // Cleanup
+  store.deleteBoard('srv-disk-roundtrip');
+  store2.deleteBoard('srv-disk-roundtrip');
+});
+
+test('186: saveToDisk persists anchors and comments', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-disk-anchors');
+  store.addAnchor('srv-disk-anchors', { id: 'anc1', name: 'Start', x: 0, y: 0, zoom: 1 });
+  store.addComment('srv-disk-anchors', { id: 'cmt1', text: 'A comment', x: 50, y: 50 });
+
+  store.saveToDisk('srv-disk-anchors');
+
+  const store2 = new BoardStore();
+  const loaded = store2.getBoard('srv-disk-anchors');
+  assert.ok(loaded);
+  assert.strictEqual(loaded.anchors.size, 1);
+  assert.strictEqual(loaded.anchors.get('anc1').name, 'Start');
+  assert.strictEqual(loaded.comments.size, 1);
+  assert.strictEqual(loaded.comments.get('cmt1').text, 'A comment');
+
+  store.deleteBoard('srv-disk-anchors');
+  store2.deleteBoard('srv-disk-anchors');
+});
+
+test('187: saveToDisk persists tag registry', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-disk-tags');
+  const board = store.getBoard('srv-disk-tags');
+  board.tagRegistry = [
+    { label: 'Urgent', color: '#FF0000' },
+    { label: 'Done', color: '#00FF00' }
+  ];
+
+  store.saveToDisk('srv-disk-tags');
+
+  const store2 = new BoardStore();
+  const loaded = store2.getBoard('srv-disk-tags');
+  assert.ok(loaded);
+  assert.strictEqual(loaded.tagRegistry.length, 2);
+  assert.strictEqual(loaded.tagRegistry[0].label, 'Urgent');
+
+  store.deleteBoard('srv-disk-tags');
+  store2.deleteBoard('srv-disk-tags');
+});
+
+test('188: loadFromDisk skips malformed elements', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const fs = require('fs');
+  const dataDir = path.join(__dirname, '..', 'data');
+
+  // Create a file with malformed data
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  const testData = {
+    elements: [
+      { id: 'good1', type: 'rect', x: 0, y: 0, width: 50, height: 50 },
+      null,  // malformed
+      { id: 123, type: 'rect' },  // non-string id
+      { type: 'rect' },  // missing id
+      { id: 'good2', type: 'sticky', x: 10, y: 20, width: 200, height: 200 }
+    ]
+  };
+  fs.writeFileSync(path.join(dataDir, 'srv-malformed-test.json'), JSON.stringify(testData));
+
+  const store = new BoardStore();
+  const board = store.getBoard('srv-malformed-test');
+  assert.ok(board, 'Board should load despite malformed elements');
+  assert.strictEqual(board.elements.size, 2, 'Only 2 valid elements should be loaded');
+  assert.ok(board.elements.has('good1'));
+  assert.ok(board.elements.has('good2'));
+
+  store.deleteBoard('srv-malformed-test');
+});
+
+test('189: loadFromDisk handles corrupt JSON file gracefully', () => {
+  const fs = require('fs');
+  const dataDir = path.join(__dirname, '..', 'data');
+
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(path.join(dataDir, 'srv-corrupt.json'), 'NOT VALID JSON {{{');
+
+  // Should not throw
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+  const board = store.getBoard('srv-corrupt');
+  // Corrupt board shouldn't load
+  // (it may or may not exist depending on error handling)
+
+  // Cleanup
+  try { fs.unlinkSync(path.join(dataDir, 'srv-corrupt.json')); } catch (_) {}
+});
+
+// ============================================================
+// BoardStore: debouncedSave
+// ============================================================
+
+test('190: debouncedSave debounces multiple calls', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-debounce');
+  const board = store.getBoard('srv-debounce');
+
+  // Call debouncedSave multiple times rapidly
+  store.debouncedSave('srv-debounce');
+  store.debouncedSave('srv-debounce');
+  store.debouncedSave('srv-debounce');
+
+  // Timer should exist
+  assert.ok(board._saveTimer, 'Should have a pending save timer');
+
+  // Clear timer and cleanup
+  clearTimeout(board._saveTimer);
+  store.deleteBoard('srv-debounce');
+});
+
+test('191: debouncedSave for non-existent board does not throw', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  // Should not throw
+  store.debouncedSave('nonexistent-board');
+  assert.ok(true);
+});
+
+// ============================================================
+// BoardStore: board lifecycle
+// ============================================================
+
+test('192: Board timestamps are updated on applyOps', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-timestamps');
+  const board = store.getBoard('srv-timestamps');
+  const createdAt = board.lastActivity;
+
+  // Small delay to ensure different timestamp
+  const now = Date.now() + 10;
+  store.applyOps('srv-timestamps', [
+    { type: 'add', elementId: 'ts1', element: { id: 'ts1', type: 'rect', x: 0, y: 0 } }
+  ]);
+
+  assert.ok(board.lastActivity >= createdAt, 'lastActivity should be updated');
+  assert.ok(board.lastModified >= createdAt, 'lastModified should be updated');
+
+  store.deleteBoard('srv-timestamps');
+});
+
+test('193: Board workshop state initializes correctly', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-workshop-init');
+  const board = store.getBoard('srv-workshop-init');
+
+  assert.strictEqual(board.timer, null);
+  assert.strictEqual(board.voting, null);
+  assert.strictEqual(board.isolation, null);
+  assert.strictEqual(board.facilitator, null);
+  assert.strictEqual(board.followMode, false);
+
+  store.deleteBoard('srv-workshop-init');
+});
+
+test('194: Board connections set is functional', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-conn');
+  const board = store.getBoard('srv-conn');
+
+  assert.ok(board.connections instanceof Set);
+  assert.strictEqual(board.connections.size, 0);
+
+  // Simulate adding connections
+  const fakeWs1 = { id: 1 };
+  const fakeWs2 = { id: 2 };
+  board.connections.add(fakeWs1);
+  board.connections.add(fakeWs2);
+  assert.strictEqual(board.connections.size, 2);
+
+  board.connections.delete(fakeWs1);
+  assert.strictEqual(board.connections.size, 1);
+
+  store.deleteBoard('srv-conn');
+});
+
+// ============================================================
+// ws-handler: message validators extended
+// ============================================================
+
+test('195: MESSAGE_VALIDATORS - anchor operations', () => {
+  assert.ok(MESSAGE_VALIDATORS['anchor-add']({ anchor: { name: 'Start', id: 'a1' } }));
+  assert.ok(!MESSAGE_VALIDATORS['anchor-add']({ anchor: { id: 'a1' } })); // missing name
+  assert.ok(!MESSAGE_VALIDATORS['anchor-add']({})); // missing anchor
+
+  assert.ok(MESSAGE_VALIDATORS['anchor-update']({ anchorId: 'a1', props: { name: 'Updated' } }));
+  assert.ok(!MESSAGE_VALIDATORS['anchor-update']({ anchorId: 'a1' })); // missing props
+
+  assert.ok(MESSAGE_VALIDATORS['anchor-delete']({ anchorId: 'a1' }));
+  assert.ok(!MESSAGE_VALIDATORS['anchor-delete']({})); // missing anchorId
+});
+
+test('196: MESSAGE_VALIDATORS - timer operations', () => {
+  assert.ok(MESSAGE_VALIDATORS['timer-start']({ duration: 300 }));
+  assert.ok(!MESSAGE_VALIDATORS['timer-start']({ duration: 0 })); // must be > 0
+  assert.ok(!MESSAGE_VALIDATORS['timer-start']({ duration: -5 })); // negative
+  assert.ok(!MESSAGE_VALIDATORS['timer-start']({})); // missing
+});
+
+test('197: MESSAGE_VALIDATORS - vote operations', () => {
+  assert.ok(MESSAGE_VALIDATORS['vote-start']({})); // always true
+  assert.ok(MESSAGE_VALIDATORS['vote-cast']({ elementId: 'el1' }));
+  assert.ok(!MESSAGE_VALIDATORS['vote-cast']({})); // missing elementId
+  assert.ok(MESSAGE_VALIDATORS['vote-uncast']({ elementId: 'el1' }));
+  assert.ok(!MESSAGE_VALIDATORS['vote-uncast']({ elementId: 123 })); // wrong type
+});
+
+test('198: MESSAGE_VALIDATORS - comment operations', () => {
+  assert.ok(MESSAGE_VALIDATORS['comment-add']({ comment: { id: 'c1', text: 'Hello' } }));
+  assert.ok(!MESSAGE_VALIDATORS['comment-add']({ comment: {} })); // missing id
+  assert.ok(!MESSAGE_VALIDATORS['comment-add']({})); // missing comment
+
+  assert.ok(MESSAGE_VALIDATORS['comment-update']({ commentId: 'c1', props: { text: 'Updated' } }));
+  assert.ok(!MESSAGE_VALIDATORS['comment-update']({ commentId: 'c1' })); // missing props
+
+  assert.ok(MESSAGE_VALIDATORS['comment-delete']({ commentId: 'c1' }));
+  assert.ok(!MESSAGE_VALIDATORS['comment-delete']({}));
+});
+
+test('199: MESSAGE_VALIDATORS - laser and follow-view', () => {
+  assert.ok(MESSAGE_VALIDATORS['laser']({ x: 100, y: 200 }));
+  assert.ok(!MESSAGE_VALIDATORS['laser']({ x: 'a', y: 200 }));
+
+  assert.ok(MESSAGE_VALIDATORS['follow-view']({ x: 50, y: 60 }));
+  assert.ok(!MESSAGE_VALIDATORS['follow-view']({ x: 50 })); // missing y
+});
+
+test('200: MESSAGE_VALIDATORS - webrtc-signal', () => {
+  assert.ok(MESSAGE_VALIDATORS['webrtc-signal']({ targetUserId: 'u1', signal: { type: 'offer' } }));
+  assert.ok(!MESSAGE_VALIDATORS['webrtc-signal']({ signal: {} })); // missing targetUserId
+  assert.ok(!MESSAGE_VALIDATORS['webrtc-signal']({ targetUserId: 'u1' })); // missing signal
+});
+
+test('201: MESSAGE_VALIDATORS - tag-registry-update', () => {
+  assert.ok(MESSAGE_VALIDATORS['tag-registry-update']({ tags: [] }));
+  assert.ok(MESSAGE_VALIDATORS['tag-registry-update']({ tags: [{ label: 'A', color: '#F00' }] }));
+  assert.ok(!MESSAGE_VALIDATORS['tag-registry-update']({ tags: 'not an array' }));
+});
+
+test('202: MESSAGE_VALIDATORS - round-robin and checkin', () => {
+  assert.ok(MESSAGE_VALIDATORS['round-robin']({ action: 'start' }));
+  assert.ok(!MESSAGE_VALIDATORS['round-robin']({ action: 123 }));
+
+  assert.ok(MESSAGE_VALIDATORS['checkin-start']({})); // always true
+  assert.ok(MESSAGE_VALIDATORS['checkin-vote']({ emoji: '👍' }));
+  assert.ok(!MESSAGE_VALIDATORS['checkin-vote']({}));
+});
+
+// ============================================================
+// BoardStore: applyOps edge cases
+// ============================================================
+
+test('203: applyOps returns warning at element threshold', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-warning');
+  // Add elements up to near the warning threshold
+  const ops = [];
+  for (let i = 0; i < 4000; i++) {
+    ops.push({ type: 'add', elementId: `w${i}`, element: { id: `w${i}`, type: 'rect', x: i, y: 0 } });
+  }
+  const warning = store.applyOps('srv-warning', ops);
+  // Should have a warning at threshold
+  assert.ok(warning, 'Should return a warning string');
+  assert.ok(warning.includes('approaching'), 'Warning should mention approaching limit');
+
+  store.deleteBoard('srv-warning');
+});
+
+test('204: applyOps add then update then delete in single batch', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-batch');
+  store.applyOps('srv-batch', [
+    { type: 'add', elementId: 'batch1', element: { id: 'batch1', type: 'rect', x: 0, y: 0, text: '' } },
+    { type: 'update', elementId: 'batch1', props: { text: 'Updated', x: 100 } },
+    { type: 'delete', elementId: 'batch1' }
+  ]);
+
+  const board = store.getBoard('srv-batch');
+  assert.strictEqual(board.elements.size, 0, 'Element should be deleted');
+
+  store.deleteBoard('srv-batch');
+});
+
+test('205: applyOps on non-existent board is no-op', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  // Should not throw
+  store.applyOps('totally-missing', [
+    { type: 'add', elementId: 'x', element: { id: 'x', type: 'rect' } }
+  ]);
+  assert.ok(true, 'applyOps on missing board should not throw');
+});
+
+// ============================================================
+// BoardStore: anchor and comment operations
+// ============================================================
+
+test('206: Anchor add, update, delete cycle', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-anc-cycle');
+  store.addAnchor('srv-anc-cycle', { id: 'a1', name: 'View 1', x: 100, y: 200, zoom: 1.5 });
+  let board = store.getBoard('srv-anc-cycle');
+  assert.strictEqual(board.anchors.size, 1);
+  assert.strictEqual(board.anchors.get('a1').name, 'View 1');
+
+  store.updateAnchor('srv-anc-cycle', 'a1', { name: 'Updated View' });
+  assert.strictEqual(board.anchors.get('a1').name, 'Updated View');
+
+  store.deleteAnchor('srv-anc-cycle', 'a1');
+  assert.strictEqual(board.anchors.size, 0);
+
+  store.deleteBoard('srv-anc-cycle');
+});
+
+test('207: Comment add, update, delete cycle', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-cmt-cycle');
+  store.addComment('srv-cmt-cycle', { id: 'c1', text: 'First comment', x: 50, y: 50 });
+  let board = store.getBoard('srv-cmt-cycle');
+  assert.strictEqual(board.comments.size, 1);
+
+  store.updateComment('srv-cmt-cycle', 'c1', { text: 'Edited comment', resolved: true });
+  assert.strictEqual(board.comments.get('c1').text, 'Edited comment');
+  assert.strictEqual(board.comments.get('c1').resolved, true);
+
+  store.deleteComment('srv-cmt-cycle', 'c1');
+  assert.strictEqual(board.comments.size, 0);
+
+  store.deleteBoard('srv-cmt-cycle');
+});
+
+test('208: Multiple anchors coexist', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-multi-anc');
+  for (let i = 0; i < 10; i++) {
+    store.addAnchor('srv-multi-anc', { id: `a${i}`, name: `View ${i}`, x: i * 100, y: 0, zoom: 1 });
+  }
+  const board = store.getBoard('srv-multi-anc');
+  assert.strictEqual(board.anchors.size, 10);
+
+  // Delete odd ones
+  for (let i = 1; i < 10; i += 2) {
+    store.deleteAnchor('srv-multi-anc', `a${i}`);
+  }
+  assert.strictEqual(board.anchors.size, 5);
+
+  store.deleteBoard('srv-multi-anc');
+});
+
+// ============================================================
+// Rate limiting
+// ============================================================
+
+test('209: Board creation rate limit allows 10 per minute', () => {
+  // Inline the rate limit logic for testing
+  const rateMap = new Map();
+  function checkRate(ip) {
+    const now = Date.now();
+    const entry = rateMap.get(ip);
+    if (!entry || now > entry.resetTime) {
+      rateMap.set(ip, { count: 1, resetTime: now + 60000 });
+      return true;
+    }
+    if (entry.count >= 10) return false;
+    entry.count++;
+    return true;
+  }
+
+  const ip = '127.0.0.1';
+  for (let i = 0; i < 10; i++) {
+    assert.ok(checkRate(ip), `Request ${i + 1} should be allowed`);
+  }
+  assert.ok(!checkRate(ip), 'Request 11 should be rate limited');
+});
+
+test('210: Message rate limiter resets after window', () => {
+  const rateMap = new Map();
+  function checkRate(clientId, msgType) {
+    const key = `${clientId}:${msgType}`;
+    const now = Date.now();
+    const entry = rateMap.get(key);
+    if (!entry || now > entry.resetTime) {
+      rateMap.set(key, { count: 1, resetTime: now + 1000 });
+      return true;
+    }
+    if (entry.count >= 100) return false;
+    entry.count++;
+    return true;
+  }
+
+  const client = 'user1';
+  for (let i = 0; i < 100; i++) {
+    assert.ok(checkRate(client, 'op'), `Op ${i + 1} should be allowed`);
+  }
+  assert.ok(!checkRate(client, 'op'), 'Op 101 should be rate limited');
+
+  // Different message type should have its own counter
+  assert.ok(checkRate(client, 'cursor'), 'Different message type should not be limited');
+});
+
+// ============================================================
+// Board store: saveAll
+// ============================================================
+
+test('211: saveAll handles empty store', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  // No boards exist (after cleanup) - should not throw
+  const ids = store.getAllBoardIds();
+  for (const id of ids) {
+    if (id.startsWith('srv-')) store.deleteBoard(id);
+  }
+
+  try {
+    store.saveAll();
+    assert.ok(true);
+  } catch (e) {
+    assert.fail('saveAll should not throw on empty store');
+  }
+});
+
+test('212: getAllBoardIds returns all board IDs', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+
+  store.createBoard('srv-getall-a');
+  store.createBoard('srv-getall-b');
+  store.createBoard('srv-getall-c');
+
+  const ids = store.getAllBoardIds();
+  assert.ok(ids.includes('srv-getall-a'));
+  assert.ok(ids.includes('srv-getall-b'));
+  assert.ok(ids.includes('srv-getall-c'));
+
+  store.deleteBoard('srv-getall-a');
+  store.deleteBoard('srv-getall-b');
+  store.deleteBoard('srv-getall-c');
+});
+
+// ============================================================
 // Summary
 // ============================================================
 

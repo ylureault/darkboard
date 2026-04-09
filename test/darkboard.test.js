@@ -1184,6 +1184,120 @@ test('168: History undo/redo return null when empty', () => {
   assert.strictEqual(h.redo(), null);
 });
 
+// ---- Additional utility functions for testing ----
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function createTextElement(x, y) {
+  return createElement('text', {
+    x, y,
+    width: 200,
+    height: 40,
+    fill: 'transparent',
+    stroke: 'transparent',
+    text: 'Texte',
+    fontSize: 20
+  });
+}
+
+function createImageElement(x, y, w, h, dataUrl) {
+  return createElement('image', {
+    x, y,
+    width: w,
+    height: h,
+    fill: 'transparent',
+    stroke: 'transparent',
+    imageData: dataUrl
+  });
+}
+
+function getAnchorPoints(el) {
+  const bounds = getElementBounds(el);
+  return [
+    { x: bounds.x + bounds.w / 2, y: bounds.y, side: 'top' },
+    { x: bounds.x + bounds.w / 2, y: bounds.y + bounds.h, side: 'bottom' },
+    { x: bounds.x, y: bounds.y + bounds.h / 2, side: 'left' },
+    { x: bounds.x + bounds.w, y: bounds.y + bounds.h / 2, side: 'right' },
+  ];
+}
+
+function getBestAnchors(sourceEl, targetEl) {
+  const srcAnchors = getAnchorPoints(sourceEl);
+  const tgtAnchors = getAnchorPoints(targetEl);
+  let best = null;
+  let bestDist = Infinity;
+  for (const sa of srcAnchors) {
+    for (const ta of tgtAnchors) {
+      const d = Math.hypot(sa.x - ta.x, sa.y - ta.y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = { src: sa, tgt: ta };
+      }
+    }
+  }
+  return best;
+}
+
+function isInsideEnvelope(el, envelope) {
+  const bounds = getElementBounds(el);
+  const cx = bounds.x + bounds.w / 2;
+  const cy = bounds.y + bounds.h / 2;
+  return pointInRect(cx, cy, envelope.x, envelope.y + 36, envelope.width, envelope.height - 36);
+}
+
+function getResizeHandle(el, worldX, worldY, handleSize) {
+  handleSize = handleSize || 8;
+  const bounds = getElementBounds(el);
+  if (!bounds) return null;
+  const handles = [
+    { name: 'nw', x: bounds.x, y: bounds.y },
+    { name: 'ne', x: bounds.x + bounds.w, y: bounds.y },
+    { name: 'sw', x: bounds.x, y: bounds.y + bounds.h },
+    { name: 'se', x: bounds.x + bounds.w, y: bounds.y + bounds.h },
+    { name: 'n', x: bounds.x + bounds.w / 2, y: bounds.y },
+    { name: 's', x: bounds.x + bounds.w / 2, y: bounds.y + bounds.h },
+    { name: 'w', x: bounds.x, y: bounds.y + bounds.h / 2 },
+    { name: 'e', x: bounds.x + bounds.w, y: bounds.y + bounds.h / 2 },
+  ];
+  for (const h of handles) {
+    if (Math.abs(worldX - h.x) < handleSize && Math.abs(worldY - h.y) < handleSize) {
+      return h.name;
+    }
+  }
+  return null;
+}
+
+function createInverseOps(ops, elements) {
+  const inverse = [];
+  for (const op of ops) {
+    switch (op.type) {
+      case 'add':
+        inverse.push({ type: 'delete', elementId: op.elementId });
+        break;
+      case 'delete': {
+        const el = elements.get(op.elementId);
+        if (el) {
+          inverse.push({ type: 'add', elementId: op.elementId, element: deepClone(el) });
+        }
+        break;
+      }
+      case 'update': {
+        const el = elements.get(op.elementId);
+        if (el) {
+          const oldProps = {};
+          for (const key of Object.keys(op.props)) {
+            oldProps[key] = el[key];
+          }
+          inverse.push({ type: 'update', elementId: op.elementId, props: oldProps });
+        }
+        break;
+      }
+    }
+  }
+  return inverse.reverse();
+}
+
 // ============================================================
 // Bug Fix Regression Tests
 // ============================================================
@@ -1650,6 +1764,707 @@ test('188: normalizeRect with negative dimensions', () => {
   const r2 = normalizeRect(50, 50, 0, 0);
   assert.strictEqual(r2.x, 50);
   assert.strictEqual(r2.w, 0);
+});
+
+// ============================================================
+// Utils: lerp, clamp, deepClone
+// ============================================================
+
+test('189: lerp basic interpolation', () => {
+  assert.strictEqual(lerp(0, 10, 0), 0);
+  assert.strictEqual(lerp(0, 10, 1), 10);
+  assert.strictEqual(lerp(0, 10, 0.5), 5);
+  assert.strictEqual(lerp(0, 10, 0.25), 2.5);
+  assert.strictEqual(lerp(-10, 10, 0.5), 0);
+  assert.strictEqual(lerp(100, 200, 0.1), 110);
+});
+
+test('190: lerp extrapolation beyond 0-1', () => {
+  assert.strictEqual(lerp(0, 10, 2), 20);
+  assert.strictEqual(lerp(0, 10, -1), -10);
+  assert.strictEqual(lerp(5, 15, 1.5), 20);
+});
+
+test('191: clamp basic behavior', () => {
+  assert.strictEqual(clamp(5, 0, 10), 5);
+  assert.strictEqual(clamp(-5, 0, 10), 0);
+  assert.strictEqual(clamp(15, 0, 10), 10);
+  assert.strictEqual(clamp(0, 0, 10), 0);
+  assert.strictEqual(clamp(10, 0, 10), 10);
+});
+
+test('192: clamp with negative ranges', () => {
+  assert.strictEqual(clamp(0, -10, -5), -5);
+  assert.strictEqual(clamp(-7, -10, -5), -7);
+  assert.strictEqual(clamp(-15, -10, -5), -10);
+});
+
+test('193: clamp with equal min/max', () => {
+  assert.strictEqual(clamp(100, 5, 5), 5);
+  assert.strictEqual(clamp(-100, 5, 5), 5);
+});
+
+test('194: deepClone creates independent copy', () => {
+  const original = { a: 1, b: { c: 2, d: [3, 4] } };
+  const clone = deepClone(original);
+  assert.deepStrictEqual(clone, original);
+
+  // Modify clone, original should be unchanged
+  clone.b.c = 999;
+  clone.b.d.push(5);
+  assert.strictEqual(original.b.c, 2);
+  assert.strictEqual(original.b.d.length, 2);
+});
+
+test('195: deepClone handles arrays', () => {
+  const arr = [1, { x: 2 }, [3, 4]];
+  const clone = deepClone(arr);
+  assert.deepStrictEqual(clone, arr);
+  clone[1].x = 99;
+  assert.strictEqual(arr[1].x, 2);
+});
+
+test('196: deepClone handles null and empty objects', () => {
+  assert.strictEqual(deepClone(null), null);
+  assert.deepStrictEqual(deepClone({}), {});
+  assert.deepStrictEqual(deepClone([]), []);
+});
+
+// ============================================================
+// createTextElement and createImageElement
+// ============================================================
+
+test('197: createTextElement has correct defaults', () => {
+  const el = createTextElement(50, 100);
+  assert.strictEqual(el.type, 'text');
+  assert.strictEqual(el.x, 50);
+  assert.strictEqual(el.y, 100);
+  assert.strictEqual(el.width, 200);
+  assert.strictEqual(el.height, 40);
+  assert.strictEqual(el.text, 'Texte');
+  assert.strictEqual(el.fontSize, 20);
+  assert.ok(el.id, 'Should have an ID');
+});
+
+test('198: createImageElement stores dimensions and data', () => {
+  const el = createImageElement(10, 20, 640, 480, 'data:image/png;base64,ABC');
+  assert.strictEqual(el.type, 'image');
+  assert.strictEqual(el.x, 10);
+  assert.strictEqual(el.y, 20);
+  assert.strictEqual(el.width, 640);
+  assert.strictEqual(el.height, 480);
+  assert.strictEqual(el.imageData, 'data:image/png;base64,ABC');
+});
+
+test('199: createTextElement generates unique IDs', () => {
+  const ids = new Set();
+  for (let i = 0; i < 20; i++) {
+    ids.add(createTextElement(0, 0).id);
+  }
+  assert.strictEqual(ids.size, 20);
+});
+
+// ============================================================
+// getAnchorPoints and getBestAnchors
+// ============================================================
+
+test('200: getAnchorPoints returns 4 anchor points for rect', () => {
+  const el = createElement('rect', { x: 0, y: 0, width: 100, height: 50 });
+  const anchors = getAnchorPoints(el);
+  assert.strictEqual(anchors.length, 4);
+
+  // Top center
+  assert.strictEqual(anchors[0].x, 50);
+  assert.strictEqual(anchors[0].y, 0);
+  assert.strictEqual(anchors[0].side, 'top');
+
+  // Bottom center
+  assert.strictEqual(anchors[1].x, 50);
+  assert.strictEqual(anchors[1].y, 50);
+  assert.strictEqual(anchors[1].side, 'bottom');
+
+  // Left center
+  assert.strictEqual(anchors[2].x, 0);
+  assert.strictEqual(anchors[2].y, 25);
+  assert.strictEqual(anchors[2].side, 'left');
+
+  // Right center
+  assert.strictEqual(anchors[3].x, 100);
+  assert.strictEqual(anchors[3].y, 25);
+  assert.strictEqual(anchors[3].side, 'right');
+});
+
+test('201: getAnchorPoints for sticky', () => {
+  const el = createSticky(100, 200);
+  const anchors = getAnchorPoints(el);
+  assert.strictEqual(anchors.length, 4);
+  // Sticky at (100,200) with width/height=200
+  assert.strictEqual(anchors[0].x, 200); // top center: x + w/2
+  assert.strictEqual(anchors[0].y, 200); // top: y
+  assert.strictEqual(anchors[3].x, 300); // right: x + w
+  assert.strictEqual(anchors[3].y, 300); // right center: y + h/2
+});
+
+test('202: getBestAnchors finds closest pair', () => {
+  // Two rects side by side (right of A -> left of B is closest)
+  const a = createElement('rect', { x: 0, y: 0, width: 100, height: 100 });
+  const b = createElement('rect', { x: 200, y: 0, width: 100, height: 100 });
+  const best = getBestAnchors(a, b);
+  assert.ok(best);
+  assert.strictEqual(best.src.side, 'right');
+  assert.strictEqual(best.tgt.side, 'left');
+});
+
+test('203: getBestAnchors for vertically stacked elements', () => {
+  const top = createElement('rect', { x: 0, y: 0, width: 100, height: 100 });
+  const bottom = createElement('rect', { x: 0, y: 300, width: 100, height: 100 });
+  const best = getBestAnchors(top, bottom);
+  assert.ok(best);
+  assert.strictEqual(best.src.side, 'bottom');
+  assert.strictEqual(best.tgt.side, 'top');
+});
+
+test('204: getBestAnchors for diagonal elements', () => {
+  const a = createElement('rect', { x: 0, y: 0, width: 50, height: 50 });
+  const b = createElement('rect', { x: 200, y: 200, width: 50, height: 50 });
+  const best = getBestAnchors(a, b);
+  assert.ok(best);
+  // Diagonal: right+bottom of A closest to left+top of B
+  // The actual closest pair depends on distances
+  assert.ok(['right', 'bottom'].includes(best.src.side));
+  assert.ok(['left', 'top'].includes(best.tgt.side));
+});
+
+// ============================================================
+// isInsideEnvelope
+// ============================================================
+
+test('205: isInsideEnvelope - element inside', () => {
+  const envelope = { type: 'envelope', x: 0, y: 0, width: 400, height: 300 };
+  const inside = createElement('rect', { x: 100, y: 100, width: 50, height: 50 });
+  assert.ok(isInsideEnvelope(inside, envelope));
+});
+
+test('206: isInsideEnvelope - element in header area (above body)', () => {
+  const envelope = { type: 'envelope', x: 0, y: 0, width: 400, height: 300 };
+  // Element centered at y=18, which is in the 36px header zone
+  const inHeader = createElement('rect', { x: 100, y: 0, width: 50, height: 30 });
+  assert.ok(!isInsideEnvelope(inHeader, envelope), 'Header zone should not count');
+});
+
+test('207: isInsideEnvelope - element outside', () => {
+  const envelope = { type: 'envelope', x: 0, y: 0, width: 400, height: 300 };
+  const outside = createElement('rect', { x: 500, y: 500, width: 50, height: 50 });
+  assert.ok(!isInsideEnvelope(outside, envelope));
+});
+
+// ============================================================
+// getResizeHandle
+// ============================================================
+
+test('208: getResizeHandle detects corner handles', () => {
+  const el = createElement('rect', { x: 100, y: 100, width: 200, height: 150 });
+
+  assert.strictEqual(getResizeHandle(el, 100, 100), 'nw');
+  assert.strictEqual(getResizeHandle(el, 300, 100), 'ne');
+  assert.strictEqual(getResizeHandle(el, 100, 250), 'sw');
+  assert.strictEqual(getResizeHandle(el, 300, 250), 'se');
+});
+
+test('209: getResizeHandle detects edge handles', () => {
+  const el = createElement('rect', { x: 100, y: 100, width: 200, height: 150 });
+
+  assert.strictEqual(getResizeHandle(el, 200, 100), 'n');  // top center
+  assert.strictEqual(getResizeHandle(el, 200, 250), 's');  // bottom center
+  assert.strictEqual(getResizeHandle(el, 100, 175), 'w');  // left center
+  assert.strictEqual(getResizeHandle(el, 300, 175), 'e');  // right center
+});
+
+test('210: getResizeHandle returns null when outside handles', () => {
+  const el = createElement('rect', { x: 100, y: 100, width: 200, height: 150 });
+
+  assert.strictEqual(getResizeHandle(el, 200, 175), null);  // center of element
+  assert.strictEqual(getResizeHandle(el, 0, 0), null);       // far away
+  assert.strictEqual(getResizeHandle(el, 500, 500), null);   // far away
+});
+
+test('211: getResizeHandle custom handle size', () => {
+  const el = createElement('rect', { x: 0, y: 0, width: 100, height: 100 });
+
+  // With small handle size (2px), point at (5,5) should miss the nw handle at (0,0)
+  assert.strictEqual(getResizeHandle(el, 5, 5, 2), null);
+  // With default size (8px), it should hit
+  assert.strictEqual(getResizeHandle(el, 5, 5, 8), 'nw');
+  // With large size (20px), it should also hit
+  assert.strictEqual(getResizeHandle(el, 15, 15, 20), 'nw');
+});
+
+// ============================================================
+// createInverseOps
+// ============================================================
+
+test('212: createInverseOps for add creates delete', () => {
+  const elements = new Map();
+  const ops = [{ type: 'add', elementId: 'el1' }];
+  const inverse = createInverseOps(ops, elements);
+  assert.strictEqual(inverse.length, 1);
+  assert.strictEqual(inverse[0].type, 'delete');
+  assert.strictEqual(inverse[0].elementId, 'el1');
+});
+
+test('213: createInverseOps for delete creates add with clone', () => {
+  const elements = new Map();
+  const el = { id: 'el1', type: 'sticky', x: 10, y: 20, text: 'Hello' };
+  elements.set('el1', el);
+
+  const ops = [{ type: 'delete', elementId: 'el1' }];
+  const inverse = createInverseOps(ops, elements);
+  assert.strictEqual(inverse.length, 1);
+  assert.strictEqual(inverse[0].type, 'add');
+  assert.strictEqual(inverse[0].elementId, 'el1');
+  assert.deepStrictEqual(inverse[0].element, el);
+
+  // Verify it's a deep clone (not same reference)
+  assert.notStrictEqual(inverse[0].element, el);
+});
+
+test('214: createInverseOps for update captures old props', () => {
+  const elements = new Map();
+  const el = { id: 'el1', type: 'rect', x: 10, y: 20, fill: '#FF0000' };
+  elements.set('el1', el);
+
+  const ops = [{ type: 'update', elementId: 'el1', props: { x: 50, fill: '#00FF00' } }];
+  const inverse = createInverseOps(ops, elements);
+  assert.strictEqual(inverse.length, 1);
+  assert.strictEqual(inverse[0].type, 'update');
+  assert.strictEqual(inverse[0].props.x, 10);  // old value
+  assert.strictEqual(inverse[0].props.fill, '#FF0000');  // old value
+});
+
+test('215: createInverseOps reverses operation order', () => {
+  const elements = new Map();
+  const el1 = { id: 'a', type: 'rect', x: 0, y: 0 };
+  const el2 = { id: 'b', type: 'rect', x: 100, y: 100 };
+  elements.set('a', el1);
+  elements.set('b', el2);
+
+  const ops = [
+    { type: 'delete', elementId: 'a' },
+    { type: 'delete', elementId: 'b' },
+  ];
+  const inverse = createInverseOps(ops, elements);
+  assert.strictEqual(inverse.length, 2);
+  // Reversed order: b first, then a
+  assert.strictEqual(inverse[0].elementId, 'b');
+  assert.strictEqual(inverse[1].elementId, 'a');
+});
+
+test('216: createInverseOps skips delete of non-existent element', () => {
+  const elements = new Map();
+  const ops = [{ type: 'delete', elementId: 'nonexistent' }];
+  const inverse = createInverseOps(ops, elements);
+  assert.strictEqual(inverse.length, 0);
+});
+
+test('217: createInverseOps handles mixed operations', () => {
+  const elements = new Map();
+  const el = { id: 'el1', type: 'sticky', x: 0, y: 0, text: '' };
+  elements.set('el1', el);
+
+  const ops = [
+    { type: 'add', elementId: 'el2' },
+    { type: 'update', elementId: 'el1', props: { x: 50 } },
+    { type: 'delete', elementId: 'el1' },
+  ];
+  const inverse = createInverseOps(ops, elements);
+  assert.strictEqual(inverse.length, 3);
+  // Reversed: delete inverse (add) first, then update inverse, then add inverse (delete)
+  assert.strictEqual(inverse[0].type, 'add');
+  assert.strictEqual(inverse[0].elementId, 'el1');
+  assert.strictEqual(inverse[1].type, 'update');
+  assert.strictEqual(inverse[1].props.x, 0);
+  assert.strictEqual(inverse[2].type, 'delete');
+  assert.strictEqual(inverse[2].elementId, 'el2');
+});
+
+// ============================================================
+// Hit testing advanced cases
+// ============================================================
+
+test('218: hitTestElement diamond edge cases', () => {
+  const diamond = createElement('diamond', { x: 0, y: 0, width: 100, height: 100 });
+  // Center should hit
+  assert.ok(hitTestElement(diamond, 50, 50));
+  // Edge midpoints should hit (on the diamond boundary)
+  assert.ok(hitTestElement(diamond, 50, 0));   // top vertex
+  assert.ok(hitTestElement(diamond, 0, 50));   // left vertex
+  assert.ok(hitTestElement(diamond, 100, 50)); // right vertex
+  assert.ok(hitTestElement(diamond, 50, 100)); // bottom vertex
+  // Corners should not hit (outside the diamond)
+  assert.ok(!hitTestElement(diamond, 1, 1));
+  assert.ok(!hitTestElement(diamond, 99, 1));
+  assert.ok(!hitTestElement(diamond, 1, 99));
+  assert.ok(!hitTestElement(diamond, 99, 99));
+});
+
+test('219: hitTestElement triangle edge cases', () => {
+  const triangle = createElement('triangle', { x: 0, y: 0, width: 100, height: 100 });
+  // Center should hit
+  assert.ok(hitTestElement(triangle, 50, 60));
+  // Bottom-left corner should hit
+  assert.ok(hitTestElement(triangle, 1, 99));
+  // Bottom-right corner should hit
+  assert.ok(hitTestElement(triangle, 99, 99));
+  // Top-left corner should NOT hit (outside triangle)
+  assert.ok(!hitTestElement(triangle, 1, 1));
+  // Top-right corner should NOT hit
+  assert.ok(!hitTestElement(triangle, 99, 1));
+});
+
+test('220: hitTestElement connector with orthogonal line type', () => {
+  const conn = createElement('connector', { x: 0, y: 0, x2: 200, y2: 200 });
+  conn.lineType = 'orthogonal';
+  // hitTestElement treats connector as straight segment regardless of lineType
+  // Point near the diagonal line from (0,0) to (200,200)
+  assert.ok(hitTestElement(conn, 100, 100));
+  // Far from the diagonal line
+  assert.ok(!hitTestElement(conn, 0, 200));
+});
+
+test('221: hitTestElement frame detects border only', () => {
+  const frame = createElement('frame', { x: 100, y: 100, width: 300, height: 300 });
+  // Border should hit
+  assert.ok(hitTestElement(frame, 100, 250));  // left border
+  assert.ok(hitTestElement(frame, 400, 250));  // right border
+  // Interior should NOT hit (frame is transparent inside)
+  assert.ok(!hitTestElement(frame, 250, 250));
+  // Title area should hit
+  assert.ok(hitTestElement(frame, 250, 90));
+});
+
+test('222: hitTestElement text with padding', () => {
+  const text = createElement('text', { x: 50, y: 50, width: 100, height: 30 });
+  // Inside with padding
+  assert.ok(hitTestElement(text, 100, 65));
+  // Just outside padding
+  assert.ok(!hitTestElement(text, 200, 200));
+});
+
+// ============================================================
+// getElementBounds edge cases
+// ============================================================
+
+test('223: getElementBounds for freehand with points', () => {
+  const freehand = createElement('freehand', {
+    x: 0, y: 0,
+    points: [{ x: 10, y: 20 }, { x: 50, y: 80 }, { x: 30, y: 10 }]
+  });
+  const bounds = getElementBounds(freehand);
+  assert.strictEqual(bounds.x, 10);  // min x
+  assert.strictEqual(bounds.y, 10);  // min y
+  assert.strictEqual(bounds.w, 40);  // max x - min x
+  assert.strictEqual(bounds.h, 70);  // max y - min y
+});
+
+test('224: getElementBounds for connector', () => {
+  const conn = createConnector('a', 'b');
+  conn.x = 10;
+  conn.y = 20;
+  conn.x2 = 100;
+  conn.y2 = 80;
+  const bounds = getElementBounds(conn);
+  assert.strictEqual(bounds.x, 10);
+  assert.strictEqual(bounds.y, 20);
+  assert.strictEqual(bounds.w, 90);
+  assert.strictEqual(bounds.h, 60);
+});
+
+test('225: getElementBounds for line', () => {
+  const line = createElement('line', { x: 50, y: 30, x2: 200, y2: 150 });
+  const bounds = getElementBounds(line);
+  assert.strictEqual(bounds.x, 50);
+  assert.strictEqual(bounds.y, 30);
+  assert.strictEqual(bounds.w, 150);
+  assert.strictEqual(bounds.h, 120);
+});
+
+test('226: getElementBounds for all rect-like types', () => {
+  const types = ['rect', 'sticky', 'text', 'frame', 'image', 'envelope', 'diamond', 'triangle', 'card', 'list'];
+  for (const type of types) {
+    const el = createElement(type, { x: 10, y: 20, width: 100, height: 50 });
+    const bounds = getElementBounds(el);
+    assert.strictEqual(bounds.x, 10, `${type} bounds.x`);
+    assert.strictEqual(bounds.y, 20, `${type} bounds.y`);
+    assert.strictEqual(bounds.w, 100, `${type} bounds.w`);
+    assert.strictEqual(bounds.h, 50, `${type} bounds.h`);
+  }
+});
+
+// ============================================================
+// Element factory edge cases
+// ============================================================
+
+test('227: createElement with zero dimensions', () => {
+  const el = createElement('rect', { x: 0, y: 0, width: 0, height: 0 });
+  assert.strictEqual(el.width, 0);
+  assert.strictEqual(el.height, 0);
+  assert.strictEqual(el.type, 'rect');
+});
+
+test('228: createElement with negative coordinates', () => {
+  const el = createElement('rect', { x: -100, y: -200, width: 50, height: 50 });
+  assert.strictEqual(el.x, -100);
+  assert.strictEqual(el.y, -200);
+});
+
+test('229: createSticky default color is set', () => {
+  const el = createSticky(0, 0);
+  assert.ok(el.fill, 'Sticky should have a fill color');
+  assert.ok(typeof el.fill === 'string');
+});
+
+test('230: createFrame default title', () => {
+  const f1 = createFrame(0, 0, 200, 200);
+  assert.strictEqual(f1.text, 'Zone');
+  const f2 = createFrame(0, 0, 200, 200, 'Custom Title');
+  assert.strictEqual(f2.text, 'Custom Title');
+});
+
+test('231: createConnector default properties', () => {
+  const conn = createConnector('src', 'tgt');
+  assert.strictEqual(conn.sourceId, 'src');
+  assert.strictEqual(conn.targetId, 'tgt');
+  assert.strictEqual(conn.type, 'connector');
+  assert.ok(conn.id);
+});
+
+test('232: createMindmapNode with parent', () => {
+  const node = createMindmapNode(50, 50, 'Child', 'parent123');
+  assert.strictEqual(node.mindmapParent, 'parent123');
+  assert.strictEqual(node.text, 'Child');
+  assert.ok(Array.isArray(node.mindmapChildren));
+});
+
+test('233: createEmbed with URL', () => {
+  const embed = createEmbed(10, 20, 'https://youtube.com/watch?v=123');
+  assert.strictEqual(embed.embedUrl, 'https://youtube.com/watch?v=123');
+  assert.strictEqual(embed.type, 'embed');
+  assert.strictEqual(embed.x, 10);
+  assert.strictEqual(embed.y, 20);
+});
+
+// ============================================================
+// isLightColor edge cases
+// ============================================================
+
+test('234: isLightColor for various colors', () => {
+  assert.ok(isLightColor('#FFFFFF'));     // white
+  assert.ok(isLightColor('#FFD966'));     // yellow
+  assert.ok(isLightColor('#FFFACD'));     // lemon
+  assert.ok(!isLightColor('#000000'));    // black
+  assert.ok(!isLightColor('#1a1a2e'));    // dark navy
+  assert.ok(!isLightColor('#333333'));    // dark gray
+});
+
+test('235: isLightColor boundary at threshold', () => {
+  // Threshold is luminance > 186
+  // #808080 = rgb(128,128,128) luminance = 128 (dark)
+  assert.ok(!isLightColor('#808080'));
+  // #C0C0C0 = rgb(192,192,192) luminance = 192 (light)
+  assert.ok(isLightColor('#C0C0C0'));
+});
+
+// ============================================================
+// richTextToPlain and parseRichText edge cases
+// ============================================================
+
+test('236: richTextToPlain handles nested tags', () => {
+  assert.strictEqual(richTextToPlain('<b><i>bold italic</i></b>'), 'bold italic');
+  assert.strictEqual(richTextToPlain('<div><p>paragraph</p></div>'), 'paragraph');
+});
+
+test('237: richTextToPlain handles empty and null input', () => {
+  assert.strictEqual(richTextToPlain(''), '');
+  assert.strictEqual(richTextToPlain('no tags'), 'no tags');
+});
+
+test('238: parseRichText extracts all segment types', () => {
+  const result = parseRichText('normal <b>bold</b> <i>italic</i> <b><i>both</i></b>');
+  assert.ok(result.length >= 4);
+  const boldSeg = result.find(s => s.bold && !s.italic);
+  const italicSeg = result.find(s => s.italic && !s.bold);
+  assert.ok(boldSeg);
+  assert.ok(italicSeg);
+});
+
+test('239: parseRichText handles plain text', () => {
+  const result = parseRichText('just plain text');
+  assert.ok(result.length >= 1);
+  assert.strictEqual(result[0].text, 'just plain text');
+  assert.ok(!result[0].bold);
+  assert.ok(!result[0].italic);
+});
+
+// ============================================================
+// History advanced scenarios
+// ============================================================
+
+test('240: History push with complex multi-op entries', () => {
+  const h = new History();
+  // Simulate moving multiple elements at once
+  const ops = [
+    { type: 'update', elementId: 'a', props: { x: 100, y: 100 } },
+    { type: 'update', elementId: 'b', props: { x: 200, y: 200 } },
+    { type: 'update', elementId: 'c', props: { x: 300, y: 300 } },
+  ];
+  const inverseOps = [
+    { type: 'update', elementId: 'a', props: { x: 0, y: 0 } },
+    { type: 'update', elementId: 'b', props: { x: 0, y: 0 } },
+    { type: 'update', elementId: 'c', props: { x: 0, y: 0 } },
+  ];
+  h.push(ops, inverseOps);
+  const undone = h.undo();
+  assert.strictEqual(undone.length, 3, 'Undo should return all 3 inverse ops');
+});
+
+test('241: History alternating undo/redo', () => {
+  const h = new History();
+  h.push([{ type: 'add', id: 1 }], [{ type: 'delete', id: 1 }]);
+  h.push([{ type: 'add', id: 2 }], [{ type: 'delete', id: 2 }]);
+
+  h.undo(); // undo add 2
+  h.redo(); // redo add 2
+  h.undo(); // undo add 2 again
+  h.undo(); // undo add 1
+
+  assert.strictEqual(h.undoStack.length, 0);
+  assert.strictEqual(h.redoStack.length, 2);
+});
+
+test('242: History stress test - many operations', () => {
+  const h = new History();
+  for (let i = 0; i < 200; i++) {
+    h.push([{ type: 'add', id: i }], [{ type: 'delete', id: i }]);
+  }
+  // History max size should cap it
+  assert.ok(h.undoStack.length <= 200);
+
+  // Undo all
+  let undoCount = 0;
+  while (h.canUndo()) {
+    h.undo();
+    undoCount++;
+  }
+  assert.ok(undoCount > 0);
+  assert.strictEqual(h.undoStack.length, 0);
+});
+
+// ============================================================
+// Complex integration scenarios
+// ============================================================
+
+test('243: Full element lifecycle with inverse ops', () => {
+  const elements = new Map();
+  const h = new History();
+
+  // Create element
+  const el = createSticky(100, 200);
+  elements.set(el.id, el);
+  const addOps = [{ type: 'add', elementId: el.id, element: el }];
+  const addInverse = createInverseOps(addOps, elements);
+  h.push(addOps, addInverse);
+
+  // Move element
+  const moveOps = [{ type: 'update', elementId: el.id, props: { x: 300, y: 400 } }];
+  const moveInverse = createInverseOps(moveOps, elements);
+  assert.strictEqual(moveInverse[0].props.x, 100);
+  assert.strictEqual(moveInverse[0].props.y, 200);
+
+  // Apply move
+  Object.assign(el, moveOps[0].props);
+  h.push(moveOps, moveInverse);
+
+  assert.strictEqual(el.x, 300);
+  assert.strictEqual(el.y, 400);
+
+  // Undo move
+  const undoMove = h.undo();
+  Object.assign(el, undoMove[0].props);
+  assert.strictEqual(el.x, 100);
+  assert.strictEqual(el.y, 200);
+});
+
+test('244: Connector between two elements uses anchor points', () => {
+  const rectA = createElement('rect', { x: 0, y: 0, width: 100, height: 100 });
+  const rectB = createElement('rect', { x: 300, y: 0, width: 100, height: 100 });
+
+  const best = getBestAnchors(rectA, rectB);
+  const conn = createConnector(rectA.id, rectB.id);
+  conn.x = best.src.x;
+  conn.y = best.src.y;
+  conn.x2 = best.tgt.x;
+  conn.y2 = best.tgt.y;
+
+  assert.strictEqual(conn.x, 100);   // right edge of A
+  assert.strictEqual(conn.y, 50);    // center of A
+  assert.strictEqual(conn.x2, 300);  // left edge of B
+  assert.strictEqual(conn.y2, 50);   // center of B
+});
+
+test('245: Multiple elements with different z-indices sort correctly', () => {
+  const elements = new Map();
+  const el1 = createElement('rect', { x: 0, y: 0, width: 50, height: 50, zIndex: 10 });
+  const el2 = createElement('rect', { x: 0, y: 0, width: 50, height: 50, zIndex: 1 });
+  const el3 = createElement('rect', { x: 0, y: 0, width: 50, height: 50, zIndex: 5 });
+  elements.set(el1.id, el1);
+  elements.set(el2.id, el2);
+  elements.set(el3.id, el3);
+
+  const sorted = Array.from(elements.values()).sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+  assert.strictEqual(sorted[0].zIndex, 1);
+  assert.strictEqual(sorted[1].zIndex, 5);
+  assert.strictEqual(sorted[2].zIndex, 10);
+});
+
+test('246: Marquee selection with partial overlap', () => {
+  const box = { x: 50, y: 50, w: 200, h: 200 };
+  const selected = [];
+  const testElements = [
+    createElement('rect', { x: 100, y: 100, width: 50, height: 50 }),  // fully inside
+    createElement('rect', { x: 0, y: 0, width: 60, height: 60 }),      // partially overlapping
+    createElement('rect', { x: 300, y: 300, width: 50, height: 50 }),  // fully outside
+  ];
+
+  for (const el of testElements) {
+    const bounds = getElementBounds(el);
+    // Full enclosure check
+    if (bounds.x >= box.x && bounds.y >= box.y &&
+        bounds.x + bounds.w <= box.x + box.w &&
+        bounds.y + bounds.h <= box.y + box.h) {
+      selected.push(el);
+    }
+  }
+  assert.strictEqual(selected.length, 1); // Only the fully enclosed one
+});
+
+test('247: Marquee selection with partial overlap mode', () => {
+  const box = { x: 50, y: 50, w: 200, h: 200 };
+  const selected = [];
+  const testElements = [
+    createElement('rect', { x: 100, y: 100, width: 50, height: 50 }),  // fully inside
+    createElement('rect', { x: 0, y: 0, width: 60, height: 60 }),      // partially overlapping
+    createElement('rect', { x: 300, y: 300, width: 50, height: 50 }),  // fully outside
+  ];
+
+  for (const el of testElements) {
+    const bounds = getElementBounds(el);
+    // Partial overlap check
+    if (bounds.x + bounds.w > box.x && bounds.x < box.x + box.w &&
+        bounds.y + bounds.h > box.y && bounds.y < box.y + box.h) {
+      selected.push(el);
+    }
+  }
+  assert.strictEqual(selected.length, 2); // Fully inside + partial overlap
 });
 
 // ============================================================
