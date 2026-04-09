@@ -396,7 +396,7 @@ class UI {
     this.exportJSON();
     setTimeout(() => {
       this.exportPNG();
-      this.app.showToast('Export complet (JSON + PNG) termine!', 'success');
+      this.app.showToast('Export complet (JSON + PNG) terminé !', 'success');
     }, 500);
   }
 
@@ -424,7 +424,7 @@ class UI {
     link.href = URL.createObjectURL(blob);
     link.click();
     URL.revokeObjectURL(link.href);
-    this.app.showToast('Export JSON termine!', 'success');
+    this.app.showToast('Export JSON terminé !', 'success');
   }
 
   initJSONImport() {
@@ -567,7 +567,7 @@ class UI {
     }
 
     this.app.renderer.markDirty();
-    this.app.showToast(`${count} elements importes !`);
+    this.app.showToast(`${count} éléments importés !`);
   }
 
   importDraftIO(data) {
@@ -610,7 +610,7 @@ class UI {
         el.height = item.height || 180;
         el.cardTitle = item.cardTitle || item.title || item.text || '';
         el.cardDescription = item.cardDescription || item.description || item.content || '';
-        el.cardStatus = item.status || item.cardStatus || 'A faire';
+        el.cardStatus = item.status || item.cardStatus || 'À faire';
         el.cardPriority = item.priority || item.cardPriority || 'Moyenne';
         el.fill = item.color || item.fill || '#4a9eff';
       }
@@ -657,7 +657,7 @@ class UI {
     }
 
     this.app.renderer.markDirty();
-    this.app.showToast(`${elements.length} elements importes depuis Draft.io !`);
+    this.app.showToast(`${elements.length} éléments importés depuis Draft.io !`);
   }
 
   importGenericBoard(data) {
@@ -739,7 +739,7 @@ class UI {
     this.app.history.push(ops, inverseOps);
     this.app.sync.sendOps(ops);
     this.app.renderer.markDirty();
-    this.app.showToast(`${ops.length} elements importes depuis Markdown`);
+    this.app.showToast(`${ops.length} éléments importés depuis Markdown`);
   }
 
   // ========================= CSV IMPORT =========================
@@ -889,7 +889,7 @@ class UI {
       if (dbType === 'card') {
         el.cardTitle = text;
         el.cardDescription = getVal(row, 'text') || '';
-        el.cardStatus = getVal(row, 'status') || 'A faire';
+        el.cardStatus = getVal(row, 'status') || 'À faire';
         el.cardPriority = getVal(row, 'priority') || 'Moyenne';
         el.cardAssignee = getVal(row, 'assignee') || '';
         el.fill = color || '#4a9eff';
@@ -936,7 +936,7 @@ class UI {
     }
 
     this.app.renderer.markDirty();
-    this.app.showToast(`${elements.length} elements importes depuis CSV !`);
+    this.app.showToast(`${elements.length} éléments importés depuis CSV !`);
   }
 
   parseCSVRows(text) {

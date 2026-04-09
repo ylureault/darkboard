@@ -167,11 +167,11 @@ class DarkBoardApp {
       // #89 - Show count and types in selection info
       if (count === 1) {
         const selEl = this.renderer.elements.get([...this.renderer.selectedIds][0]);
-        const typeLabels = { sticky: 'post-it', text: 'texte', rect: 'rectangle', circle: 'cercle', line: 'ligne', arrow: 'fleche', frame: 'cadre', envelope: 'enveloppe', connector: 'connecteur', diamond: 'losange', triangle: 'triangle', card: 'carte', list: 'liste', image: 'image', freehand: 'dessin', mindmap: 'mindmap', embed: 'embed' };
+        const typeLabels = { sticky: 'post-it', text: 'texte', rect: 'rectangle', circle: 'cercle', line: 'ligne', arrow: 'flèche', frame: 'cadre', envelope: 'enveloppe', connector: 'connecteur', diamond: 'losange', triangle: 'triangle', card: 'carte', list: 'liste', image: 'image', freehand: 'dessin', mindmap: 'mindmap', embed: 'embed' };
         el.textContent = selEl ? (typeLabels[selEl.type] || selEl.type) : '1 objet';
       } else {
         const typeCounts = {};
-        const typeLabels = { sticky: 'post-it', rect: 'rectangle', circle: 'cercle', text: 'texte', card: 'carte', line: 'ligne', arrow: 'fleche', connector: 'connecteur', frame: 'cadre', image: 'image', list: 'liste' };
+        const typeLabels = { sticky: 'post-it', rect: 'rectangle', circle: 'cercle', text: 'texte', card: 'carte', line: 'ligne', arrow: 'flèche', connector: 'connecteur', frame: 'cadre', image: 'image', list: 'liste' };
         for (const id of this.renderer.selectedIds) {
           const selEl = this.renderer.elements.get(id);
           if (selEl) { typeCounts[selEl.type] = (typeCounts[selEl.type] || 0) + 1; }
@@ -917,8 +917,8 @@ class DarkBoardApp {
     const adds = ops.filter(o => o.type === 'add');
     const updates = ops.filter(o => o.type === 'update');
     if (deletes.length > 0) return `suppression de ${deletes.length} élément${deletes.length > 1 ? 's' : ''}`;
-    if (adds.length > 0) return `ajout de ${adds.length} element${adds.length > 1 ? 's' : ''}`;
-    if (updates.length > 0) return `modification de ${updates.length} element${updates.length > 1 ? 's' : ''}`;
+    if (adds.length > 0) return `ajout de ${adds.length} élément${adds.length > 1 ? 's' : ''}`;
+    if (updates.length > 0) return `modification de ${updates.length} élément${updates.length > 1 ? 's' : ''}`;
     return '';
   }
 
@@ -1840,7 +1840,7 @@ class DarkBoardApp {
       <div class="search-row">
         <input type="text" class="search-input" placeholder="Rechercher..." />
         <span class="search-count">0/0</span>
-        <button class="search-btn" id="searchPrev" title="Precedent">▲</button>
+        <button class="search-btn" id="searchPrev" title="Précédent">▲</button>
         <button class="search-btn" id="searchNext" title="Suivant">▼</button>
         <button class="search-close" title="Fermer">✕</button>
       </div>
@@ -2250,18 +2250,18 @@ class DarkBoardApp {
     let html = '';
     if (existing) {
       html += `<div style="margin-bottom:12px">
-        <div style="font-weight:bold;margin-bottom:4px">${existing.author} <span style="color:var(--text-muted);font-weight:normal;font-size:11px">${new Date(existing.timestamp).toLocaleString('fr-FR')}</span></div>
-        <div style="background:var(--btn);padding:8px 12px;border-radius:6px;margin-bottom:8px">${existing.text}</div>`;
+        <div style="font-weight:bold;margin-bottom:4px">${this._escapeHtml(existing.author)} <span style="color:var(--text-muted);font-weight:normal;font-size:11px">${new Date(existing.timestamp).toLocaleString('fr-FR')}</span></div>
+        <div style="background:var(--btn);padding:8px 12px;border-radius:6px;margin-bottom:8px">${this._escapeHtml(existing.text)}</div>`;
       if (existing.replies) {
         for (const r of existing.replies) {
           html += `<div style="margin-left:16px;margin-bottom:4px">
-            <div style="font-size:12px;color:var(--text-muted)">${r.author} — ${new Date(r.timestamp).toLocaleString('fr-FR')}</div>
-            <div style="background:var(--btn);padding:6px 10px;border-radius:6px;font-size:13px">${r.text}</div>
+            <div style="font-size:12px;color:var(--text-muted)">${this._escapeHtml(r.author)} — ${new Date(r.timestamp).toLocaleString('fr-FR')}</div>
+            <div style="background:var(--btn);padding:6px 10px;border-radius:6px;font-size:13px">${this._escapeHtml(r.text)}</div>
           </div>`;
         }
       }
       html += `</div>`;
-      html += `<textarea class="comment-input" placeholder="Repondre..." style="width:100%;height:60px;background:var(--btn);border:1px solid var(--panel-border);border-radius:6px;color:var(--text);padding:8px;resize:vertical;font-size:13px"></textarea>`;
+      html += `<textarea class="comment-input" placeholder="Répondre..." style="width:100%;height:60px;background:var(--btn);border:1px solid var(--panel-border);border-radius:6px;color:var(--text);padding:8px;resize:vertical;font-size:13px"></textarea>`;
     } else {
       html += `<p style="margin-bottom:8px;font-weight:bold">Ajouter un commentaire</p>`;
       html += `<textarea class="comment-input" placeholder="Votre commentaire..." style="width:100%;height:80px;background:var(--btn);border:1px solid var(--panel-border);border-radius:6px;color:var(--text);padding:8px;resize:vertical;font-size:13px"></textarea>`;
@@ -2273,14 +2273,14 @@ class DarkBoardApp {
     actions.style.marginTop = '12px';
 
     const submitBtn = document.createElement('button');
-    submitBtn.textContent = existing ? 'Repondre' : 'Ajouter';
+    submitBtn.textContent = existing ? 'Répondre' : 'Ajouter';
     submitBtn.style.background = 'var(--accent)';
     submitBtn.style.color = 'white';
     submitBtn.style.border = 'none';
 
     if (existing) {
       const resolveBtn = document.createElement('button');
-      resolveBtn.textContent = existing.resolved ? 'Reouvrir' : 'Resoudre';
+      resolveBtn.textContent = existing.resolved ? 'Réouvrir' : 'Résoudre';
       resolveBtn.addEventListener('click', () => {
         existing.resolved = !existing.resolved;
         this.sync.sendCommentUpdate(existing.id, { resolved: existing.resolved });
@@ -2359,8 +2359,8 @@ class DarkBoardApp {
 
     // Gather target elements (multi-select support)
     const targets = [];
-    if (this.selectedElements.size > 1) {
-      for (const id of this.selectedElements) {
+    if (this.renderer.selectedIds.size > 1) {
+      for (const id of this.renderer.selectedIds) {
         const e = this.renderer.elements.get(id);
         if (e && e.type === 'sticky') targets.push(e);
       }
@@ -2376,8 +2376,8 @@ class DarkBoardApp {
       this.tagRegistry = [
         { label: 'Urgent', color: '#FF6B6B' },
         { label: 'Important', color: '#F4A460' },
-        { label: 'Idee', color: '#FFD966' },
-        { label: 'A faire', color: '#4a9eff' },
+        { label: 'Idée', color: '#FFD966' },
+        { label: 'À faire', color: '#4a9eff' },
         { label: 'En cours', color: '#45B7D1' },
         { label: 'Fait', color: '#4ECDC4' },
         { label: 'Question', color: '#DDA0DD' },
@@ -2578,12 +2578,12 @@ class DarkBoardApp {
         <label>Statut</label>
         <select class="card-field" data-field="cardStatus">
           <option value="">-- Aucun --</option>
-          <option value="todo" ${el.cardStatus === 'todo' ? 'selected' : ''}>A faire</option>
+          <option value="todo" ${el.cardStatus === 'todo' ? 'selected' : ''}>À faire</option>
           <option value="in-progress" ${el.cardStatus === 'in-progress' ? 'selected' : ''}>En cours</option>
           <option value="review" ${el.cardStatus === 'review' ? 'selected' : ''}>En review</option>
-          <option value="done" ${el.cardStatus === 'done' ? 'selected' : ''}>Termine</option>
+          <option value="done" ${el.cardStatus === 'done' ? 'selected' : ''}>Terminé</option>
         </select>
-        <label>Priorite</label>
+        <label>Priorité</label>
         <select class="card-field" data-field="cardPriority">
           <option value="">-- Aucune --</option>
           <option value="high" ${el.cardPriority === 'high' ? 'selected' : ''}>Haute</option>
@@ -3100,19 +3100,19 @@ class DarkBoardApp {
         <div class="context-menu-item" data-action="copy">Copier <span class="shortcut-hint">Ctrl+C</span></div>
         <div class="context-menu-item" data-action="duplicate">Dupliquer <span class="shortcut-hint">Ctrl+D</span></div>
         <div class="context-menu-separator"></div>
-        <div class="context-menu-item" data-action="${isLocked ? 'unlock' : 'lock'}">${isLocked ? '🔓 Deverrouiller' : '🔒 Verrouiller'} <span class="shortcut-hint">Ctrl+Shift+L</span></div>
+        <div class="context-menu-item" data-action="${isLocked ? 'unlock' : 'lock'}">${isLocked ? '🔓 Déverrouiller' : '🔒 Verrouiller'} <span class="shortcut-hint">Ctrl+Shift+L</span></div>
         ${multiSel ? `<div class="context-menu-item" data-action="group">📦 Grouper <span class="shortcut-hint">Ctrl+G</span></div>` : ''}
-        ${isGrouped ? `<div class="context-menu-item" data-action="ungroup">📤 Degrouper <span class="shortcut-hint">Ctrl+Shift+G</span></div>` : ''}
-        ${hit.rotation ? `<div class="context-menu-item" data-action="resetRotation">↺ Remettre a 0°</div>` : ''}
+        ${isGrouped ? `<div class="context-menu-item" data-action="ungroup">📤 Dégrouper <span class="shortcut-hint">Ctrl+Shift+G</span></div>` : ''}
+        ${hit.rotation ? `<div class="context-menu-item" data-action="resetRotation">↺ Remettre à 0°</div>` : ''}
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="front">Mettre devant</div>
-        <div class="context-menu-item" data-action="back">Mettre derriere</div>
+        <div class="context-menu-item" data-action="back">Mettre derrière</div>
         ${multiSel ? `
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="alignTop">↑ Aligner en haut</div>
         <div class="context-menu-item" data-action="alignBottom">↓ Aligner en bas</div>
-        <div class="context-menu-item" data-action="alignLeft">← Aligner a gauche</div>
-        <div class="context-menu-item" data-action="alignRight">→ Aligner a droite</div>
+        <div class="context-menu-item" data-action="alignLeft">← Aligner à gauche</div>
+        <div class="context-menu-item" data-action="alignRight">→ Aligner à droite</div>
         <div class="context-menu-item" data-action="alignCenterH">↔ Centrer horizontalement</div>
         <div class="context-menu-item" data-action="alignCenterV">↕ Centrer verticalement</div>
         <div class="context-menu-item" data-action="distributeH">⇔ Distribuer horizontalement</div>
@@ -3120,39 +3120,39 @@ class DarkBoardApp {
         ` : ''}
         ${hit.type === 'envelope' ? `
         <div class="context-menu-separator"></div>
-        <div class="context-menu-item" data-action="toggleCollapse">${hit.collapsed ? '▼ Etendre' : '▶ Reduire'}</div>
+        <div class="context-menu-item" data-action="toggleCollapse">${hit.collapsed ? '▼ Étendre' : '▶ Réduire'}</div>
         <div class="context-menu-item" data-action="deleteWithContent" style="color:var(--danger)">Supprimer avec le contenu</div>
         ` : ''}
-        ${hit.type === 'sticky' || (multiSel && Array.from(this.selectedElements).some(id => { const e = this.renderer.elements.get(id); return e && e.type === 'sticky'; })) ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editTags">🏷️ Tags</div>` : ''}
+        ${hit.type === 'sticky' || (multiSel && Array.from(this.renderer.selectedIds).some(id => { const e = this.renderer.elements.get(id); return e && e.type === 'sticky'; })) ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editTags">🏷️ Tags</div>` : ''}
         ${hit.type === 'card' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editCard">✏️ Modifier la carte</div>` : ''}
         ${hit.type === 'list' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editList">✏️ Modifier la liste</div>` : ''}
-        ${hit.type === 'mindmap' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="addMindmapChild">🧠 Ajouter un noeud enfant</div><div class="context-menu-item" data-action="layoutMindmap">📐 Re-organiser</div>` : ''}
+        ${hit.type === 'mindmap' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="addMindmapChild">🧠 Ajouter un nœud enfant</div><div class="context-menu-item" data-action="layoutMindmap">📐 Réorganiser</div>` : ''}
         ${hit.type === 'embed' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="openEmbed">▶️ Ouvrir l'embed</div><div class="context-menu-item" data-action="editEmbedUrl">🔗 Modifier l'URL</div>` : ''}
         ${hit.type === 'connector' ? `
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="connStraight">${hit.lineType !== 'orthogonal' && hit.lineType !== 'curve' ? '✓ ' : ''}Ligne droite</div>
         <div class="context-menu-item" data-action="connOrthogonal">${hit.lineType === 'orthogonal' ? '✓ ' : ''}Ligne orthogonale</div>
-        <div class="context-menu-item" data-action="connCurved">${hit.lineType === 'curve' ? '✓ ' : ''}Ligne courbee</div>
+        <div class="context-menu-item" data-action="connCurved">${hit.lineType === 'curve' ? '✓ ' : ''}Ligne courbée</div>
         ` : ''}
         <div class="context-menu-separator"></div>
-        <div class="context-menu-item" data-action="react">😀 Reagir</div>
+        <div class="context-menu-item" data-action="react">😀 Réagir</div>
         <div class="context-menu-item" data-action="comment">💬 Commenter</div>
         <div class="context-menu-separator"></div>
-        <div class="context-menu-item" data-action="selectSimilar">🔍 Selectionner les similaires</div>
+        <div class="context-menu-item" data-action="selectSimilar">🔍 Sélectionner les similaires</div>
         ${!multiSel ? `<div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="convertTo">🔄 Convertir en...</div>
-        <div class="context-menu-item" data-action="linkElement">🔗 Lier a un element</div>` : ''}
+        <div class="context-menu-item" data-action="linkElement">🔗 Lier à un élément</div>` : ''}
         ${!multiSel && hit.type === 'sticky' ? `
         <div class="context-menu-item" data-action="assignUser">👤 Assigner</div>
-        <div class="context-menu-item" data-action="setDueDate">📅 Echeance</div>
-        <div class="context-menu-item" data-action="setPriority">⚡ Priorite</div>
+        <div class="context-menu-item" data-action="setDueDate">📅 Échéance</div>
+        <div class="context-menu-item" data-action="setPriority">⚡ Priorité</div>
         <div class="context-menu-item" data-action="setStickyTemplate">📋 Template</div>
-        <div class="context-menu-item" data-action="setCategory">🎨 Categorie</div>` : ''}
+        <div class="context-menu-item" data-action="setCategory">🎨 Catégorie</div>` : ''}
         ${multiSel ? `<div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="batchColor">🎨 Couleur commune</div>
         <div class="context-menu-item" data-action="autoGrid">📐 Grille auto</div>
         <div class="context-menu-item" data-action="autoCircle">⭕ Cercle auto</div>
-        <div class="context-menu-item" data-action="smartSpace">↔ Espacement egal</div>` : ''}
+        <div class="context-menu-item" data-action="smartSpace">↔ Espacement égal</div>` : ''}
         <div class="context-menu-separator"></div>
         <div class="context-menu-item context-menu-info" style="font-size:11px;color:var(--text-muted);cursor:default">z:${hit.zIndex || 0} | ${Math.round(hit.width || 0)}x${Math.round(hit.height || 0)}</div><!-- #R2-109 #R2-110 -->
         <div class="context-menu-separator"></div>
@@ -3162,7 +3162,7 @@ class DarkBoardApp {
       menu.innerHTML = `
         <div class="context-menu-item" data-action="paste">Coller <span class="shortcut-hint">Ctrl+V</span></div>
         <div class="context-menu-separator"></div>
-        <div class="context-menu-item" data-action="selectAll">Tout selectionner <span class="shortcut-hint">Ctrl+A</span></div>
+        <div class="context-menu-item" data-action="selectAll">Tout sélectionner <span class="shortcut-hint">Ctrl+A</span></div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="addAnchor">📌 Ajouter une ancre ici</div>
         <div class="context-menu-item" data-action="addCanvasComment">💬 Ajouter un commentaire</div>
@@ -3173,7 +3173,7 @@ class DarkBoardApp {
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="exportPNG">📷 Exporter en PNG</div>
         <div class="context-menu-separator"></div>
-        <div class="context-menu-item" data-action="resetView">Reinitialiser la vue</div>
+        <div class="context-menu-item" data-action="resetView">Réinitialiser la vue</div>
       `;
     }
 
@@ -4161,7 +4161,7 @@ class DarkBoardApp {
             <rect x="8" y="2" width="13" height="13" rx="2"/><rect x="3" y="9" width="13" height="13" rx="2" opacity="0.3"/>
           </svg>
         </button>
-        <button class="ftb-btn" data-action="sendBack" title="Mettre derriere">
+        <button class="ftb-btn" data-action="sendBack" title="Mettre derrière">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
             <rect x="3" y="9" width="13" height="13" rx="2"/><rect x="8" y="2" width="13" height="13" rx="2" opacity="0.3"/>
           </svg>
@@ -4664,13 +4664,13 @@ DarkBoardApp.prototype.initWelcomeTour = function() {
 DarkBoardApp.prototype.initContextualTips = function() {
   var self = this;
   var tips = [
-    'Astuce: Double-cliquez pour creer un post-it rapidement',
-    'Astuce: Maintenez Alt en deplacant un element pour le dupliquer',
-    'Astuce: Utilisez Ctrl+G pour grouper des elements selectionnes',
+    'Astuce: Double-cliquez pour créer un post-it rapidement',
+    'Astuce: Maintenez Alt en déplaçant un élément pour le dupliquer',
+    'Astuce: Utilisez Ctrl+G pour grouper des éléments sélectionnés',
     'Astuce: Glissez des images directement sur le tableau',
-    'Astuce: Appuyez sur Espace + glissez pour deplacer la vue',
+    'Astuce: Appuyez sur Espace + glissez pour déplacer la vue',
     'Astuce: Ctrl+F pour rechercher et remplacer du texte',
-    'Astuce: Utilisez les ancres (N) pour creer une presentation'
+    'Astuce: Utilisez les ancres (N) pour créer une présentation'
   ];
   var shownTips = JSON.parse(localStorage.getItem('darkboard-shown-tips') || '[]');
   setTimeout(function() {
@@ -4708,11 +4708,11 @@ DarkBoardApp.prototype._showToolCursorHint = function(toolName) {
   var hints = {
     sticky: 'Cliquez pour placer un post-it', rect: 'Glissez pour dessiner un rectangle',
     circle: 'Glissez pour dessiner un cercle', draw: 'Glissez pour dessiner',
-    line: 'Glissez pour tracer une ligne', arrow: 'Glissez pour tracer une fleche',
-    text: 'Cliquez pour placer du texte', connector: 'Cliquez sur un element source',
-    frame: 'Glissez pour creer un cadre', mindmap: 'Cliquez pour placer un noeud',
+    line: 'Glissez pour tracer une ligne', arrow: 'Glissez pour tracer une flèche',
+    text: 'Cliquez pour placer du texte', connector: 'Cliquez sur un élément source',
+    frame: 'Glissez pour créer un cadre', mindmap: 'Cliquez pour placer un nœud',
     diamond: 'Glissez pour dessiner un losange', triangle: 'Glissez pour dessiner un triangle',
-    envelope: 'Glissez pour creer une enveloppe'
+    envelope: 'Glissez pour créer une enveloppe'
   };
   var hint = hints[toolName];
   if (!hint) return;
@@ -4928,7 +4928,7 @@ DarkBoardApp.prototype.getRecentColors = function() {
 DarkBoardApp.prototype.showSmartPasteDialog = function(text, cx, cy) {
   var self = this;
   this.showConfirmDialog(
-    'Texte avec tabulations detecte. Creer en tant que:',
+    'Texte avec tabulations détecté. Créer en tant que :',
     [
       { label: 'Post-its', action: function() {
         var cells = text.split(/[\t\n]/).map(function(c) { return c.trim(); }).filter(function(c) { return c.length > 0; });
@@ -4999,7 +4999,7 @@ DarkBoardApp.prototype.showUndoMoveToast = function() {
   var self = this;
   var toast = document.createElement('div');
   toast.className = 'toast show';
-  toast.innerHTML = '<span class="toast-icon toast-icon-info">i</span><span>Elements deplaces loin</span>';
+  toast.innerHTML = '<span class="toast-icon toast-icon-info">i</span><span>Éléments déplacés loin</span>';
   var btn = document.createElement('button');
   btn.textContent = 'Revenir';
   btn.style.cssText = 'margin-left:12px;background:var(--accent);color:white;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;';
@@ -5225,7 +5225,7 @@ DarkBoardApp.prototype._showConvertMenu = function(hit) {
 // #R2-140: Priority picker
 DarkBoardApp.prototype._showPriorityPicker = function(hit) {
   var self = this;
-  this.showConfirmDialog('Priorite:', [
+  this.showConfirmDialog('Priorité :', [
     { label: 'Haute', action: function() { self.updateSelectedElements({ priority: 'high' }); } },
     { label: 'Moyenne', action: function() { self.updateSelectedElements({ priority: 'medium' }); } },
     { label: 'Basse', action: function() { self.updateSelectedElements({ priority: 'low' }); } },
@@ -5237,7 +5237,7 @@ DarkBoardApp.prototype._showPriorityPicker = function(hit) {
 DarkBoardApp.prototype._showTemplatePicker = function(hit) {
   var self = this;
   this.showConfirmDialog('Template sticky:', [
-    { label: 'Idee', action: function() { self.updateSelectedElements({ stickyTemplate: 'idea' }); } },
+    { label: 'Idée', action: function() { self.updateSelectedElements({ stickyTemplate: 'idea' }); } },
     { label: 'Question', action: function() { self.updateSelectedElements({ stickyTemplate: 'question' }); } },
     { label: 'Action', action: function() { self.updateSelectedElements({ stickyTemplate: 'action' }); } },
     { label: 'Risque', action: function() { self.updateSelectedElements({ stickyTemplate: 'risk' }); } },
@@ -5248,7 +5248,7 @@ DarkBoardApp.prototype._showTemplatePicker = function(hit) {
 // #R2-148: Category picker
 DarkBoardApp.prototype._showCategoryPicker = function(hit) {
   var self = this;
-  this.showConfirmDialog('Categorie:', [
+  this.showConfirmDialog('Catégorie :', [
     { label: 'Rouge', action: function() { self.updateSelectedElements({ category: 'red' }); } },
     { label: 'Bleu', action: function() { self.updateSelectedElements({ category: 'blue' }); } },
     { label: 'Vert', action: function() { self.updateSelectedElements({ category: 'green' }); } },
@@ -5307,7 +5307,7 @@ DarkBoardApp.prototype._autoArrangeCircle = function() {
 // #R2-143: Smart spacing - equalize gaps between selected elements
 DarkBoardApp.prototype._smartSpacing = function() {
   var ids = Array.from(this.renderer.selectedIds);
-  if (ids.length < 3) { this.showToast('Selectionnez au moins 3 elements'); return; }
+  if (ids.length < 3) { this.showToast('Sélectionnez au moins 3 éléments'); return; }
   var self = this;
   var elements = ids.map(function(id) { return self.renderer.elements.get(id); }).filter(Boolean);
   elements.sort(function(a, b) { return a.x - b.x; });
@@ -5325,7 +5325,7 @@ DarkBoardApp.prototype._smartSpacing = function() {
     }
     curX += (el.width || 100) + gap;
   }
-  if (ops.length > 0) { this.history.push(ops, inverseOps); this.sync.sendOps(ops); this.renderer.markDirty(); this.showToast('Espacement egalise'); }
+  if (ops.length > 0) { this.history.push(ops, inverseOps); this.sync.sendOps(ops); this.renderer.markDirty(); this.showToast('Espacement égalise'); }
 };
 
 // #R2-107: Navigate to linked element on click
@@ -5369,14 +5369,14 @@ DarkBoardApp.prototype.searchElements = function(query) {
     var el = entry[1];
     if ((el.text || '').toLowerCase().includes(q)) found.push(el);
   }
-  if (found.length === 0) { this.showToast('Aucun resultat pour "' + query + '"'); return; }
+  if (found.length === 0) { this.showToast('Aucun résultat pour "' + query + '"'); return; }
   this.renderer.selectedIds.clear();
   for (var el of found) this.renderer.selectedIds.add(el.id);
   var first = found[0];
   var bounds = getElementBounds(first);
   if (bounds) this.animateToView(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2, 1);
   this.renderer.markDirty();
-  this.showToast(found.length + ' element(s) trouve(s)');
+  this.showToast(found.length + ' élément(s) trouvé(s)');
 };
 
 // #R2-123: Board statistics panel
@@ -5387,7 +5387,7 @@ DarkBoardApp.prototype.showBoardStats = function() {
   var tagCounts = {};
   for (var el of elements) if (el.tags) for (var t of el.tags) tagCounts[t.label] = (tagCounts[t.label] || 0) + 1;
   var html = '<h3 style="margin:0 0 12px">Statistiques du board</h3>';
-  html += '<p>Total: <strong>' + elements.length + '</strong> elements</p>';
+  html += '<p>Total: <strong>' + elements.length + '</strong> éléments</p>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:8px 0">';
   for (var k in typeCounts) html += '<span>' + k + ':</span><span><strong>' + typeCounts[k] + '</strong></span>';
   html += '</div>';
@@ -5545,12 +5545,12 @@ DarkBoardApp.prototype.showCheatSheet = function() {
     '<h3>Raccourcis clavier</h3>' +
     '<div class="cheat-sheet-grid">' +
     '<div class="cheat-sheet-section"><h4>Outils</h4>' +
-    '<div class="cs-row"><span>Selection</span><kbd>V</kbd></div>' +
+    '<div class="cs-row"><span>Sélection</span><kbd>V</kbd></div>' +
     '<div class="cs-row"><span>Main</span><kbd>H</kbd></div>' +
     '<div class="cs-row"><span>Rectangle</span><kbd>R</kbd></div>' +
     '<div class="cs-row"><span>Cercle</span><kbd>O</kbd></div>' +
     '<div class="cs-row"><span>Ligne</span><kbd>L</kbd></div>' +
-    '<div class="cs-row"><span>Fleche</span><kbd>A</kbd></div>' +
+    '<div class="cs-row"><span>Flèche</span><kbd>A</kbd></div>' +
     '<div class="cs-row"><span>Connecteur</span><kbd>K</kbd></div>' +
     '<div class="cs-row"><span>Dessin</span><kbd>D</kbd></div>' +
     '<div class="cs-row"><span>Post-it</span><kbd>S</kbd></div>' +
@@ -5562,7 +5562,7 @@ DarkBoardApp.prototype.showCheatSheet = function() {
     '</div>' +
     '<div class="cheat-sheet-section"><h4>Actions</h4>' +
     '<div class="cs-row"><span>Annuler</span><kbd>Ctrl+Z</kbd></div>' +
-    '<div class="cs-row"><span>Retablir</span><kbd>Ctrl+Y</kbd></div>' +
+    '<div class="cs-row"><span>Rétablir</span><kbd>Ctrl+Y</kbd></div>' +
     '<div class="cs-row"><span>Copier</span><kbd>Ctrl+C</kbd></div>' +
     '<div class="cs-row"><span>Coller</span><kbd>Ctrl+V</kbd></div>' +
     '<div class="cs-row"><span>Couper</span><kbd>Ctrl+X</kbd></div>' +
@@ -5575,10 +5575,10 @@ DarkBoardApp.prototype.showCheatSheet = function() {
     '</div>' +
     '<div class="cheat-sheet-section"><h4>Navigation</h4>' +
     '<div class="cs-row"><span>Zoom</span><kbd>Molette</kbd></div>' +
-    '<div class="cs-row"><span>Deplacer vue</span><kbd>Espace</kbd></div>' +
+    '<div class="cs-row"><span>Déplacer vue</span><kbd>Espace</kbd></div>' +
     '<div class="cs-row"><span>Centrer</span><kbd>Home</kbd></div>' +
     '<div class="cs-row"><span>Adapter</span><kbd>Ctrl+0</kbd></div>' +
-    '<div class="cs-row"><span>Fleches</span><kbd>1/10/100px</kbd></div>' +
+    '<div class="cs-row"><span>Flèches</span><kbd>1/10/100px</kbd></div>' +
     '<div class="cs-row"><span>Dupliquer</span><kbd>Alt+Drag</kbd></div>' +
     '<div class="cs-row"><span>Contraindre</span><kbd>Shift</kbd></div>' +
     '<div class="cs-row"><span>Ancres</span><kbd>N</kbd></div>' +
@@ -5596,14 +5596,14 @@ DarkBoardApp.prototype.initDidYouKnow = function() {
   if (sessionStorage.getItem('darkboard-dyk-shown')) return;
   sessionStorage.setItem('darkboard-dyk-shown', '1');
   var tips = [
-    'Le saviez-vous ? Maintenez Alt en deplacant un element pour le dupliquer !',
+    'Le saviez-vous ? Maintenez Alt en déplaçant un élément pour le dupliquer !',
     'Le saviez-vous ? Ctrl+F ouvre la recherche et remplacement sur le tableau.',
     'Le saviez-vous ? Glissez des images directement depuis votre bureau sur le tableau.',
-    'Le saviez-vous ? Appuyez sur N pour gerer les ancres et creer des presentations.',
-    'Le saviez-vous ? Double-cliquez sur un element pour editer son texte.',
+    'Le saviez-vous ? Appuyez sur N pour gérer les ancres et créer des présentations.',
+    'Le saviez-vous ? Double-cliquez sur un élément pour éditer son texte.',
     'Le saviez-vous ? Vous pouvez coller du contenu depuis Miro, Excel ou Google Sheets.',
-    'Le saviez-vous ? Le mode Laser est visible par tous les participants en temps reel.',
-    'Le saviez-vous ? Ctrl+0 adapte la vue a tous les elements du tableau.'
+    'Le saviez-vous ? Le mode Laser est visible par tous les participants en temps réel.',
+    'Le saviez-vous ? Ctrl+0 adapte la vue à tous les éléments du tableau.'
   ];
   var self = this;
   setTimeout(function() {
@@ -5638,7 +5638,7 @@ DarkBoardApp.prototype._celebrateFirstSticky = function(el) {
     document.body.appendChild(p);
     setTimeout(function(el) { el.remove(); }, 1200, p);
   }
-  this.showToast('Votre premier post-it ! Continuez a creer.', 'success');
+  this.showToast('Votre premier post-it ! Continuez à créer.', 'success');
 };
 
 // #R2-179: Milestone celebrations (10, 50, 100 stickies created)
@@ -5662,24 +5662,24 @@ DarkBoardApp.prototype.initToolTipPreview = function() {
   var self = this;
   var tipEl = null;
   var descriptions = {
-    select: { title: 'Selection (V)', desc: 'Selectionner et deplacer des elements' },
-    hand: { title: 'Main (H)', desc: 'Deplacer la vue du canevas' },
+    select: { title: 'Sélection (V)', desc: 'Sélectionner et déplacer des éléments' },
+    hand: { title: 'Main (H)', desc: 'Déplacer la vue du canevas' },
     rect: { title: 'Rectangle (R)', desc: 'Dessiner un rectangle' },
     circle: { title: 'Cercle (O)', desc: 'Dessiner un cercle' },
     diamond: { title: 'Losange', desc: 'Dessiner un losange' },
     triangle: { title: 'Triangle', desc: 'Dessiner un triangle' },
     line: { title: 'Ligne (L)', desc: 'Tracer une ligne droite' },
-    arrow: { title: 'Fleche (A)', desc: 'Tracer une fleche' },
-    connector: { title: 'Connecteur (K)', desc: 'Relier deux elements' },
-    draw: { title: 'Dessin (D)', desc: 'Dessin a main levee' },
-    sticky: { title: 'Post-it (S)', desc: 'Creer un post-it colore' },
+    arrow: { title: 'Flèche (A)', desc: 'Tracer une flèche' },
+    connector: { title: 'Connecteur (K)', desc: 'Relier deux éléments' },
+    draw: { title: 'Dessin (D)', desc: 'Dessin à main levée' },
+    sticky: { title: 'Post-it (S)', desc: 'Créer un post-it coloré' },
     text: { title: 'Texte (T)', desc: 'Ajouter du texte' },
-    envelope: { title: 'Enveloppe (G)', desc: 'Contenu revele au clic' },
+    envelope: { title: 'Enveloppe (G)', desc: 'Contenu révélé au clic' },
     card: { title: 'Carte (M)', desc: 'Carte de gestion Kanban' },
-    list: { title: 'Liste (I)', desc: 'Liste a puces / checklist' },
+    list: { title: 'Liste (I)', desc: 'Liste à puces / checklist' },
     frame: { title: 'Cadre (F)', desc: 'Zone de regroupement' },
     mindmap: { title: 'Mind Map (W)', desc: 'Structure radiale' },
-    eraser: { title: 'Gomme (E)', desc: 'Effacer des elements' },
+    eraser: { title: 'Gomme (E)', desc: 'Effacer des éléments' },
     zoomZone: { title: 'Zoom zone', desc: 'Zoomer sur une zone' }
   };
   var removeTip = function() { if (tipEl) { tipEl.remove(); tipEl = null; } };
@@ -5710,7 +5710,7 @@ DarkBoardApp.prototype.initProgressiveDisclosure = function() {
   // After 5 uses, show connector/mindmap hints
   if (usageCount === 5) {
     setTimeout(function() {
-      self.showToast('Decouvrez les connecteurs (K) pour relier vos elements!', 'info');
+      self.showToast('Découvrez les connecteurs (K) pour relier vos éléments !', 'info');
     }, 10000);
   }
   // After 10 uses, show advanced workshop features
@@ -5729,7 +5729,7 @@ DarkBoardApp.prototype.showActivitySummary = function(summary) {
     var labels = { sticky: 'post-its', rect: 'rectangles', text: 'textes', circle: 'cercles', card: 'cartes', frame: 'cadres', connector: 'connecteurs' };
     return e[1] + ' ' + (labels[e[0]] || e[0]);
   });
-  var msg = 'Pendant votre absence: ' + summary.newElementCount + ' nouveaux elements';
+  var msg = 'Pendant votre absence: ' + summary.newElementCount + ' nouveaux éléments';
   if (parts.length > 0 && parts.length <= 3) msg += ' (' + parts.join(', ') + ')';
   this.showToast(msg, 'info');
 };
@@ -5742,7 +5742,7 @@ DarkBoardApp.prototype.initGettingStartedChecklist = function() {
   var self = this;
   var checkState = function() {
     var checks = {
-      'Creer un post-it': self.renderer.elements.size > 0,
+      'Créer un post-it': self.renderer.elements.size > 0,
       'Partager le lien': !!localStorage.getItem('darkboard-shared'),
       'Utiliser le timer': !!localStorage.getItem('darkboard-timer-used'),
       'Lancer un vote': !!localStorage.getItem('darkboard-vote-used')
@@ -5969,7 +5969,7 @@ DarkBoardApp.prototype.printLayout = function() {
   var self = this;
   // Fit all elements, then trigger print
   var elements = Array.from(this.renderer.elements.values());
-  if (elements.length === 0) { this.showToast('Aucun element a imprimer'); return; }
+  if (elements.length === 0) { this.showToast('Aucun élément à imprimer'); return; }
   // Calculate bounds
   var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   elements.forEach(function(el) {
@@ -6065,7 +6065,7 @@ DarkBoardApp.prototype.toggleVoiceToText = function() {
   if (this._voiceActive) {
     if (this._voiceRecognition) this._voiceRecognition.stop();
     this._voiceActive = false;
-    this.showToast('Dictee vocale arretee');
+    this.showToast('Dictée vocale arrêtée');
     return;
   }
   var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -6089,7 +6089,7 @@ DarkBoardApp.prototype.toggleVoiceToText = function() {
       self.history.push(ops, [{ type: 'delete', elementId: el.id }]);
       self.sync.sendOps(ops);
       self.renderer.markDirty();
-      self.showToast('Post-it cree par dictee vocale');
+      self.showToast('Post-it créé par dictée vocale');
     }
   };
   recognition.onerror = function(event) {
@@ -6100,7 +6100,7 @@ DarkBoardApp.prototype.toggleVoiceToText = function() {
   recognition.start();
   this._voiceRecognition = recognition;
   this._voiceActive = true;
-  this.showToast('Dictee vocale activee - parlez pour creer des post-its');
+  this.showToast('Dictée vocale activée - parlez pour créer des post-its');
 };
 
 // #R2-121: Enhanced CSV import — detect delimiter and create stickies from rows
@@ -6223,9 +6223,9 @@ DarkBoardApp.prototype.autoConnectNearby = function() {
     this.history.push(ops, inverseOps);
     this.sync.sendOps(ops);
     this.renderer.markDirty();
-    this.showToast(ops.length + ' connecteurs crees automatiquement');
+    this.showToast(ops.length + ' connecteurs créés automatiquement');
   } else {
-    this.showToast('Aucun element assez proche a connecter');
+    this.showToast('Aucun élément assez proche à connecter');
   }
 };
 

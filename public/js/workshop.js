@@ -416,7 +416,7 @@ class Workshop {
     if (this.voting) this.voting.hideResults = false;
     document.getElementById('voteReveal').style.display = 'none';
     this.app.renderer.markDirty();
-    this.app.showToast('Resultats du vote reveles !');
+    this.app.showToast('Résultats du vote révélés !');
   }
 
   handleVoteEnd(msg) {
@@ -429,7 +429,7 @@ class Workshop {
     }
     // Keep results visible briefly
     this.app.renderer.markDirty();
-    this.app.showToast('Vote termine !');
+    this.app.showToast('Vote terminé !');
     // Store last vote results for matrix feature
     this._lastVoteResults = Object.assign({}, this.voteResults);
     this._lastVoterDetails = Object.assign({}, this.voterDetails);
@@ -517,7 +517,7 @@ class Workshop {
       document.getElementById('btnIsolation').classList.remove('active');
     }
     this.app.renderer.markDirty();
-    this.app.showToast('Toutes les contributions sont revelees !');
+    this.app.showToast('Toutes les contributions sont révélées !');
   }
 
   // =====================
@@ -554,7 +554,7 @@ class Workshop {
         }, 100);
       } else {
         document.getElementById('followStop').style.display = 'none';
-        document.getElementById('followText').textContent = 'Vue synchronisee avec l\'animateur';
+        document.getElementById('followText').textContent = 'Vue synchronisée avec l\'animateur';
       }
     } else {
       banner.style.display = 'none';
@@ -908,7 +908,7 @@ class Workshop {
     // Send all ops
     this.app.applyOps(ops);
     this.app.sync.sendOps(ops);
-    this.app.showToast('Matrice de priorisation creee !');
+    this.app.showToast('Matrice de priorisation créée !');
   }
 
   // =====================
@@ -943,7 +943,7 @@ class Workshop {
         document.getElementById('btnRoundRobin').classList.remove('active');
       }
       if (msg && msg.index === -1) {
-        this.app.showToast('Tour de table termine !');
+        this.app.showToast('Tour de table terminé !');
       }
       return;
     }
@@ -1014,7 +1014,7 @@ class Workshop {
         // Auto-reveal isolation
         this.app.sync.send({ type: 'isolation-reveal' });
         this.app.sync.send({ type: 'timer-clear' });
-        this.app.showToast('Brainstorm termine ! Contributions revelees.');
+        this.app.showToast('Brainstorm terminé ! Contributions révélées.');
       }
     }, 500);
   }
@@ -1338,7 +1338,7 @@ class Workshop {
     const results = this.voteResults || {};
     const voterDetails = this.voterDetails || {};
     if (Object.keys(results).length === 0) {
-      this.app.showToast('Pas de resultats de vote a exporter');
+      this.app.showToast('Pas de résultats de vote à exporter');
       return;
     }
     const rows = ['id,text,votes,voters'];
@@ -1356,7 +1356,7 @@ class Workshop {
     link.href = URL.createObjectURL(blob);
     link.click();
     URL.revokeObjectURL(link.href);
-    this.app.showToast('Resultats du vote exportes en CSV !');
+    this.app.showToast('Résultats du vote exportés en CSV !');
   }
 
   // #R2-114: Timer presets
@@ -1403,7 +1403,7 @@ class Workshop {
     sticky.height = 100;
     sticky.fontSize = 12;
     this.app.addElement(sticky);
-    this.app.showToast('Parking Lot cree !');
+    this.app.showToast('Parking Lot créé !');
   }
 
   // #R2-117: Sentiment analysis summary
@@ -1459,13 +1459,13 @@ class Workshop {
       x += textEl.width + 10;
       if (x > cam.x + 300) { x = cam.x - 300; y += 60; }
     }
-    this.app.showToast('Nuage de mots genere avec ' + sorted.length + ' mots');
+    this.app.showToast('Nuage de mots généré avec ' + sorted.length + ' mots');
   }
 
   // #R2-119: Voting heat map overlay
   showVotingHeatmap() {
     const results = Object.keys(this.voteResults).length > 0 ? this.voteResults : (this._lastVoteResults || {});
-    if (Object.keys(results).length === 0) { this.app.showToast('Pas de resultats de vote'); return; }
+    if (Object.keys(results).length === 0) { this.app.showToast('Pas de résultats de vote'); return; }
     // Toggle heatmap overlay
     this._heatmapActive = !this._heatmapActive;
     if (this._heatmapActive) {

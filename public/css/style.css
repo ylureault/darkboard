@@ -1193,7 +1193,7 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
    ========================= */
 .isolation-banner {
   position: fixed;
-  top: 68px;
+  top: 72px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -1203,7 +1203,7 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
   border: 1px solid var(--danger);
   border-radius: 10px;
   padding: 10px 20px;
-  z-index: 110;
+  z-index: 160;
   font-size: 14px;
   font-weight: 600;
   color: var(--danger);
@@ -3805,7 +3805,7 @@ body.light .reaction-picker { box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
 /* #127 - Contextual tip banner */
 .tip-banner {
   position: fixed;
-  top: 64px;
+  top: 72px;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(74,158,255,0.12);
@@ -4494,7 +4494,7 @@ body.light-theme .brand-badge {
 
 /* #R2-177: "Did you know?" tip */
 .dyk-banner {
-  position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+  position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%);
   background: var(--panel); border: 1px solid var(--accent-20); border-left: 3px solid var(--accent);
   border-radius: var(--radius-md); padding: 10px 20px; font-size: 13px; color: var(--text);
   z-index: 500; box-shadow: var(--shadow-md); display: flex; align-items: center;

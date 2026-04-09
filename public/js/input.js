@@ -325,43 +325,45 @@ class InputHandler {
   onWheel(e) {
     e.preventDefault();
 
-    if (e.ctrlKey || e.metaKey) {
-      // #R2-16: Smooth scroll-to-zoom with easing
-      const delta = -e.deltaY * 0.005;
-      const targetZoom = clamp(this.app.renderer.camera.zoom * (1 + delta), 0.1, 5);
-      // Use smooth animation for discrete wheel events (deltaMode 0 = pixel scroll from trackpad)
-      if (e.deltaMode === 0 && Math.abs(e.deltaY) < 20) {
-        // Trackpad: direct zoom for responsiveness
-        this.app.renderer.setZoom(targetZoom, e.clientX, e.clientY);
-        this.app.updateZoomDisplay();
+    // Detect trackpad vs mouse wheel: trackpad sends small deltaY with deltaMode 0
+    const isTrackpad = e.deltaMode === 0 && Math.abs(e.deltaY) < 50 && !e.ctrlKey && !e.metaKey;
+
+    if (isTrackpad && !e.ctrlKey && !e.metaKey) {
+      // Trackpad: two-finger scroll = pan, pinch = zoom (browser sends ctrlKey with pinch)
+      if (e.shiftKey) {
+        this.app.renderer.pan(-e.deltaY, 0);
       } else {
-        // Mouse wheel: smooth animated zoom
-        if (this._wheelZoomRaf) cancelAnimationFrame(this._wheelZoomRaf);
-        const startZoom = this.app.renderer.camera.zoom;
-        const cx = e.clientX, cy = e.clientY;
-        const startTime = performance.now();
-        const duration = 120;
-        const app = this.app;
-        const self = this;
-        const step = (now) => {
-          const t = Math.min(1, (now - startTime) / duration);
-          const ease = 1 - Math.pow(1 - t, 2);
-          const z = startZoom + (targetZoom - startZoom) * ease;
-          app.renderer.setZoom(z, cx, cy);
-          app.updateZoomDisplay();
-          if (t < 1) self._wheelZoomRaf = requestAnimationFrame(step);
-          else self._wheelZoomRaf = null;
-        };
-        this._wheelZoomRaf = requestAnimationFrame(step);
+        this.app.renderer.pan(-e.deltaX, -e.deltaY);
       }
-    } else if (e.shiftKey) {
-      // Shift+scroll = horizontal pan
-      this.app.renderer.pan(-e.deltaY, 0);
       this.app.renderer.markDirty();
+    } else if (e.ctrlKey || e.metaKey) {
+      // Ctrl/Cmd + scroll OR trackpad pinch (browser sends ctrlKey) = zoom
+      const delta = -e.deltaY * 0.01;
+      const targetZoom = clamp(this.app.renderer.camera.zoom * (1 + delta), 0.1, 5);
+      this.app.renderer.setZoom(targetZoom, e.clientX, e.clientY);
+      this.app.updateZoomDisplay();
     } else {
-      // Default scroll = vertical pan (both mouse wheel and trackpad)
-      this.app.renderer.pan(-e.deltaX, -e.deltaY);
-      this.app.renderer.markDirty();
+      // Mouse wheel (no modifier) = zoom centered on cursor
+      const delta = -e.deltaY * 0.003;
+      const targetZoom = clamp(this.app.renderer.camera.zoom * (1 + delta), 0.1, 5);
+      // Smooth animated zoom for mouse wheel
+      if (this._wheelZoomRaf) cancelAnimationFrame(this._wheelZoomRaf);
+      const startZoom = this.app.renderer.camera.zoom;
+      const cx = e.clientX, cy = e.clientY;
+      const startTime = performance.now();
+      const duration = 120;
+      const app = this.app;
+      const self = this;
+      const step = (now) => {
+        const t = Math.min(1, (now - startTime) / duration);
+        const ease = 1 - Math.pow(1 - t, 2);
+        const z = startZoom + (targetZoom - startZoom) * ease;
+        app.renderer.setZoom(z, cx, cy);
+        app.updateZoomDisplay();
+        if (t < 1) self._wheelZoomRaf = requestAnimationFrame(step);
+        else self._wheelZoomRaf = null;
+      };
+      this._wheelZoomRaf = requestAnimationFrame(step);
     }
   }
 

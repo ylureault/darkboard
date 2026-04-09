@@ -24,7 +24,7 @@
     <span id="loadingMessage" style="color:#4a9eff;font-family:system-ui,sans-serif;font-size:14px">Chargement...</span>
     <style>@keyframes dbspin{to{transform:rotate(360deg)}}</style>
     <!-- #R2-191: Fun rotating loading messages -->
-    <script>(function(){var m=['Preparation du canevas...','Chargement de la creativite...','Assemblage des post-its...','Connexion au tableau...','Affutage des crayons...','Deploiement des idees...'];var e=document.getElementById('loadingMessage');if(e){e.textContent=m[Math.floor(Math.random()*m.length)];var i=0;setInterval(function(){i=(i+1)%m.length;e.textContent=m[i];},2000);}})();</script>
+    <script>(function(){var m=['Préparation du canevas...','Chargement de la créativité...','Assemblage des post-its...','Connexion au tableau...','Affûtage des crayons...','Déploiement des idées...'];var e=document.getElementById('loadingMessage');if(e){e.textContent=m[Math.floor(Math.random()*m.length)];var i=0;setInterval(function(){i=(i+1)%m.length;e.textContent=m[i];},2000);}})();</script>
   </div>
 
   <canvas id="canvas" style="touch-action:none" aria-label="Tableau blanc collaboratif DarkBoard" role="application"></canvas>
@@ -32,7 +32,7 @@
   <!-- Empty board welcome hint (#121 improved) -->
   <div class="empty-board-hint" id="emptyBoardHint" style="display:none">
     <h2>Bienvenue sur DarkBoard</h2>
-    <p>Double-cliquez pour creer un post-it</p>
+    <p>Double-cliquez pour créer un post-it</p>
     <div class="hint-tools">
       <div class="hint-tool-icon">
         <svg viewBox="0 0 24 24"><path d="M15.5 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V8.5L15.5 3z"/><polyline points="14,3 14,9 21,9"/></svg>
@@ -67,7 +67,7 @@
         <span class="brand-sep">&times;</span>
         <span class="brand-darkboard">DarkBoard</span>
       </div>
-      <p class="brand-sub">par <strong>Insuffle Academie</strong></p>
+      <p class="brand-sub">par <strong>Insuffle Académie</strong></p>
       <p>Choisissez un pseudonyme pour commencer</p>
       <input type="text" id="nameInput" placeholder="Votre pseudo..." maxlength="20" autofocus />
       <p style="font-size:12px;color:var(--text-muted);margin:10px 0 2px">Couleur du curseur</p>
@@ -277,7 +277,7 @@
   <div class="tag-filter-bar" id="tagFilterBar" style="display:none"></div>
 
   <!-- Color panel (collapsible) -->
-  <div class="color-panel" id="colorPanel" style="display:none" role="toolbar" aria-label="Panneau couleurs et epaisseur">
+  <div class="color-panel" id="colorPanel" style="display:none" role="toolbar" aria-label="Panneau couleurs et épaisseur">
     <div class="color-panel-section">
       <span class="color-section-label">Remplissage</span>
       <div class="color-row" id="fillColors"></div>
@@ -289,7 +289,7 @@
     </div>
     <div class="color-panel-divider"></div>
     <div class="color-panel-section">
-      <span class="color-section-label">Epaisseur</span>
+      <span class="color-section-label">Épaisseur</span>
       <div class="stroke-options" id="strokeWidths"></div>
     </div>
   </div>
@@ -312,7 +312,7 @@
           <circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3l2 2M19 3l-2 2"/>
         </svg>
         Chrono
-        <span class="fctl-tooltip">Lancer un compte a rebours visible par tous</span>
+        <span class="fctl-tooltip">Lancer un compte à rebours visible par tous</span>
       </button>
       <button class="fctl-btn" id="btnVote" title="Vote — Lancer une session de vote" aria-label="Vote, lancer une session de vote">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -343,14 +343,14 @@
           <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
         </svg>
         Brainstorm
-        <span class="fctl-tooltip">Isoloir + timer: ideation silencieuse</span>
+        <span class="fctl-tooltip">Isoloir + timer: idéation silencieuse</span>
       </button>
       <button class="fctl-btn" id="btnRoundRobin" title="Tour de table — Discussion en tour par tour" aria-label="Tour de table">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
           <circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 3"/>
         </svg>
         Tour de table
-        <span class="fctl-tooltip">Chaque participant parle a son tour</span>
+        <span class="fctl-tooltip">Chaque participant parle à son tour</span>
       </button>
       <button class="fctl-btn" id="btnCheckin" title="Check-in — Sondage d'humeur" aria-label="Check-in">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -359,15 +359,15 @@
         Check-in
         <span class="fctl-tooltip">Sondage d'humeur des participants</span>
       </button>
-      <button class="fctl-btn" id="btnMatrix" title="Matrice de priorisation — Apres un vote" aria-label="Matrice de priorisation">
+      <button class="fctl-btn" id="btnMatrix" title="Matrice de priorisation — Après un vote" aria-label="Matrice de priorisation">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
           <rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/>
           <rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/>
         </svg>
         Matrice
-        <span class="fctl-tooltip">Matrice 2x2 pour prioriser apres un vote</span>
+        <span class="fctl-tooltip">Matrice 2x2 pour prioriser après un vote</span>
       </button>
-      <button class="fctl-btn" id="btnAutoCluster" title="Auto-regroupement — Regrouper les post-its par theme" aria-label="Auto-regroupement">
+      <button class="fctl-btn" id="btnAutoCluster" title="Auto-regroupement — Regrouper les post-its par thème" aria-label="Auto-regroupement">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
           <circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><circle cx="12" cy="16" r="3"/>
           <path d="M10.5 9.5L12 14M13.5 9.5L12 14" opacity="0.5"/>
@@ -385,12 +385,12 @@
         <span class="fctl-tooltip">Return On Time Invested (1-5)</span>
       </button>
       <!-- #R2-112: Fishbowl mode -->
-      <button class="fctl-btn" id="btnFishbowl" title="Fishbowl — Un editeur a la fois" aria-label="Mode fishbowl">
+      <button class="fctl-btn" id="btnFishbowl" title="Fishbowl — Un éditeur à la fois" aria-label="Mode fishbowl">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
           <circle cx="12" cy="12" r="10"/><path d="M8 12a4 4 0 018 0"/><circle cx="12" cy="12" r="2"/>
         </svg>
         Fishbowl
-        <span class="fctl-tooltip">Un seul editeur a la fois, les autres observent</span>
+        <span class="fctl-tooltip">Un seul éditeur à la fois, les autres observent</span>
       </button>
       <!-- #R2-113: Export vote CSV -->
       <button class="fctl-btn" id="btnVoteCSV" title="Export votes CSV" aria-label="Exporter les votes en CSV">
@@ -399,7 +399,7 @@
           <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>
         </svg>
         Votes CSV
-        <span class="fctl-tooltip">Exporter les resultats de vote en CSV</span>
+        <span class="fctl-tooltip">Exporter les résultats de vote en CSV</span>
       </button>
       <!-- #R2-114: Timer presets -->
       <button class="fctl-btn" id="btnTimerPresets" title="Presets timer" aria-label="Presets de timer rapides">
@@ -419,12 +419,12 @@
         <span class="fctl-tooltip">Timer de pause avec rappel de stretching</span>
       </button>
       <!-- #R2-116: Parking lot -->
-      <button class="fctl-btn" id="btnParkingLot" title="Parking Lot — Zone de sujets a traiter plus tard" aria-label="Creer un parking lot">
+      <button class="fctl-btn" id="btnParkingLot" title="Parking Lot — Zone de sujets à traiter plus tard" aria-label="Créer un parking lot">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
           <rect x="3" y="3" width="18" height="18" rx="2"/><text x="12" y="16" text-anchor="middle" font-size="12" font-weight="bold" fill="currentColor" stroke="none">P</text>
         </svg>
         Parking
-        <span class="fctl-tooltip">Creer une zone pour les sujets a traiter plus tard</span>
+        <span class="fctl-tooltip">Créer une zone pour les sujets à traiter plus tard</span>
       </button>
       <!-- #R2-117: Sentiment analysis -->
       <button class="fctl-btn" id="btnSentiment" title="Analyse sentiment — Analyser le ton des post-its" aria-label="Analyse de sentiment">
@@ -435,12 +435,12 @@
         <span class="fctl-tooltip">Analyser le sentiment des post-its</span>
       </button>
       <!-- #R2-118: Word cloud -->
-      <button class="fctl-btn" id="btnWordCloud" title="Nuage de mots — Generer un nuage de mots" aria-label="Generer un nuage de mots">
+      <button class="fctl-btn" id="btnWordCloud" title="Nuage de mots — Générer un nuage de mots" aria-label="Générer un nuage de mots">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
           <path d="M17 10H3M21 6H3M21 14H3M17 18H3"/>
         </svg>
         Mots
-        <span class="fctl-tooltip">Nuage de mots a partir des post-its</span>
+        <span class="fctl-tooltip">Nuage de mots à partir des post-its</span>
       </button>
       <!-- #R2-119: Voting heatmap -->
       <button class="fctl-btn" id="btnHeatmap" title="Heatmap — Heatmap des votes" aria-label="Heatmap des votes">
@@ -452,12 +452,12 @@
         <span class="fctl-tooltip">Afficher la heatmap de vote sur le canevas</span>
       </button>
       <!-- #R2-120: Retro template -->
-      <button class="fctl-btn" id="btnRetroTemplate" title="Retro — Generer un template de retrospective" aria-label="Template de retrospective">
+      <button class="fctl-btn" id="btnRetroTemplate" title="Retro — Générer un template de rétrospective" aria-label="Template de rétrospective">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
           <rect x="2" y="3" width="6" height="18" rx="1"/><rect x="9" y="3" width="6" height="18" rx="1"/><rect x="16" y="3" width="6" height="18" rx="1"/>
         </svg>
         Retro
-        <span class="fctl-tooltip">Template 3 colonnes: bien / ameliorer / actions</span>
+        <span class="fctl-tooltip">Template 3 colonnes: bien / améliorer / actions</span>
       </button>
     </div>
   </div>
@@ -481,7 +481,7 @@
         <input type="number" id="timerSeconds" value="0" min="0" max="59" /> sec
       </div>
       <div class="modal-actions">
-        <button class="modal-btn" id="timerStart" aria-label="Demarrer le minuteur">Demarrer</button>
+        <button class="modal-btn" id="timerStart" aria-label="Démarrer le minuteur">Démarrer</button>
         <button class="modal-btn modal-btn-secondary" id="timerCancel" aria-label="Annuler">Annuler</button>
       </div>
     </div>
@@ -496,10 +496,10 @@
         <button class="quota-btn" data-quota="1" aria-label="1 vote par participant">1</button>
         <button class="quota-btn active" data-quota="3" aria-label="3 votes par participant">3</button>
         <button class="quota-btn" data-quota="5" aria-label="5 votes par participant">5</button>
-        <button class="quota-btn" data-quota="0" aria-label="Votes illimites">Illimite</button>
+        <button class="quota-btn" data-quota="0" aria-label="Votes illimités">Illimité</button>
       </div>
       <label class="modal-label">
-        <input type="checkbox" id="voteHideResults" checked /> Masquer les resultats pendant le vote
+        <input type="checkbox" id="voteHideResults" checked /> Masquer les résultats pendant le vote
       </label>
       <div class="modal-actions">
         <button class="modal-btn" id="voteStart" aria-label="Lancer le vote">Lancer le vote</button>
@@ -512,21 +512,21 @@
   <div class="vote-bar" id="voteBar" style="display:none;">
     <span class="vote-bar-label">Vote en cours</span>
     <span class="vote-bar-remaining" id="voteRemaining">3 votes restants</span>
-    <button class="vote-bar-btn" id="voteReveal" style="display:none;" aria-label="Reveler les resultats du vote">Reveler</button>
+    <button class="vote-bar-btn" id="voteReveal" style="display:none;" aria-label="Révéler les résultats du vote">Révéler</button>
     <button class="vote-bar-btn vote-bar-danger" id="voteEnd" style="display:none;" aria-label="Terminer le vote">Terminer</button>
   </div>
 
   <!-- Isolation mode banner -->
   <div class="isolation-banner" id="isolationBanner" style="display:none;">
-    <span>Mode isoloir actif — Vos contributions sont privees</span>
-    <button class="isolation-btn" id="isolationReveal" style="display:none;" aria-label="Reveler toutes les contributions">Reveler tout</button>
+    <span>Mode isoloir actif — Vos contributions sont privées</span>
+    <button class="isolation-btn" id="isolationReveal" style="display:none;" aria-label="Révéler toutes les contributions">Révéler tout</button>
     <button class="isolation-btn isolation-btn-secondary" id="isolationCancel" style="display:none;" aria-label="Annuler le mode isoloir">Annuler</button>
   </div>
 
   <!-- Follow mode banner -->
   <div class="follow-banner" id="followBanner" style="display:none;">
-    <span id="followText">Vue synchronisee avec l'animateur</span>
-    <button class="follow-stop-btn" id="followStop" style="display:none;" aria-label="Arreter le mode suivez-moi">Arreter</button>
+    <span id="followText">Vue synchronisée avec l'animateur</span>
+    <button class="follow-stop-btn" id="followStop" style="display:none;" aria-label="Arrêter le mode suivez-moi">Arrêter</button>
   </div>
 
   <!-- Anchors panel (sidebar) -->
@@ -536,7 +536,7 @@
       <button class="anchors-close" id="anchorsClose" aria-label="Fermer le panneau ancres">x</button>
     </div>
     <div class="anchors-list" id="anchorsList"></div>
-    <button class="anchors-add" id="anchorsAdd" aria-label="Ajouter une ancre a la position actuelle">+ Ajouter une ancre ici</button>
+    <button class="anchors-add" id="anchorsAdd" aria-label="Ajouter une ancre à la position actuelle">+ Ajouter une ancre ici</button>
   </div>
 
   <!-- Anchors toggle button -->
@@ -549,12 +549,12 @@
   </button>
 
   <!-- ============ BOTTOM BAR LEFT ============ -->
-  <div class="bottom-bar bottom-bar-left" role="toolbar" aria-label="Barre d'outils inferieure gauche">
+  <div class="bottom-bar bottom-bar-left" role="toolbar" aria-label="Barre d'outils inférieure gauche">
     <!-- Zoom -->
-    <button class="bb-btn" id="zoomOut" title="Dezoomer" aria-label="Dezoomer">-</button>
-    <span class="bb-zoom-level" id="zoomLevel" title="Reinitialiser le zoom" role="status" aria-label="Niveau de zoom actuel">100%</span>
+    <button class="bb-btn" id="zoomOut" title="Dézoomer" aria-label="Dézoomer">-</button>
+    <span class="bb-zoom-level" id="zoomLevel" title="Réinitialiser le zoom" role="status" aria-label="Niveau de zoom actuel">100%</span>
     <button class="bb-btn" id="zoomIn" title="Zoomer" aria-label="Zoomer">+</button>
-    <button class="bb-btn" id="zoomFit" title="Adapter a l'ecran" aria-label="Adapter la vue a l'ecran">
+    <button class="bb-btn" id="zoomFit" title="Adapter à l'écran" aria-label="Adapter la vue à l'écran">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
         <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/>
       </svg>
@@ -566,7 +566,7 @@
         <rect x="2" y="2" width="20" height="20" rx="2"/><rect x="10" y="10" width="8" height="8" rx="1" fill="currentColor" opacity="0.3"/>
       </svg>
     </button>
-    <button class="bb-btn" id="toggleSnap" title="Grille magnetique" aria-label="Activer ou desactiver la grille magnetique">
+    <button class="bb-btn" id="toggleSnap" title="Grille magnétique" aria-label="Activer ou désactiver la grille magnétique">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
         <path d="M3 3h4v4H3zM17 3h4v4h-4zM3 17h4v4H3zM17 17h4v4h-4z"/><path d="M10 3h4v4h-4zM10 17h4v4h-4zM3 10h4v4H3zM17 10h4v4h-4zM10 10h4v4h-4z" opacity="0.3"/>
       </svg>
@@ -578,12 +578,12 @@
         <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
       </svg>
     </button>
-    <button class="bb-btn bb-btn-label" id="templateBtn" title="Modeles" aria-label="Ouvrir les modeles">
+    <button class="bb-btn bb-btn-label" id="templateBtn" title="Modèles" aria-label="Ouvrir les modeles">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
         <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
         <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
       </svg>
-      Modeles
+      Modèles
     </button>
     <button class="bb-btn" id="helpBtn" title="Aide (?)" aria-label="Aide et raccourcis clavier">?</button>
     <div class="bb-sep"></div>
@@ -596,7 +596,7 @@
   </div>
 
   <!-- ============ BOTTOM BAR RIGHT ============ -->
-  <div class="bottom-bar bottom-bar-right" role="toolbar" aria-label="Barre d'outils inferieure droite">
+  <div class="bottom-bar bottom-bar-right" role="toolbar" aria-label="Barre d'outils inférieure droite">
     <!-- Views -->
     <button class="bb-btn bb-btn-label" id="tableViewBtn" title="Vue tableau" aria-label="Ouvrir la vue tableau">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -614,11 +614,11 @@
     </button>
     <div class="bb-sep"></div>
     <!-- Present + Laser -->
-    <button class="bb-btn bb-btn-label" id="presentBtn" title="Mode presentation (ancres)" aria-label="Lancer le mode presentation">
+    <button class="bb-btn bb-btn-label" id="presentBtn" title="Mode présentation (ancres)" aria-label="Lancer le mode présentation">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
         <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
       </svg>
-      Presenter
+      Présenter
     </button>
     <button class="bb-btn bb-btn-label" id="laserBtn" title="Pointeur laser" aria-label="Activer le pointeur laser">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -688,10 +688,10 @@
 
   <!-- Presentation controls (hidden by default) -->
   <div class="presentation-controls" id="presentationControls" style="display:none">
-    <button class="pres-btn" id="presPrev" title="Ancre precedente" aria-label="Ancre precedente">&#9664;</button>
+    <button class="pres-btn" id="presPrev" title="Ancre précédente" aria-label="Ancre précédente">&#9664;</button>
     <span class="pres-indicator" id="presIndicator">1/1</span>
     <button class="pres-btn" id="presNext" title="Ancre suivante" aria-label="Ancre suivante">&#9654;</button>
-    <button class="pres-btn" id="presExit" title="Quitter" aria-label="Quitter le mode presentation">&#10005;</button>
+    <button class="pres-btn" id="presExit" title="Quitter" aria-label="Quitter le mode présentation">&#10005;</button>
   </div>
 
   <!-- Theme and Template buttons are now in the bottom-bar-left -->
@@ -736,12 +736,12 @@
   </div>
 
   <!-- Template modal -->
-  <div class="modal-overlay" id="templateModal" style="display:none;" role="dialog" aria-label="Choix de modele">
+  <div class="modal-overlay" id="templateModal" style="display:none;" role="dialog" aria-label="Choix de modèle">
     <div class="modal modal-lg">
-      <h2>Choisir un modele</h2>
+      <h2>Choisir un modèle</h2>
       <div class="template-grid" id="templateGrid"></div>
       <div class="modal-actions">
-        <button class="modal-btn modal-btn-secondary" id="templateClose" aria-label="Fermer les modeles">Fermer</button>
+        <button class="modal-btn modal-btn-secondary" id="templateClose" aria-label="Fermer les modèles">Fermer</button>
       </div>
     </div>
   </div>
@@ -752,7 +752,7 @@
   <div class="brand-badge">
     <span class="brand-insuffle">Insuffle</span>
     <span style="opacity:0.5">|</span>
-    <span>Insuffle Academie</span>
+    <span>Insuffle Académie</span>
     <span class="selection-count" id="selectionCount" style="display:none"></span>
   </div>
 
@@ -770,12 +770,12 @@
           <h4>Outils</h4>
           <table class="help-table" aria-label="Raccourcis outils">
             <tbody>
-              <tr><td><kbd>V</kbd></td><td>Selectionner</td></tr>
-              <tr><td><kbd>H</kbd></td><td>Main (deplacer la vue)</td></tr>
+              <tr><td><kbd>V</kbd></td><td>Sélectionner</td></tr>
+              <tr><td><kbd>H</kbd></td><td>Main (déplacer la vue)</td></tr>
               <tr><td><kbd>R</kbd></td><td>Rectangle</td></tr>
               <tr><td><kbd>O</kbd></td><td>Cercle</td></tr>
               <tr><td><kbd>L</kbd></td><td>Ligne</td></tr>
-              <tr><td><kbd>A</kbd></td><td>Fleche</td></tr>
+              <tr><td><kbd>A</kbd></td><td>Flèche</td></tr>
               <tr><td><kbd>K</kbd></td><td>Connecteur</td></tr>
               <tr><td><kbd>D</kbd></td><td>Dessin libre</td></tr>
               <tr><td><kbd>S</kbd></td><td>Post-it</td></tr>
@@ -795,19 +795,19 @@
           <table class="help-table" aria-label="Raccourcis actions">
             <tbody>
               <tr><td><kbd>Ctrl+Z</kbd></td><td>Annuler</td></tr>
-              <tr><td><kbd>Ctrl+Y</kbd></td><td>Retablir</td></tr>
+              <tr><td><kbd>Ctrl+Y</kbd></td><td>Rétablir</td></tr>
               <tr><td><kbd>Ctrl+C</kbd></td><td>Copier</td></tr>
               <tr><td><kbd>Ctrl+X</kbd></td><td>Couper</td></tr>
               <tr><td><kbd>Ctrl+V</kbd></td><td>Coller (texte, images, post-its)</td></tr>
-              <tr><td><kbd>Ctrl+A</kbd></td><td>Tout selectionner</td></tr>
+              <tr><td><kbd>Ctrl+A</kbd></td><td>Tout sélectionner</td></tr>
               <tr><td><kbd>Ctrl+G</kbd></td><td>Grouper</td></tr>
-              <tr><td><kbd>Ctrl+Shift+G</kbd></td><td>Degrouper</td></tr>
+              <tr><td><kbd>Ctrl+Shift+G</kbd></td><td>Dégrouper</td></tr>
               <tr><td><kbd>Ctrl+D</kbd></td><td>Dupliquer</td></tr>
               <tr><td><kbd>Ctrl+F</kbd></td><td>Rechercher / Remplacer</td></tr>
               <tr><td><kbd>Home</kbd></td><td>Centrer sur le tableau</td></tr>
               <tr><td><kbd>Suppr</kbd></td><td>Supprimer</td></tr>
               <tr><td><kbd>N</kbd></td><td>Panneau ancres</td></tr>
-              <tr><td><kbd>?</kbd></td><td>Aide (cette fenetre)</td></tr>
+              <tr><td><kbd>?</kbd></td><td>Aide (cette fenêtre)</td></tr>
             </tbody>
           </table>
         </div>
@@ -817,21 +817,21 @@
             <tbody>
               <tr><td><kbd>Molette</kbd></td><td>Zoom</td></tr>
               <tr><td><kbd>Ctrl++/-</kbd></td><td>Zoom +/-</td></tr>
-              <tr><td><kbd>Ctrl+0</kbd></td><td>Adapter a l'ecran</td></tr>
-              <tr><td><kbd>Fleches</kbd></td><td>Deplacer selection (1px)</td></tr>
-              <tr><td><kbd>Shift+Fleches</kbd></td><td>Deplacer (10px)</td></tr>
-              <tr><td><kbd>Ctrl+Fleches</kbd></td><td>Deplacer (100px)</td></tr>
-              <tr><td><kbd>Alt+Glisser</kbd></td><td>Dupliquer un element</td></tr>
+              <tr><td><kbd>Ctrl+0</kbd></td><td>Adapter à l'écran</td></tr>
+              <tr><td><kbd>Flèches</kbd></td><td>Déplacer sélection (1px)</td></tr>
+              <tr><td><kbd>Shift+Flèches</kbd></td><td>Déplacer (10px)</td></tr>
+              <tr><td><kbd>Ctrl+Flèches</kbd></td><td>Déplacer (100px)</td></tr>
+              <tr><td><kbd>Alt+Glisser</kbd></td><td>Dupliquer un élément</td></tr>
               <tr><td><kbd>Shift</kbd></td><td>Proportions contraintes</td></tr>
-              <tr><td><kbd>Espace+Glisser</kbd></td><td>Deplacer la vue</td></tr>
+              <tr><td><kbd>Espace+Glisser</kbd></td><td>Déplacer la vue</td></tr>
             </tbody>
           </table>
           <h4 style="margin-top:12px">Collaboration</h4>
           <table class="help-table" aria-label="Astuces collaboration">
             <tbody>
-              <tr><td colspan="2">Clic sur utilisateur &#8594; aller a sa position</td></tr>
-              <tr><td colspan="2">Laser: visible par tous en temps reel</td></tr>
-              <tr><td colspan="2">Chat: discuter en temps reel</td></tr>
+              <tr><td colspan="2">Clic sur utilisateur &#8594; aller à sa position</td></tr>
+              <tr><td colspan="2">Laser: visible par tous en temps réel</td></tr>
+              <tr><td colspan="2">Chat: discuter en temps réel</td></tr>
               <tr><td colspan="2">Audio: communication vocale WebRTC</td></tr>
               <tr><td colspan="2">Animateur: timer, vote, isoloir, suivez-moi, brainstorm, tour de table, check-in</td></tr>
             </tbody>
@@ -864,7 +864,7 @@
   <div class="round-robin-banner" id="roundRobinBanner" style="display:none;">
     <span id="roundRobinText">Tour de table</span>
     <button class="round-robin-btn" id="roundRobinNext" style="display:none;" aria-label="Passer au participant suivant">Suivant</button>
-    <button class="round-robin-btn round-robin-btn-stop" id="roundRobinStop" style="display:none;" aria-label="Arreter le tour de table">Arreter</button>
+    <button class="round-robin-btn round-robin-btn-stop" id="roundRobinStop" style="display:none;" aria-label="Arrêter le tour de table">Arrêter</button>
   </div>
 
   <!-- Silent brainstorm modal -->
@@ -876,7 +876,7 @@
         <input type="number" id="brainstormMinutes" value="5" min="1" max="30" /> minutes
       </div>
       <div class="modal-actions">
-        <button class="modal-btn" id="brainstormStart" aria-label="Demarrer le brainstorm">Demarrer</button>
+        <button class="modal-btn" id="brainstormStart" aria-label="Démarrer le brainstorm">Démarrer</button>
         <button class="modal-btn modal-btn-secondary" id="brainstormCancel" aria-label="Annuler">Annuler</button>
       </div>
     </div>
@@ -906,7 +906,7 @@
   <!-- Check-in results overlay -->
   <div class="checkin-results" id="checkinResults" style="display:none;">
     <div class="checkin-results-header">
-      <span>Resultats Check-in</span>
+      <span>Résultats Check-in</span>
       <button class="checkin-results-close" id="checkinResultsClose">&times;</button>
     </div>
     <div class="checkin-results-body" id="checkinResultsBody"></div>
