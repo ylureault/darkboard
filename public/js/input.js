@@ -607,7 +607,7 @@ class InputHandler {
       }
       if (lower === 'f' && !e.ctrlKey && !e.metaKey) {
         // Toggle fullscreen in presentation mode
-        if (document.fullscreenElement) document.exitFullscreen();
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
         else document.documentElement.requestFullscreen().catch(() => {});
         return;
       }
@@ -671,9 +671,9 @@ class InputHandler {
     if (e.key === 'F5') {
       e.preventDefault();
       if (this.app.ui && this.app.ui.presentationActive) {
-        if (document.fullscreenElement) document.exitFullscreen();
-        else document.documentElement.requestFullscreen();
-      } else {
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        else document.documentElement.requestFullscreen().catch(() => {});
+      } else if (this.app.ui) {
         this.app.ui.startPresentation();
       }
       return;
@@ -766,7 +766,8 @@ class InputHandler {
       }
       // Deactivate laser
       if (this.app.ui && this.app.ui.laserActive) {
-        document.getElementById('laserBtn').click();
+        const laserBtn = document.getElementById('laserBtn');
+        if (laserBtn) laserBtn.click();
         return;
       }
       // Return to select tool and clear selection
