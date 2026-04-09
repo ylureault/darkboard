@@ -1317,7 +1317,7 @@ class DarkBoardApp {
 
     if (useRichText) {
       editor.contentEditable = 'true';
-      editor.innerHTML = el.richText || (el.text ? el.text.replace(/\n/g, '<br>') : '');
+      editor.innerHTML = this._sanitizeRichText(el.richText) || (el.text ? this._escapeHtml(el.text).replace(/\n/g, '<br>') : '');
       editor.style.outline = 'none';
       editor.style.whiteSpace = 'pre-wrap';
       editor.style.wordWrap = 'break-word';
@@ -1825,7 +1825,7 @@ class DarkBoardApp {
     if (!this.searchPanel) this.createSearchPanel();
     const visible = this.searchPanel.style.display !== 'none';
     this.searchPanel.style.display = visible ? 'none' : 'flex';
-    if (!visible) this.searchPanel.querySelector('.search-input').focus();
+    if (!visible) { const si = this.searchPanel.querySelector('.search-input'); if (si) si.focus(); }
   }
 
   closeSearchPanel() {
@@ -2297,6 +2297,7 @@ class DarkBoardApp {
 
     submitBtn.addEventListener('click', () => {
       const textarea = dialog.querySelector('.comment-input');
+      if (!textarea) return;
       const text = textarea.value.trim();
       if (!text) return;
 
@@ -2337,6 +2338,7 @@ class DarkBoardApp {
 
     // Focus textarea and stop key propagation
     const textarea = dialog.querySelector('.comment-input');
+    if (textarea) {
     setTimeout(() => textarea.focus(), 50);
     textarea.addEventListener('keydown', (e) => {
       e.stopPropagation();
@@ -2350,6 +2352,7 @@ class DarkBoardApp {
 
     // @mention autocomplete
     this._setupMentionAutocomplete(textarea);
+    }
   }
 
   // Tag editor panel - supports single or multi-select
@@ -3764,6 +3767,36 @@ class DarkBoardApp {
     const d = document.createElement('div');
     d.textContent = str;
     return d.innerHTML;
+  }
+
+  _sanitizeRichText(html) {
+    if (!html) return '';
+    const allowed = { B: 1, I: 1, U: 1, S: 1, BR: 1, SPAN: 1, DIV: 1, P: 1, EM: 1, STRONG: 1, SUB: 1, SUP: 1 };
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const walk = (node) => {
+      const children = [...node.childNodes];
+      for (const child of children) {
+        if (child.nodeType === 3) continue; // text node — safe
+        if (child.nodeType === 1) {
+          if (!allowed[child.tagName]) {
+            // Replace disallowed element with its text content
+            child.replaceWith(document.createTextNode(child.textContent));
+          } else {
+            // Remove all attributes except style (for color/font-size only)
+            const attrs = [...child.attributes];
+            for (const a of attrs) {
+              if (a.name === 'style') continue;
+              child.removeAttribute(a.name);
+            }
+            walk(child);
+          }
+        } else {
+          child.remove(); // comments, processing instructions, etc.
+        }
+      }
+    };
+    walk(doc.body);
+    return doc.body.innerHTML;
   }
 
   // =====================
