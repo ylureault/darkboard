@@ -429,7 +429,7 @@ class CanvasRenderer {
     if (this.selectionBox) {
       const dashLen = 6 / this.camera.zoom;
       const gapLen = 4 / this.camera.zoom;
-      const animOffset = ((performance.now() / 50) % (dashLen + gapLen)) / this.camera.zoom;
+      const animOffset = (performance.now() / 50) % (dashLen + gapLen);
       ctx.strokeStyle = '#4a9eff';
       ctx.lineWidth = 1.5 / this.camera.zoom;
       ctx.setLineDash([dashLen, gapLen]);
