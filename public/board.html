@@ -20,8 +20,8 @@
 <body>
   <!-- Loading overlay -->
   <div id="loadingOverlay" style="position:fixed;inset:0;z-index:99999;background:var(--bg,#1a1a2e);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity .3s">
-    <div style="width:36px;height:36px;border:3px solid rgba(74,158,255,0.2);border-top-color:#4a9eff;border-radius:50%;animation:dbspin .7s linear infinite"></div>
-    <span id="loadingMessage" style="color:#4a9eff;font-family:system-ui,sans-serif;font-size:14px">Chargement...</span>
+    <div style="width:36px;height:36px;border:3px solid rgba(74,158,255,0.2);border-top-color:var(--accent,#4a9eff);border-radius:50%;animation:dbspin .7s linear infinite"></div>
+    <span id="loadingMessage" style="color:var(--accent,#4a9eff);font-family:system-ui,sans-serif;font-size:14px">Chargement...</span>
     <style>@keyframes dbspin{to{transform:rotate(360deg)}}</style>
     <!-- #R2-191: Fun rotating loading messages -->
     <script>(function(){var m=['Préparation du canevas...','Chargement de la créativité...','Assemblage des post-its...','Connexion au tableau...','Affûtage des crayons...','Déploiement des idées...'];var e=document.getElementById('loadingMessage');if(e){e.textContent=m[Math.floor(Math.random()*m.length)];var i=0;setInterval(function(){i=(i+1)%m.length;e.textContent=m[i];},2000);}})();</script>
@@ -591,7 +591,7 @@
     <div class="bb-sync" id="syncIndicator">
       <div class="sync-dot" id="syncDot"></div>
       <span id="syncText">En ligne</span>
-      <span id="syncUsers" style="margin-left:6px;font-size:11px;color:#7a7a8e;"></span>
+      <span id="syncUsers" style="margin-left:6px;font-size:11px;color:var(--text-muted,#7a7a8e);"></span>
     </div>
   </div>
 
