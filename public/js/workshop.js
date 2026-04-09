@@ -1517,6 +1517,6 @@ class Workshop {
       sticky.height = 150;
       this.app.addElement(sticky);
     }
-    this.app.showToast('Template retrospective cree !');
+    this.app.showToast('Template rétrospective créé !');
   }
 }

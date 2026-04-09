@@ -1662,8 +1662,8 @@ class DarkBoardApp {
       <button class="fmt-btn" data-cmd="justifyCenter" title="Centre"><span style="font-size:11px">&#8801;</span></button>
       <button class="fmt-btn" data-cmd="justifyRight" title="Droite"><span style="font-size:10px;direction:rtl;display:block">&#9776;</span></button>
       <span class="fmt-sep"></span>
-      <button class="fmt-btn" data-cmd="insertUnorderedList" title="Liste a puces">&#8226;</button>
-      <button class="fmt-btn" data-cmd="insertOrderedList" title="Liste numerotee">1.</button>
+      <button class="fmt-btn" data-cmd="insertUnorderedList" title="Liste à puces">&#8226;</button>
+      <button class="fmt-btn" data-cmd="insertOrderedList" title="Liste numérotée">1.</button>
       <span class="fmt-sep"></span>
       <button class="fmt-btn" data-action="formatPainter" title="Pinceau de mise en forme">&#128396;</button>
       <button class="fmt-btn" data-cmd="removeFormat" title="Effacer">&#10005;</button>
@@ -5365,7 +5365,7 @@ DarkBoardApp.prototype._smartSpacing = function() {
 DarkBoardApp.prototype._handleLinkedElement = function(el) {
   if (!el || !el.linkedElementId) return false;
   var target = this.renderer.elements.get(el.linkedElementId);
-  if (!target) { this.showToast('Element lie introuvable'); return false; }
+  if (!target) { this.showToast('Élément lié introuvable'); return false; }
   var bounds = getElementBounds(target);
   if (bounds) {
     this.renderer.selectedIds.clear();
