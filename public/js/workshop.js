@@ -676,7 +676,7 @@ class Workshop {
   // Keyboard-triggered anchor search
   openAnchorSearch() {
     if (this.anchors.size === 0) {
-      this.app.showToast('Aucune ancre definie');
+      this.app.showToast('Aucune ancre définie');
       return;
     }
 
@@ -1034,7 +1034,7 @@ class Workshop {
     }
 
     if (stickies.length === 0) {
-      this.app.showToast('Aucun post-it a regrouper.');
+      this.app.showToast('Aucun post-it à regrouper.');
       return;
     }
 
@@ -1154,7 +1154,7 @@ class Workshop {
 
     this.app.applyOps(ops);
     this.app.sync.sendOps(ops);
-    this.app.showToast(allClusters.length + ' clusters crees !');
+    this.app.showToast(allClusters.length + ' clusters créés !');
   }
 
   // =====================
@@ -1385,7 +1385,7 @@ class Workshop {
     if (!this.isFacilitator) return;
     const duration = (minutes || 5) * 60;
     this.app.sync.send({ type: 'timer-start', duration: duration });
-    this.app.showToast('Pause de ' + (minutes || 5) + ' min - Levez-vous et etirez-vous !');
+    this.app.showToast('Pause de ' + (minutes || 5) + ' min - Levez-vous et étirez-vous !');
   }
 
   // #R2-116: Parking lot - dedicated frame for parked ideas
@@ -1397,7 +1397,7 @@ class Workshop {
     this.app.addElement(frame);
     // Add instruction sticky
     const sticky = createSticky(cam.x + 420, cam.y - 160);
-    sticky.text = 'Glissez ici les idees a traiter plus tard';
+    sticky.text = 'Glissez ici les idées à traiter plus tard';
     sticky.fill = '#ffd966';
     sticky.width = 180;
     sticky.height = 100;
