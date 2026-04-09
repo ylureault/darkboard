@@ -1277,7 +1277,7 @@ const Tools = {
         return;
       }
       // Create root node
-      const node = createMindmapNode(worldX - 80, worldY - 25, 'Idee centrale', null, '#4a9eff');
+      const node = createMindmapNode(worldX - 80, worldY - 25, 'Idée centrale', null, '#4a9eff');
       node.width = 200;
       node.height = 60;
       node.fontSize = 18;
@@ -1369,7 +1369,7 @@ const Tools = {
     cursor: 'crosshair',
 
     onPointerDown(app, worldX, worldY) {
-      const url = prompt('URL a integrer (YouTube, Figma, Google Docs, etc.):');
+      const url = prompt('URL à intégrer (YouTube, Figma, Google Docs, etc.):');
       if (!url) { app.setTool('select'); return; }
       const el = createEmbed(worldX - 240, worldY - 160, url);
       app.addElement(el);

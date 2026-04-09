@@ -1541,7 +1541,7 @@ const CARD_STATUS_COLORS = {
   'todo': '#888', 'in-progress': '#4a9eff', 'review': '#ffd966', 'done': '#4ecdc4'
 };
 const CARD_STATUS_LABELS = {
-  'todo': 'A faire', 'in-progress': 'En cours', 'review': 'En review', 'done': 'Termine'
+  'todo': 'À faire', 'in-progress': 'En cours', 'review': 'En review', 'done': 'Terminé'
 };
 const CARD_PRIORITY_COLORS = { 'high': '#e94560', 'medium': '#ffd966', 'low': '#4ecdc4' };
 
