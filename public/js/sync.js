@@ -37,13 +37,22 @@ class SyncClient {
       console.log('Connected to DarkBoard server');
 
       // Join board with name
-      this.ws.send(JSON.stringify({
-        type: 'join',
-        boardId: getBoardId(),
-        userId: getSessionId(),
-        name: this.app.userName
-      }));
+      try {
+        this.ws.send(JSON.stringify({
+          type: 'join',
+          boardId: getBoardId(),
+          userId: getSessionId(),
+          name: this.app.userName
+        }));
+      } catch (e) {
+        console.error('SyncClient: join send failed', e);
+        return;
+      }
 
+      // Merge any unflushed messages from a previous failed reconnect
+      if (this._pendingFlush && this._pendingFlush.length > 0) {
+        this.offlineQueue = this._pendingFlush.concat(this.offlineQueue);
+      }
       // Save offline queue for re-application after init
       this._pendingFlush = this.offlineQueue.slice();
       this.offlineQueue = [];
