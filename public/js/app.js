@@ -5431,7 +5431,7 @@ DarkBoardApp.prototype.showBoardStats = function() {
   }
   var overlay = document.createElement('div');
   overlay.className = 'confirm-overlay';
-  overlay.innerHTML = '<div class="confirm-dialog" style="max-width:400px">' + html + '<div class="confirm-actions"><button onclick="this.closest(\'.confirm-overlay\').remove()">Fermer</button></div></div>';
+  overlay.innerHTML = '<div class="confirm-dialog" style="max-width:400px">' + html + '<div class="confirm-actions"><button onclick="event.target.closest(\'.confirm-overlay\').remove()">Fermer</button></div></div>';
   document.body.appendChild(overlay);
 };
 

@@ -289,7 +289,7 @@ class Workshop {
     if (this.timer.running) {
       this.app.sync.send({ type: 'timer-stop' });
     } else {
-      this.app.sync.send({ type: 'timer-reset' });
+      this.app.sync.send({ type: 'timer-start', duration: this.timer.remaining || this.timer.duration });
     }
   }
 
@@ -319,7 +319,7 @@ class Workshop {
 
   startVote() {
     const activeQuota = document.querySelector('.quota-btn.active');
-    const quota = parseInt(activeQuota.dataset.quota);
+    const quota = activeQuota ? parseInt(activeQuota.dataset.quota) : 3;
     const hideResults = document.getElementById('voteHideResults').checked;
 
     this.hideVoteModal();
@@ -508,6 +508,7 @@ class Workshop {
   handleIsolationReveal(msg) {
     // Replace all elements with revealed ones
     this.app.renderer.elements.clear();
+    if (!msg.elements) { this.app.renderer.markDirty(); return; }
     for (const el of msg.elements) {
       this.app.renderer.elements.set(el.id, el);
     }
@@ -1288,12 +1289,12 @@ class Workshop {
     dlg.className = 'confirm-dialog';
     dlg.style.maxWidth = '400px';
     dlg.innerHTML = `<h3 style="margin:0 0 12px">ROTI - Retour sur le temps investi</h3>
-      <p style="color:var(--text-muted);margin-bottom:12px">Notez de 1 (perte de temps) a 5 (excellent)</p>
+      <p style="color:var(--text-muted);margin-bottom:12px">Notez de 1 (perte de temps) à 5 (excellent)</p>
       <div class="roti-buttons" style="display:flex;gap:8px;justify-content:center;margin:16px 0">
         ${[1,2,3,4,5].map(n => `<button class="roti-btn" data-score="${n}" style="width:48px;height:48px;border-radius:50%;border:2px solid var(--accent);background:var(--btn);color:var(--text);font-size:18px;cursor:pointer;font-weight:bold">${n}</button>`).join('')}
       </div>
       <div id="rotiResult" style="text-align:center;margin:8px 0;color:var(--text-muted)"></div>
-      <div class="confirm-actions"><button onclick="this.closest('.confirm-overlay').remove()">Fermer</button></div>`;
+      <div class="confirm-actions"><button onclick="event.target.closest('.confirm-overlay').remove()">Fermer</button></div>`;
     overlay.appendChild(dlg);
     document.body.appendChild(overlay);
     const resultEl = dlg.querySelector('#rotiResult');
