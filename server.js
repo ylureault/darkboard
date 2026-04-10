@@ -50,7 +50,8 @@ app.use(compression());
 // Security headers + #R2-196: CORS headers for API routes
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
+  // Allow iframe embedding from any origin (intentional: DarkBoard is embeddable)
+  res.setHeader('Content-Security-Policy', "frame-ancestors *");
   // #R2-196: CORS headers
   if (req.path.startsWith('/api')) {
     res.setHeader('Access-Control-Allow-Origin', '*');

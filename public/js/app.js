@@ -704,8 +704,9 @@ class DarkBoardApp {
         ctx.scale(this.renderer.camera.zoom, this.renderer.camera.zoom);
         ctx.translate(-this.renderer.camera.x, -this.renderer.camera.y);
 
+        const notVotable = { connector: 1, line: 1, arrow: 1, freehand: 1, frame: 1, image: 1, embed: 1 };
         for (const [id, el] of this.renderer.elements) {
-          if (el.type === 'sticky' || el.type === 'rect' || el.type === 'text') {
+          if (!notVotable[el.type]) {
             const count = this.workshop.getVoteCount(id);
             const voted = this.workshop.hasVoted(id);
             if (count > 0 || voted) {
@@ -2861,7 +2862,9 @@ class DarkBoardApp {
     if (!this.workshop || !this.workshop.isVotingActive()) return false;
 
     const hit = this.renderer.hitTest(worldX, worldY);
-    if (hit && (hit.type === 'sticky' || hit.type === 'rect' || hit.type === 'text')) {
+    // Allow voting on any "content" element (not connectors, lines, arrows, freehand, frames)
+    const notVotable = { connector: 1, line: 1, arrow: 1, freehand: 1, frame: 1, image: 1, embed: 1 };
+    if (hit && hit.id && !notVotable[hit.type]) {
       return this.workshop.castVote(hit.id);
     }
     return false;

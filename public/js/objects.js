@@ -546,6 +546,15 @@ function renderElement(ctx, el, selected, camera) {
     ctx.globalAlpha = Math.max(0, Math.min(1, el.opacity));
   }
 
+  // Isolation mode: render ghosted elements (other users' contributions during
+  // "mode isoloir") with a dimmed, blurred look so only the shape/activity is
+  // visible, not the content.
+  if (el._isolated) {
+    ctx.globalAlpha = (ctx.globalAlpha || 1) * 0.55;
+    // Slight blur so the scrambled block characters appear "floutés"
+    ctx.filter = 'blur(1.2px)';
+  }
+
   // Shadow support (for shapes that don't have built-in shadows)
   if (el.shadowEnabled && el.type !== 'sticky' && el.type !== 'card' && el.type !== 'envelope') {
     ctx.shadowColor = el.shadowColor || 'rgba(0,0,0,0.3)';

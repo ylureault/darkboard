@@ -999,6 +999,11 @@ button, .tool-btn, .bb-btn, .fctl-btn, .modal-btn, .ftb-btn {
   position: fixed;
   top: 68px;
   left: 12px;
+  width: max-content;
+  min-width: 180px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: var(--radius-lg); /* #R2-74 consistent border-radius */
