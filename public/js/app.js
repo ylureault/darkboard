@@ -2468,6 +2468,7 @@ class DarkBoardApp {
         commonTags.push(...(targets[0].tags || []));
       }
 
+      const esc = (s) => this._escapeHtml(s == null ? '' : String(s));
       panel.innerHTML = `
         <div class="tag-editor-header">
           <span>Tags${isMulti ? ` (${targets.length} post-its)` : ''}</span>
@@ -2475,21 +2476,23 @@ class DarkBoardApp {
         </div>
         <div class="tag-editor-current">
           ${commonTags.length === 0 ? '<span class="tag-editor-empty">Aucun tag</span>' :
-            commonTags.map(t => `
-              <span class="tag-pill" style="background:${t.color || '#888'}; color:${isLightColor(t.color || '#888') ? '#1a1a1a' : '#fff'}">
-                ${t.label}
-                <button class="tag-remove" data-label="${t.label}">&times;</button>
+            commonTags.map(t => {
+              const c = t.color || '#888';
+              return `
+              <span class="tag-pill" style="background:${esc(c)}; color:${isLightColor(c) ? '#1a1a1a' : '#fff'}">
+                ${esc(t.label)}
+                <button class="tag-remove" data-label="${esc(t.label)}">&times;</button>
               </span>
-            `).join('')}
+            `;}).join('')}
         </div>
         <div class="tag-editor-presets">
           <span class="tag-editor-label">Registre :</span>
           ${this.tagRegistry.filter(p => !commonTags.some(t => t.label === p.label)).map(p => `
             <div class="tag-preset-row">
-              <button class="tag-preset-btn" data-label="${p.label}" data-color="${p.color}" style="background:${p.color}; color:${isLightColor(p.color) ? '#1a1a1a' : '#fff'}">
-                ${p.label}
+              <button class="tag-preset-btn" data-label="${esc(p.label)}" data-color="${esc(p.color)}" style="background:${esc(p.color)}; color:${isLightColor(p.color) ? '#1a1a1a' : '#fff'}">
+                ${esc(p.label)}
               </button>
-              <button class="tag-registry-delete" data-label="${p.label}" title="Supprimer du registre">&times;</button>
+              <button class="tag-registry-delete" data-label="${esc(p.label)}" title="Supprimer du registre">&times;</button>
             </div>
           `).join('')}
           ${this.tagRegistry.filter(p => !commonTags.some(t => t.label === p.label)).length === 0 ? '<span class="tag-editor-empty">Tous attribues</span>' : ''}
@@ -2497,7 +2500,7 @@ class DarkBoardApp {
         <div class="tag-editor-custom">
           <input type="text" class="tag-custom-input" placeholder="Nouveau tag..." maxlength="20" />
           <div class="tag-color-row">
-            ${TAG_COLORS.map(c => `<span class="tag-color-swatch${c === '#4a9eff' ? ' active' : ''}" data-color="${c}" style="background:${c}"></span>`).join('')}
+            ${TAG_COLORS.map(c => `<span class="tag-color-swatch${c === '#4a9eff' ? ' active' : ''}" data-color="${esc(c)}" style="background:${esc(c)}"></span>`).join('')}
           </div>
           <button class="tag-add-btn">Ajouter</button>
         </div>
@@ -2571,6 +2574,7 @@ class DarkBoardApp {
 
     const panel = document.createElement('div');
     panel.className = 'card-editor-panel';
+    const esc = (s) => this._escapeHtml(s == null ? '' : String(s));
     panel.innerHTML = `
       <div class="card-editor-header">
         <h3>Carte</h3>
@@ -2578,7 +2582,7 @@ class DarkBoardApp {
       </div>
       <div class="card-editor-body">
         <label>Titre</label>
-        <input type="text" class="card-field" data-field="text" value="${(el.text || '').replace(/"/g, '&quot;')}" placeholder="Titre de la carte..." />
+        <input type="text" class="card-field" data-field="text" value="${esc(el.text)}" placeholder="Titre de la carte..." />
         <label>Statut</label>
         <select class="card-field" data-field="cardStatus">
           <option value="">-- Aucun --</option>
@@ -2595,15 +2599,15 @@ class DarkBoardApp {
           <option value="low" ${el.cardPriority === 'low' ? 'selected' : ''}>Basse</option>
         </select>
         <label>Tags (separes par virgule)</label>
-        <input type="text" class="card-field" data-field="cardTags" value="${(el.cardTags || []).join(', ')}" placeholder="Frontend, Sprint 4..." />
+        <input type="text" class="card-field" data-field="cardTags" value="${esc((el.cardTags || []).join(', '))}" placeholder="Frontend, Sprint 4..." />
         <label>Story Points</label>
-        <input type="number" class="card-field" data-field="cardPoints" value="${el.cardPoints || ''}" min="0" placeholder="0" />
+        <input type="number" class="card-field" data-field="cardPoints" value="${esc(el.cardPoints)}" min="0" placeholder="0" />
         <label>Assigne a</label>
-        <input type="text" class="card-field" data-field="cardAssignee" value="${el.cardAssignee || ''}" placeholder="Nom..." />
+        <input type="text" class="card-field" data-field="cardAssignee" value="${esc(el.cardAssignee)}" placeholder="Nom..." />
         <label>Date echeance</label>
-        <input type="date" class="card-field" data-field="cardDueDate" value="${el.cardDueDate || ''}" />
+        <input type="date" class="card-field" data-field="cardDueDate" value="${esc(el.cardDueDate)}" />
         <label>Description</label>
-        <textarea class="card-field card-desc" data-field="cardDescription" placeholder="Description detaillee...">${el.cardDescription || ''}</textarea>
+        <textarea class="card-field card-desc" data-field="cardDescription" placeholder="Description detaillee...">${esc(el.cardDescription)}</textarea>
         <label>Checklist</label>
         <div class="card-checklist-editor"></div>
         <button class="list-add-btn card-add-check">+ Ajouter un element</button>
@@ -2617,7 +2621,7 @@ class DarkBoardApp {
       container.innerHTML = el.cardChecklist.map((item, i) => `
         <div class="list-item-row">
           <input type="checkbox" ${item.checked ? 'checked' : ''} data-chk-idx="${i}" />
-          <input type="text" class="list-item-input" data-chk-text-idx="${i}" value="${(item.text || '').replace(/"/g, '&quot;')}" placeholder="Sous-tache..." />
+          <input type="text" class="list-item-input" data-chk-text-idx="${i}" value="${this._escapeHtml(item.text || '')}" placeholder="Sous-tache..." />
           <button class="list-item-del" data-chk-del="${i}">&times;</button>
         </div>
       `).join('');
@@ -2710,6 +2714,7 @@ class DarkBoardApp {
     panel.className = 'card-editor-panel';
 
     const renderList = () => {
+      const esc = (s) => this._escapeHtml(s == null ? '' : String(s));
       panel.innerHTML = `
         <div class="card-editor-header">
           <h3>Liste</h3>
@@ -2717,7 +2722,7 @@ class DarkBoardApp {
         </div>
         <div class="card-editor-body">
           <label>Titre</label>
-          <input type="text" class="list-title" value="${(el.text || '').replace(/"/g, '&quot;')}" placeholder="Titre..." />
+          <input type="text" class="list-title" value="${esc(el.text)}" placeholder="Titre..." />
           <div style="display:flex;align-items:center;gap:8px;margin:8px 0">
             <input type="checkbox" id="chkMode" ${el.checkboxMode ? 'checked' : ''} />
             <label for="chkMode" style="margin:0;text-transform:none;font-size:13px">Mode checklist</label>
@@ -2726,7 +2731,7 @@ class DarkBoardApp {
           <div class="list-items-editor">
             ${el.listItems.map((item, i) => `
               <div class="list-item-row">
-                <input type="text" class="list-item-input" data-idx="${i}" value="${(item.text || '').replace(/"/g, '&quot;')}" placeholder="Element..." />
+                <input type="text" class="list-item-input" data-idx="${i}" value="${esc(item.text)}" placeholder="Element..." />
                 <button class="list-item-del" data-idx="${i}">&times;</button>
               </div>
             `).join('')}
@@ -2895,7 +2900,10 @@ class DarkBoardApp {
 
     // My avatar
     const myFac = this.isFacilitator ? ' facilitator' : '';
-    avatarsHtml += `<div class="user-avatar${myFac}" style="background:${this.myColor}" title="${this.userName} (Vous)">${(this.userName || '').slice(0, 2).toUpperCase()}<span class="user-avatar-dot"></span></div>`;
+    const myNameSafe = this._escapeHtml(this.userName || '');
+    const myColorSafe = this._escapeHtml(this.myColor || '');
+    const myInitials = this._escapeHtml((this.userName || '').slice(0, 2).toUpperCase());
+    avatarsHtml += `<div class="user-avatar${myFac}" style="background:${myColorSafe}" title="${myNameSafe} (Vous)">${myInitials}<span class="user-avatar-dot"></span></div>`;
 
     // Remote user avatars (max 5 visible)
     let shown = 1;
@@ -2904,7 +2912,10 @@ class DarkBoardApp {
       const fac = user.isFacilitator ? ' facilitator' : '';
       const isActive = user.lastActivity && (Date.now() - user.lastActivity < 10000);
       const dotHtml = isActive ? '<span class="user-avatar-dot"></span>' : '';
-      avatarsHtml += `<div class="user-avatar${fac}" style="background:${user.color}" title="${user.name}">${(user.name || '').slice(0, 2).toUpperCase()}${dotHtml}</div>`;
+      const nameSafe = this._escapeHtml(user.name || '');
+      const colorSafe = this._escapeHtml(user.color || '');
+      const initialsSafe = this._escapeHtml((user.name || '').slice(0, 2).toUpperCase());
+      avatarsHtml += `<div class="user-avatar${fac}" style="background:${colorSafe}" title="${nameSafe}">${initialsSafe}${dotHtml}</div>`;
       shown++;
     }
 
@@ -2961,22 +2972,27 @@ class DarkBoardApp {
     let html = '';
 
     // Me
-    const myInitials = (this.userName || '').slice(0, 2).toUpperCase();
+    const myInitials = this._escapeHtml((this.userName || '').slice(0, 2).toUpperCase());
+    const myNameSafe = this._escapeHtml(this.userName || '');
+    const myColorSafe = this._escapeHtml(this.myColor || '');
     html += `<div class="users-dropdown-item">
-      <div class="user-avatar-sm" style="background:${this.myColor}">${myInitials}</div>
-      <span class="user-name">${this.userName} (Vous)</span>
+      <div class="user-avatar-sm" style="background:${myColorSafe}">${myInitials}</div>
+      <span class="user-name">${myNameSafe} (Vous)</span>
       ${this.isFacilitator ? '<span class="user-role">Animateur</span>' : ''}
     </div>`;
 
     // Remote users
     for (const [userId, user] of this.renderer.remoteUsers) {
-      const initials = (user.name || '').slice(0, 2).toUpperCase();
+      const initials = this._escapeHtml((user.name || '').slice(0, 2).toUpperCase());
       const roleHtml = user.isFacilitator ? '<span class="user-role">Animateur</span>' : '';
-      html += `<div class="users-dropdown-item" data-userid="${userId}">
-        <div class="user-avatar-sm" style="background:${user.color}">${initials}</div>
-        <span class="user-name">${user.name || userId}</span>
+      const userIdSafe = this._escapeHtml(userId);
+      const userNameSafe = this._escapeHtml(user.name || userId);
+      const userColorSafe = this._escapeHtml(user.color || '');
+      html += `<div class="users-dropdown-item" data-userid="${userIdSafe}">
+        <div class="user-avatar-sm" style="background:${userColorSafe}">${initials}</div>
+        <span class="user-name">${userNameSafe}</span>
         ${roleHtml}
-        <button class="goto-user-btn" data-goto="${userId}">Voir</button>
+        <button class="goto-user-btn" data-goto="${userIdSafe}">Voir</button>
       </div>`;
     }
 
@@ -4361,7 +4377,9 @@ class DarkBoardApp {
       ${Array.from(tagCounts.entries()).map(([label, count]) => {
         const regTag = (this.tagRegistry || []).find(t => t.label === label);
         const color = regTag ? regTag.color : '#888';
-        return `<button class="tag-filter-btn ${this._tagFilterActive === label ? 'active' : ''}" data-tag="${label}" style="--tag-color:${color}">${label} (${count})</button>`;
+        const labelSafe = this._escapeHtml(label);
+        const colorSafe = this._escapeHtml(color);
+        return `<button class="tag-filter-btn ${this._tagFilterActive === label ? 'active' : ''}" data-tag="${labelSafe}" style="--tag-color:${colorSafe}">${labelSafe} (${count})</button>`;
       }).join('')}
     `;
   }
