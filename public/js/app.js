@@ -774,6 +774,26 @@ class DarkBoardApp {
     }
   }
 
+  // Bulk-add elements in a single sync op so large imports don't trip
+  // the 100 ops/sec per-client rate limiter.
+  addElementsBatch(els) {
+    if (!Array.isArray(els) || els.length === 0) return;
+    const ops = [];
+    const inverseOps = [];
+    for (const el of els) {
+      this.renderer.elements.set(el.id, el);
+      ops.push({ type: 'add', elementId: el.id, element: el });
+      inverseOps.push({ type: 'delete', elementId: el.id });
+    }
+    this.history.push(ops, inverseOps);
+    this.sync.sendOps(ops);
+    this.renderer.markDirty();
+    this.hasUnsavedChanges = true;
+    this.updateTitle();
+    if (this.ui) this.ui.updateUndoRedoButtons();
+    this.updateEmptyHint();
+  }
+
   applyOps(ops) {
     for (const op of ops) {
       switch (op.type) {
@@ -2235,11 +2255,18 @@ class DarkBoardApp {
     this.showCommentModal(x, y, null);
   }
 
-  showCommentModal(x, y, elementId) {
-    // Check if there's an existing comment at this location
-    const existing = elementId
-      ? this.renderer.comments.find(c => c.elementId === elementId)
-      : null;
+  showCommentModal(x, y, elementId, existingId) {
+    // Resolve the comment to display: if a specific comment id was passed
+    // (e.g. via clicking a bubble), use it directly. Otherwise, fall back to
+    // the first comment for the element. Without the explicit id, canvas
+    // comments (elementId === null) and elements with multiple comments
+    // would never re-open the right one.
+    let existing = null;
+    if (existingId) {
+      existing = this.renderer.comments.find(c => c.id === existingId) || null;
+    } else if (elementId) {
+      existing = this.renderer.comments.find(c => c.elementId === elementId) || null;
+    }
 
     const overlay = document.createElement('div');
     overlay.className = 'confirm-overlay';
@@ -2361,15 +2388,17 @@ class DarkBoardApp {
     const existing = document.querySelector('.tag-editor-panel');
     if (existing) existing.remove();
 
-    // Gather target elements (multi-select support)
+    // Gather target elements (multi-select support). Tags now apply to any
+    // taggable element type, not just stickies.
     const targets = [];
     if (this.renderer.selectedIds.size > 1) {
       for (const id of this.renderer.selectedIds) {
         const e = this.renderer.elements.get(id);
-        if (e && e.type === 'sticky') targets.push(e);
+        if (e && this._isTaggable(e)) targets.push(e);
       }
     }
-    if (targets.length === 0) targets.push(el);
+    if (targets.length === 0 && this._isTaggable(el)) targets.push(el);
+    if (targets.length === 0) return;
 
     const screen = this.renderer.worldToScreen(el.x + el.width + 10, el.y);
 
@@ -2471,7 +2500,7 @@ class DarkBoardApp {
       const esc = (s) => this._escapeHtml(s == null ? '' : String(s));
       panel.innerHTML = `
         <div class="tag-editor-header">
-          <span>Tags${isMulti ? ` (${targets.length} post-its)` : ''}</span>
+          <span>Tags${isMulti ? ` (${targets.length} éléments)` : ''}</span>
           <button class="tag-editor-close">&times;</button>
         </div>
         <div class="tag-editor-current">
@@ -3145,7 +3174,7 @@ class DarkBoardApp {
         <div class="context-menu-item" data-action="toggleCollapse">${hit.collapsed ? '▼ Étendre' : '▶ Réduire'}</div>
         <div class="context-menu-item" data-action="deleteWithContent" style="color:var(--danger)">Supprimer avec le contenu</div>
         ` : ''}
-        ${hit.type === 'sticky' || (multiSel && Array.from(this.renderer.selectedIds).some(id => { const e = this.renderer.elements.get(id); return e && e.type === 'sticky'; })) ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editTags">🏷️ Tags</div>` : ''}
+        ${this._isTaggable(hit) || (multiSel && Array.from(this.renderer.selectedIds).some(id => { const e = this.renderer.elements.get(id); return e && this._isTaggable(e); })) ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editTags">🏷️ Tags</div>` : ''}
         ${hit.type === 'card' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editCard">✏️ Modifier la carte</div>` : ''}
         ${hit.type === 'list' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="editList">✏️ Modifier la liste</div>` : ''}
         ${hit.type === 'mindmap' ? `<div class="context-menu-separator"></div><div class="context-menu-item" data-action="addMindmapChild">🧠 Ajouter un nœud enfant</div><div class="context-menu-item" data-action="layoutMindmap">📐 Réorganiser</div>` : ''}
@@ -3784,8 +3813,18 @@ class DarkBoardApp {
 
   _escapeHtml(str) {
     const d = document.createElement('div');
-    d.textContent = str;
+    d.textContent = str == null ? '' : String(str);
     return d.innerHTML;
+  }
+
+  // Tags are visually rendered as pills along the bottom edge of the
+  // element, so anything that exposes a bounded box can carry tags.
+  // Linear elements (lines, arrows, freehand, connectors) are excluded
+  // because we have no stable place to render the pills.
+  _isTaggable(el) {
+    if (!el || !el.type) return false;
+    return el.type !== 'connector' && el.type !== 'line' &&
+           el.type !== 'arrow' && el.type !== 'freehand';
   }
 
   _sanitizeRichText(html) {

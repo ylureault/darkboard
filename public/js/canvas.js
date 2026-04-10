@@ -293,8 +293,8 @@ class CanvasRenderer {
     for (const el of sorted) {
       if (el.hidden) continue; // skip hidden elements (collapsed envelope children)
 
-      // Apply tag filter dimming
-      if (tagFilter && el.type === 'sticky') {
+      // Apply tag filter dimming (works for any taggable element type, not just stickies).
+      if (tagFilter) {
         const hasTags = el.tags && el.tags.some(t => t.label === tagFilter);
         if (!hasTags) {
           ctx.globalAlpha = 0.15;

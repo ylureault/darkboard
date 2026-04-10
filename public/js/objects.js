@@ -660,6 +660,51 @@ function renderElement(ctx, el, selected, camera) {
       break;
   }
 
+  // Tag pills — rendered for ANY element type with tags (not just stickies).
+  // Drawn after the element body but before ctx.restore so they inherit
+  // the same camera/rotation transform.
+  if (el.tags && el.tags.length > 0 && _cameraZoom >= 0.5 &&
+      el.type !== 'connector' && el.type !== 'line' && el.type !== 'arrow' &&
+      el.type !== 'freehand') {
+    drawTagPills(ctx, el);
+  }
+
+  ctx.restore();
+}
+
+// Generic tag pill renderer — works for any element exposing { x, y, width, height, tags }.
+function drawTagPills(ctx, el) {
+  const b = getElementBounds(el);
+  if (!b || b.w <= 0 || b.h <= 0) return;
+  const tagH = 18;
+  const tagPad = 6;
+  const tagGap = 4;
+  const tagFs = 10;
+  const tagY = b.y + b.h - tagH - 8;
+  let tagX = b.x + 10;
+  const maxTagX = b.x + b.w - 10;
+
+  ctx.save();
+  ctx.font = `600 ${tagFs}px -apple-system, BlinkMacSystemFont, sans-serif`;
+  ctx.textBaseline = 'middle';
+
+  for (const tag of el.tags) {
+    const label = tag && tag.label ? String(tag.label) : '';
+    if (!label) continue;
+    const tw = ctx.measureText(label).width + tagPad * 2;
+    if (tagX + tw > maxTagX) break; // No overflow
+
+    ctx.beginPath();
+    ctx.roundRect(tagX, tagY, tw, tagH, tagH / 2);
+    ctx.fillStyle = tag.color || 'rgba(0,0,0,0.15)';
+    ctx.fill();
+
+    ctx.fillStyle = isLightColor(tag.color || '#888') ? '#1a1a1a' : '#ffffff';
+    ctx.textAlign = 'left';
+    ctx.fillText(label, tagX + tagPad, tagY + tagH / 2);
+
+    tagX += tw + tagGap;
+  }
   ctx.restore();
 }
 
@@ -1061,37 +1106,7 @@ function drawSticky(ctx, el, camera) {
     ctx.restore();
   }
 
-  // Draw tags at the bottom (#103 - hide below zoom 0.5)
-  if (el.tags && el.tags.length > 0 && _cameraZoom >= 0.5) {
-    const tagH = 18;
-    const tagPad = 6;
-    const tagGap = 4;
-    const tagFs = 10;
-    const tagY = el.y + el.height - tagH - 8;
-    let tagX = el.x + 10;
-    const maxTagX = el.x + el.width - 10;
-
-    ctx.font = `600 ${tagFs}px -apple-system, BlinkMacSystemFont, sans-serif`;
-    ctx.textBaseline = 'middle';
-
-    for (const tag of el.tags) {
-      const tw = ctx.measureText(tag.label).width + tagPad * 2;
-      if (tagX + tw > maxTagX) break; // No overflow
-
-      // Tag pill background
-      ctx.beginPath();
-      ctx.roundRect(tagX, tagY, tw, tagH, tagH / 2);
-      ctx.fillStyle = tag.color || 'rgba(0,0,0,0.15)';
-      ctx.fill();
-
-      // Tag text
-      ctx.fillStyle = isLightColor(tag.color || '#888') ? '#1a1a1a' : '#ffffff';
-      ctx.textAlign = 'left';
-      ctx.fillText(tag.label, tagX + tagPad, tagY + tagH / 2);
-
-      tagX += tw + tagGap;
-    }
-  }
+  // Tags are now drawn generically by renderElement after the body.
 }
 
 // Check if a color is light (for tag text contrast)

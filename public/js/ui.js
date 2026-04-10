@@ -539,10 +539,10 @@ class UI {
 
     // Map old IDs to new IDs for references (children, connectors)
     const idMap = new Map();
-    let count = 0;
+    const prepared = [];
 
-    for (const orig of elements) {
-      const el = deepClone(orig);
+    for (let i = 0; i < elements.length; i++) {
+      const el = deepClone(elements[i]);
       const newId = generateId();
       idMap.set(el.id, newId);
       el.id = newId;
@@ -552,13 +552,13 @@ class UI {
       if (el.points) {
         el.points = el.points.map(p => ({ x: p.x + offsetX, y: p.y + offsetY }));
       }
-      el.zIndex = Date.now() + count;
-      count++;
-      this.app.addElement(el);
+      el.zIndex = Date.now() + i;
+      prepared.push(el);
     }
 
-    // Fix references (children, connectors)
-    for (const [, el] of this.app.renderer.elements) {
+    // Fix references (children, connectors) before adding to the board,
+    // so the batch op carries the correct linked IDs.
+    for (const el of prepared) {
       if (el.children) {
         el.children = el.children.map(cid => idMap.get(cid) || cid);
       }
@@ -566,8 +566,10 @@ class UI {
       if (el.targetId && idMap.has(el.targetId)) el.targetId = idMap.get(el.targetId);
     }
 
-    this.app.renderer.markDirty();
-    this.app.showToast(`${count} éléments importés !`);
+    // Send all elements in a single sync op to avoid tripping the
+    // per-client 100 ops/sec rate limiter on large imports.
+    this.app.addElementsBatch(prepared);
+    this.app.showToast(`${prepared.length} éléments importés !`);
   }
 
   importDraftIO(data) {
@@ -653,10 +655,9 @@ class UI {
     for (const el of elements) {
       el.x += offsetX;
       el.y += offsetY;
-      this.app.addElement(el);
     }
-
-    this.app.renderer.markDirty();
+    // Batch to avoid the rate limiter on large imports.
+    this.app.addElementsBatch(elements);
     this.app.showToast(`${elements.length} éléments importés depuis Draft.io !`);
   }
 
@@ -731,14 +732,8 @@ class UI {
       return;
     }
 
-    // Apply ops
-    for (const op of ops) {
-      this.app.renderer.elements.set(op.elementId, op.element);
-    }
-    const inverseOps = ops.map(op => ({ type: 'delete', elementId: op.elementId }));
-    this.app.history.push(ops, inverseOps);
-    this.app.sync.sendOps(ops);
-    this.app.renderer.markDirty();
+    // Batch via the shared helper so history + WS stay consistent with other imports.
+    this.app.addElementsBatch(ops.map(op => op.element));
     this.app.showToast(`${ops.length} éléments importés depuis Markdown`);
   }
 
@@ -932,10 +927,9 @@ class UI {
       el.x += offsetX;
       el.y += offsetY;
       if (el.x2 !== undefined) { el.x2 += offsetX; el.y2 += offsetY; }
-      this.app.addElement(el);
     }
-
-    this.app.renderer.markDirty();
+    // Batch to avoid tripping the 100 ops/sec WS rate limiter on large CSVs.
+    this.app.addElementsBatch(elements);
     this.app.showToast(`${elements.length} éléments importés depuis CSV !`);
   }
 
@@ -1223,10 +1217,9 @@ class UI {
       el.x += offsetX;
       el.y += offsetY;
       if (el.x2 !== undefined) { el.x2 += offsetX; el.y2 += offsetY; }
-      this.app.addElement(el);
     }
-
-    this.app.renderer.markDirty();
+    // Batch to avoid tripping the 100 ops/sec WS rate limiter on large Miro exports.
+    this.app.addElementsBatch(elements);
     this.app.showToast(`${elements.length} elements importes depuis Miro !`);
   }
 

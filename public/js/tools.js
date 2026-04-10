@@ -38,7 +38,7 @@ const Tools = {
       // Check comment bubble click
       const commentHit = app.renderer.hitTestComment(worldX, worldY);
       if (commentHit) {
-        app.showCommentModal(commentHit.x, commentHit.y, commentHit.elementId);
+        app.showCommentModal(commentHit.x, commentHit.y, commentHit.elementId, commentHit.id);
         return;
       }
 
