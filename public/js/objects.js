@@ -325,9 +325,10 @@ function parseRichText(html) {
   }
 
   const segments = [];
-  // Use a temporary div to parse HTML
-  const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = html;
+  // Use DOMParser (inert document) instead of a detached div to avoid
+  // triggering image loading / onerror XSS vectors from untrusted richText.
+  const parsedDoc = new DOMParser().parseFromString(html, 'text/html');
+  const tempDiv = parsedDoc.body;
 
   function walkNode(node, styles) {
     if (node.nodeType === 3) { // Text node
@@ -522,9 +523,9 @@ function renderRichText(ctx, segments, x, y, maxWidth, defaultFontSize, defaultC
 // Get plain text from rich text HTML
 function richTextToPlain(html) {
   if (!html || !/<[^>]+>/.test(html)) return html || '';
-  const div = document.createElement('div');
-  div.innerHTML = html;
-  return div.textContent || div.innerText || '';
+  // Use DOMParser (inert document) to avoid side effects from HTML parsing.
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.body.textContent || '';
 }
 
 // Render an element to canvas
