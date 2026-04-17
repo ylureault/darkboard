@@ -372,6 +372,24 @@ class CanvasRenderer {
         ctx.restore();
       }
       renderElement(ctx, el, this.selectedIds.has(el.id), this.camera);
+      if (this._flashMap && this._flashMap.has(el.id)) {
+        const elapsed = Date.now() - this._flashMap.get(el.id);
+        const t = Math.min(1, elapsed / 500);
+        const alpha = 1 - t;
+        if (alpha > 0) {
+          ctx.save();
+          const fb = getElementBounds(el);
+          const ring = 8 * alpha;
+          ctx.shadowColor = `rgba(74, 158, 255, ${0.7 * alpha})`;
+          ctx.shadowBlur = (16 + ring * 4) / this.camera.zoom;
+          ctx.strokeStyle = `rgba(74, 158, 255, ${0.5 * alpha})`;
+          ctx.lineWidth = (2 + ring * 0.5) / this.camera.zoom;
+          ctx.beginPath();
+          ctx.roundRect(fb.x - ring, fb.y - ring, fb.w + ring * 2, fb.h + ring * 2, (6 + ring) / this.camera.zoom);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
       if (el.reactions && el.reactions.length > 0) {
         renderReactionBar(ctx, el);
       }

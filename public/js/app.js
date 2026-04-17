@@ -926,11 +926,11 @@ class DarkBoardApp {
     if (ops) {
       this.applyOps(ops);
       this.sync.sendOps(ops);
-      // #87 - Multi-level undo info: describe what was undone
       const desc = this._describeOps(ops);
       this.showToast(desc ? `Annulé : ${desc}` : 'Annulé');
       this.updateTitle();
-      this.flashUndoRedoButton('undo'); // #R2-46
+      this.flashUndoRedoButton('undo');
+      this._flashOpsTargets(ops);
     }
     if (this.ui) this.ui.updateUndoRedoButtons();
   }
@@ -954,9 +954,20 @@ class DarkBoardApp {
       this.sync.sendOps(ops);
       this.showToast('R\u00e9tabli');
       this.updateTitle();
-      this.flashUndoRedoButton('redo'); // #R2-46
+      this.flashUndoRedoButton('redo');
+      this._flashOpsTargets(ops);
     }
     if (this.ui) this.ui.updateUndoRedoButtons();
+  }
+
+  _flashOpsTargets(ops) {
+    if (!ops) return;
+    for (const op of ops) {
+      if (op.type !== 'delete') {
+        const el = this.renderer.elements.get(op.elementId);
+        if (el) this._flashCreatedElement(el);
+      }
+    }
   }
 
   selectAll() {
@@ -3750,9 +3761,23 @@ class DarkBoardApp {
     }, 1000);
   }
 
-  // Stub: flash effect on newly created element
   _flashCreatedElement(el) {
-    // Brief highlight - no-op if not needed
+    if (!el || !el.id) return;
+    if (!this.renderer._flashMap) this.renderer._flashMap = new Map();
+    this.renderer._flashMap.set(el.id, Date.now());
+    this.renderer.markDirty();
+    const animate = () => {
+      if (!this.renderer._flashMap || !this.renderer._flashMap.has(el.id)) return;
+      this.renderer.markDirty();
+      const elapsed = Date.now() - this.renderer._flashMap.get(el.id);
+      if (elapsed < 500) {
+        requestAnimationFrame(animate);
+      } else {
+        this.renderer._flashMap.delete(el.id);
+        this.renderer.markDirty();
+      }
+    };
+    requestAnimationFrame(animate);
   }
 
   // Stub: milestone check

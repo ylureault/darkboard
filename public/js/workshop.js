@@ -629,7 +629,11 @@ class Workshop {
   renderAnchorsList() {
     const list = document.getElementById('anchorsList');
     if (this.anchors.size === 0) {
-      list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:13px;">Aucune ancre. Cliquez + pour en ajouter.</div>';
+      list.innerHTML = '<div class="panel-empty-state">' +
+        '<div class="empty-state-icon">&#9875;</div>' +
+        '<div class="empty-state-title">Aucune ancre</div>' +
+        '<div class="empty-state-hint">Cliquez sur <kbd>+</kbd> pour mémoriser la vue actuelle</div>' +
+        '</div>';
       return;
     }
 

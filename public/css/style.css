@@ -5509,3 +5509,203 @@ kbd {
     padding: 6px 10px;
   }
 }
+
+/* =========================
+   UX POLISH PASS 3 — Empty states, form inputs, undo feedback
+   ========================= */
+
+/* --- Empty state blocks (panels) --- */
+.panel-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  animation: emptyStateIn 0.3s ease-out;
+}
+@keyframes emptyStateIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.panel-empty-state .empty-state-icon {
+  font-size: 28px;
+  opacity: 0.35;
+  margin-bottom: 10px;
+  animation: emptyIconFloat 3s ease-in-out infinite;
+}
+@keyframes emptyIconFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.panel-empty-state .empty-state-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+  opacity: 0.7;
+}
+.panel-empty-state .empty-state-hint {
+  font-size: 11px;
+  line-height: 1.5;
+  max-width: 220px;
+}
+.panel-empty-state .empty-state-hint kbd {
+  font-size: 10px;
+  padding: 1px 5px;
+  background: var(--btn);
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+  margin: 0 1px;
+  font-family: var(--font-mono);
+}
+
+/* --- Form inputs consistent polish --- */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+textarea,
+select {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="search"]:focus,
+textarea:focus,
+select:focus {
+  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.15);
+}
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- Select dropdown custom arrow --- */
+select:not([multiple]) {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23aaa' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+body.light-theme select:not([multiple]) {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%235c5c5c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+}
+
+/* --- Textarea minimum sizing --- */
+textarea {
+  min-height: 60px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+/* --- Checkbox & radio polish --- */
+input[type="checkbox"], input[type="radio"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* --- Undo/redo button flash feedback --- */
+.btn-flash {
+  animation: undoRedoFlash 0.35s ease-out;
+}
+@keyframes undoRedoFlash {
+  0% { background: var(--accent-20) !important; transform: scale(1); box-shadow: 0 0 0 0 var(--accent-40); }
+  50% { background: var(--accent) !important; transform: scale(1.1); box-shadow: 0 0 14px var(--accent-40); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 transparent; }
+}
+
+/* --- Keyboard kbd refined style across app --- */
+kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  background: var(--btn);
+  border: 1px solid var(--panel-border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text);
+  line-height: 1;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.1);
+  white-space: nowrap;
+}
+
+/* --- Divider refinement --- */
+.toolbar .divider {
+  width: 1px;
+  height: 24px;
+  background: linear-gradient(to bottom, transparent, var(--panel-border) 20%, var(--panel-border) 80%, transparent);
+  margin: 0 4px;
+  opacity: 0.6;
+}
+
+/* --- Better toolbar grouping visual --- */
+.toolbar {
+  gap: 2px;
+}
+
+/* --- Dropdown items hover polish --- */
+.users-dropdown .dropdown-item {
+  transition: all 0.1s ease;
+}
+.users-dropdown .dropdown-item:hover {
+  background: var(--btn-hover);
+  padding-left: 14px;
+}
+
+/* --- Brand darkboard refined typography --- */
+.brand-darkboard {
+  letter-spacing: -0.3px;
+}
+
+/* --- Zoom display compact --- */
+#zoomDisplay {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3px;
+  font-weight: 600;
+}
+
+/* --- Subtle line-height polish in toasts --- */
+.toast {
+  line-height: 1.4;
+}
+
+/* --- Better scroll behavior --- */
+* {
+  scroll-behavior: smooth;
+}
+
+/* --- Reduce motion preference --- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --- Toast alignment fix with emoji/text --- */
+.toast {
+  align-items: center;
+}
+
+/* --- Sync indicator improved --- */
+.sync-indicator {
+  transition: all 0.15s ease;
+}
+.sync-indicator:hover {
+  background: var(--btn-hover);
+}
+.sync-dot {
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
