@@ -921,30 +921,35 @@ class CanvasRenderer {
     const x = comment.x;
     const y = comment.y;
     const sz = 24;
+    const isHovered = this._hoveredCommentId === comment.id;
+    const scale = isHovered ? 1.2 : 1;
     ctx.save();
+    if (isHovered) ctx.translate(x, y);
+    if (isHovered) ctx.scale(scale, scale);
+    const cx = isHovered ? 0 : x;
+    const cy = isHovered ? 0 : y;
     ctx.beginPath();
-    ctx.arc(x, y, sz / 2, 0, Math.PI * 2);
+    ctx.arc(cx, cy, sz / 2, 0, Math.PI * 2);
     ctx.fillStyle = comment.resolved ? '#666' : '#4a9eff';
-    ctx.shadowColor = 'rgba(0,0,0,0.3)';
-    ctx.shadowBlur = 6;
+    ctx.shadowColor = isHovered ? 'rgba(74,158,255,0.5)' : 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = isHovered ? 12 : 6;
     ctx.fill();
     ctx.shadowColor = 'transparent';
     ctx.fillStyle = 'white';
     ctx.font = 'bold 14px sans-serif';
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
-    ctx.fillText('💬', x, y);
+    ctx.fillText('💬', cx, cy);
     ctx.textAlign = 'left';
-    // Count
     if (comment.replies && comment.replies.length > 0) {
       ctx.beginPath();
-      ctx.arc(x + sz / 2 - 2, y - sz / 2 + 2, 8, 0, Math.PI * 2);
+      ctx.arc(cx + sz / 2 - 2, cy - sz / 2 + 2, 8, 0, Math.PI * 2);
       ctx.fillStyle = '#e94560';
       ctx.fill();
       ctx.fillStyle = 'white';
       ctx.font = 'bold 9px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(String(comment.replies.length + 1), x + sz / 2 - 2, y - sz / 2 + 2);
+      ctx.fillText(String(comment.replies.length + 1), cx + sz / 2 - 2, cy - sz / 2 + 2);
       ctx.textAlign = 'left';
     }
     ctx.restore();

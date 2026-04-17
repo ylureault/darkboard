@@ -1180,9 +1180,14 @@ function drawFreehand(ctx, el) {
 }
 
 function drawFrame(ctx, el) {
-  // #188: null/NaN guard
   if (!el || !isFinite(el.width) || !isFinite(el.height) || !isFinite(el.x) || !isFinite(el.y)) return;
   const r = 8;
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.12)';
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 3;
+
   ctx.beginPath();
   ctx.roundRect(el.x, el.y, el.width, el.height, r);
   if (el.fill && el.fill !== 'transparent') {
@@ -1195,6 +1200,7 @@ function drawFrame(ctx, el) {
   ctx.setLineDash([8, 4]);
   ctx.stroke();
   ctx.setLineDash([]);
+  ctx.restore();
 
   if (el.text) {
     const fontSize = el.fontSize || 16;
@@ -1762,8 +1768,8 @@ function drawList(ctx, el) {
   el.height = Math.max(60, totalH);
 
   // Shadow
-  ctx.shadowColor = 'rgba(0,0,0,0.2)';
-  ctx.shadowBlur = 8;
+  ctx.shadowColor = 'rgba(0,0,0,0.22)';
+  ctx.shadowBlur = 12;
   ctx.shadowOffsetY = 2;
 
   // Background
@@ -1894,9 +1900,9 @@ function drawImage(ctx, el) {
   if (!el.imageData) return;
   const img = getCachedImage(el.imageData);
   if (img.complete && img.naturalWidth > 0) {
-    ctx.shadowColor = 'rgba(0,0,0,0.2)';
-    ctx.shadowBlur = 8;
-    ctx.shadowOffsetY = 2;
+    ctx.shadowColor = 'rgba(0,0,0,0.22)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 3;
     ctx.drawImage(img, el.x, el.y, el.width, el.height);
     ctx.shadowColor = 'transparent';
   } else {

@@ -220,13 +220,20 @@ const Tools = {
           app.renderer.canvas.style.cursor = cursors[handleHit.handle] || 'default';
         } else {
           const hit = app.renderer.hitTest(worldX, worldY);
-          // Track hovered element for anchor display
           const newHoverId = hit ? hit.id : null;
           if (newHoverId !== app.renderer._hoveredElementId) {
             app.renderer._hoveredElementId = newHoverId;
             app.renderer.markDirty();
           }
-          if (hit) {
+          const commentHover = app.renderer.hitTestComment(worldX, worldY);
+          const newCommentHoverId = commentHover ? commentHover.id : null;
+          if (newCommentHoverId !== app.renderer._hoveredCommentId) {
+            app.renderer._hoveredCommentId = newCommentHoverId;
+            app.renderer.markDirty();
+          }
+          if (commentHover) {
+            app.renderer.canvas.style.cursor = 'pointer';
+          } else if (hit) {
             app.renderer.canvas.style.cursor = hit.locked ? 'not-allowed' : 'move';
           } else {
             app.renderer.canvas.style.cursor = 'default';

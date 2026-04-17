@@ -5086,3 +5086,206 @@ body.light-theme .brand-badge {
   color: var(--text-muted);
   font-size: 11px;
 }
+
+/* =========================
+   UX POLISH PASS — Micro-interactions & Visual Feedback
+   ========================= */
+
+/* --- Button :active press feedback for all button types --- */
+.bb-btn { transition: background 0.15s, transform 0.1s; }
+.bb-btn:active { transform: scale(0.9); }
+.fctl-btn:active { transform: scale(0.94); }
+.modal-btn:active { transform: translateY(0) scale(0.97); }
+.modal-btn-secondary:active { transform: scale(0.96); }
+.quota-btn { transition: all 0.12s ease; }
+.quota-btn:active { transform: scale(0.95); }
+.vote-bar-btn:active { transform: scale(0.94); }
+.timer-ctrl-btn:active { transform: scale(0.94); }
+.search-btn:active { transform: scale(0.95); }
+.confirm-actions button { transition: all 0.12s ease; }
+.confirm-actions button:active { transform: scale(0.96); }
+.share-btn:active { transform: scale(0.94); }
+.anchor-toggle-btn:active { transform: scale(0.94); }
+
+/* --- Snappier tool button activation --- */
+.tool-btn { transition: all 0.12s ease; position: relative; overflow: hidden; }
+.tool-btn:active { transform: scale(0.9); transition-duration: 0.06s; }
+.tool-btn.active {
+  animation: toolActivePulse 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes toolActivePulse {
+  0% { box-shadow: 0 0 0 0 var(--accent-40); }
+  50% { box-shadow: 0 0 16px var(--accent-40), 0 0 4px rgba(74,158,255,0.4); }
+  100% { box-shadow: 0 0 12px var(--accent-40), 0 0 2px rgba(74,158,255,0.3); }
+}
+
+/* --- Shortcut label hover reveal --- */
+.tool-btn .shortcut {
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.tool-btn:hover .shortcut { opacity: 0.9; }
+.tool-btn.active .shortcut { opacity: 1; color: rgba(255,255,255,0.7); }
+
+/* --- Enhanced context menu entrance --- */
+@keyframes contextMenuIn {
+  0% { opacity: 0; transform: scale(0.92) translateY(-4px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.context-menu {
+  animation: contextMenuIn 0.15s cubic-bezier(0.34,1.56,0.64,1);
+}
+.context-menu-item {
+  transition: all 0.1s ease;
+}
+.context-menu-item:hover {
+  background: var(--btn-hover);
+  padding-left: 15px;
+}
+
+/* --- Enhanced modal entrance --- */
+.modal {
+  animation: modalOpen 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes modalOpen {
+  0% { opacity: 0; transform: scale(0.92) translateY(-16px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* --- Modal button lift on hover --- */
+.modal-btn {
+  transition: all 0.15s ease;
+}
+.modal-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(74,158,255,0.3);
+}
+
+/* --- Confirm dialog improved spacing --- */
+.confirm-dialog { animation: modalOpen 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+.confirm-actions { gap: 12px; }
+
+/* --- Toast bounce entrance --- */
+.toast {
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.toast.show {
+  animation: toastBounce 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes toastBounce {
+  0% { opacity: 0; transform: translateX(-50%) translateY(20px) scale(0.9); }
+  60% { opacity: 1; transform: translateX(-50%) translateY(-4px) scale(1.02); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+/* --- Empty board hint fade-in --- */
+.empty-board-hint {
+  animation: hintFadeIn 0.8s ease-out 0.3s both;
+}
+@keyframes hintFadeIn {
+  from { opacity: 0; transform: translate(-50%, -50%) translateY(12px); }
+  to { opacity: 0.6; transform: translate(-50%, -50%) translateY(0); }
+}
+
+/* --- Light theme scrollbar --- */
+body.light-theme ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+}
+body.light-theme ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+body.light-theme * {
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+/* --- Anchor item hover glow --- */
+.anchor-item:hover {
+  box-shadow: inset 0 0 12px rgba(74, 158, 255, 0.08);
+}
+
+/* --- Selection count badge springier animation --- */
+@keyframes selectionPop {
+  0% { opacity: 0; transform: translateX(-50%) scale(0.6); }
+  70% { opacity: 1; transform: translateX(-50%) scale(1.12); }
+  100% { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+
+/* --- Panel slide-in refined timing --- */
+@keyframes panelSlideIn {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Color panel smooth transitions --- */
+.color-panel { transition: opacity 0.15s ease-out; }
+.users-panel { transition: opacity 0.15s ease-out; }
+
+/* --- Improved disabled button states --- */
+button:disabled, .tool-btn:disabled {
+  cursor: not-allowed;
+}
+.tool-btn:disabled {
+  opacity: 0.3;
+}
+.tool-btn:disabled:hover {
+  transform: none;
+  background: transparent;
+}
+
+/* --- Focus-visible smooth ring --- */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  transition: outline-offset 0.15s ease;
+}
+
+/* --- Floating toolbar entrance --- */
+.floating-toolbar {
+  animation: floatBarIn 0.2s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes floatBarIn {
+  0% { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.95); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+/* --- Search panel entrance --- */
+.search-panel {
+  animation: panelSlideIn 0.2s ease-out;
+}
+
+/* --- Card/List editor panel entrance --- */
+.card-editor-panel {
+  animation: panelSlideIn 0.2s ease-out;
+}
+
+/* --- Tag filter bar smooth appear --- */
+.tag-filter-bar {
+  animation: panelSlideIn 0.15s ease-out;
+}
+
+/* --- Smooth cursor transitions on canvas --- */
+#canvas {
+  transition: cursor 0s;
+}
+
+/* --- Chat panel slide in from right --- */
+.chat-panel {
+  animation: chatSlideIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes chatSlideIn {
+  0% { opacity: 0; transform: translateX(20px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+/* --- Tour overlay improved --- */
+.tour-spotlight {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* --- Subtle hover glow on interactive panels --- */
+.brand-badge:hover {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+body.light-theme .brand-badge:hover {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
