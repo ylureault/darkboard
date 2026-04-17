@@ -1994,8 +1994,10 @@ class UI {
   initMinimap() {
     const btn = document.getElementById('toggleMinimap');
     if (!btn) return;
+    btn.classList.toggle('active', this.app.renderer.minimapEnabled);
     btn.addEventListener('click', () => {
       this.app.renderer.minimapEnabled = !this.app.renderer.minimapEnabled;
+      localStorage.setItem('darkboard-minimap', this.app.renderer.minimapEnabled ? '1' : '0');
       btn.classList.toggle('active', this.app.renderer.minimapEnabled);
       this.app.renderer.markDirty();
     });

@@ -14,7 +14,7 @@ class CanvasRenderer {
     this.gridEnabled = true;
     this.snapToGrid = false;
     this.snapGridSize = 20;
-    this.minimapEnabled = false;
+    this.minimapEnabled = localStorage.getItem('darkboard-minimap') !== '0';
     this.laserPointers = new Map(); // userId -> {x, y, color}
     this.comments = []; // anchored comments
     this.alignmentGuides = []; // { type: 'h'|'v', x?, y? }
@@ -561,28 +561,35 @@ class CanvasRenderer {
       ctx.restore();
     }
 
-    // Dimension tooltip during resize
+    // Dimension tooltip during resize/move (Miro-style accent badge)
     if (this._resizeDimensions) {
       const dim = this._resizeDimensions;
       const label = `${dim.w} × ${dim.h}`;
-      const fs = 12 / this.camera.zoom;
-      ctx.font = `600 ${fs}px system-ui, sans-serif`;
+      const fs = 11 / this.camera.zoom;
+      ctx.save();
+      ctx.font = `700 ${fs}px -apple-system, BlinkMacSystemFont, system-ui, sans-serif`;
       const tm = ctx.measureText(label);
-      const px = 6 / this.camera.zoom;
-      const py = 3 / this.camera.zoom;
+      const px = 8 / this.camera.zoom;
+      const py = 5 / this.camera.zoom;
       const bw = tm.width + px * 2;
       const bh = fs + py * 2;
       const bx = dim.x - bw / 2;
       const by = dim.y;
-      ctx.fillStyle = 'rgba(30, 30, 30, 0.85)';
+      // Shadow for pop
+      ctx.shadowColor = 'rgba(0,0,0,0.35)';
+      ctx.shadowBlur = 8 / this.camera.zoom;
+      ctx.shadowOffsetY = 2 / this.camera.zoom;
+      ctx.fillStyle = '#4a9eff';
       ctx.beginPath();
-      const r = 4 / this.camera.zoom;
+      const r = 6 / this.camera.zoom;
       ctx.roundRect(bx, by, bw, bh, r);
       ctx.fill();
+      ctx.shadowColor = 'transparent';
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(label, dim.x, by + bh / 2);
+      ctx.restore();
     }
 
     // Remote cursors — #184: only update at 30fps max
@@ -988,10 +995,11 @@ class CanvasRenderer {
 
   drawMinimap() {
     const ctx = this.ctx;
-    const mmW = 180;
-    const mmH = 120;
+    const mmW = 200;
+    const mmH = 140;
     const mmX = window.innerWidth - mmW - 16;
     const mmY = window.innerHeight - mmH - 60;
+    const headerH = 22;
 
 
     // Compute world bounds of all elements
@@ -1003,59 +1011,115 @@ class CanvasRenderer {
       if (b.x + b.w > maxX) maxX = b.x + b.w;
       if (b.y + b.h > maxY) maxY = b.y + b.h;
     }
-    if (!isFinite(minX)) return;
+
+    ctx.save();
+    // Shadow for depth
+    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur = 20;
+    ctx.shadowOffsetY = 4;
+
+    // Background with rounded corners
+    ctx.fillStyle = 'rgba(30,30,30,0.9)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(mmX, mmY, mmW, mmH + headerH, 10);
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.stroke();
+
+    // Header
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx.beginPath();
+    ctx.roundRect(mmX, mmY, mmW, headerH, [10, 10, 0, 0]);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.font = '600 11px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Vue d\'ensemble', mmX + 10, mmY + headerH / 2);
+
+    // Element count indicator
+    const count = this.elements.size;
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.font = '10px -apple-system, sans-serif';
+    const countText = `${count} élément${count !== 1 ? 's' : ''}`;
+    const countW = ctx.measureText(countText).width;
+    ctx.fillText(countText, mmX + mmW - countW - 10, mmY + headerH / 2);
+
+    const bodyY = mmY + headerH;
+
+    if (!isFinite(minX)) {
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.font = '11px -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Tableau vide', mmX + mmW / 2, bodyY + mmH / 2);
+      ctx.textAlign = 'left';
+      ctx.restore();
+      return;
+    }
 
     const pad = 100;
     minX -= pad; minY -= pad; maxX += pad; maxY += pad;
     const worldW = maxX - minX || 1;
     const worldH = maxY - minY || 1;
     const scale = Math.min(mmW / worldW, mmH / worldH);
+    const offsetX = (mmW - worldW * scale) / 2;
+    const offsetY = (mmH - worldH * scale) / 2;
 
-    // Background
-    ctx.save();
-    ctx.fillStyle = 'rgba(30,30,30,0.85)';
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-    ctx.lineWidth = 1;
+    // Clip to body area
     ctx.beginPath();
-    ctx.roundRect(mmX, mmY, mmW, mmH, 8);
-    ctx.fill();
-    ctx.stroke();
-
-    // Clip to minimap
-    ctx.beginPath();
-    ctx.roundRect(mmX, mmY, mmW, mmH, 8);
+    ctx.rect(mmX, bodyY, mmW, mmH);
     ctx.clip();
 
-    // Draw elements as dots
+    // Cache extents for hit testing
+    this._minimapExtents = { mmX, mmY: bodyY, mmW, mmH, minX, minY, scale, offsetX, offsetY };
+
+    // Draw elements with type-aware colors
     for (const el of this.elements.values()) {
       const b = getElementBounds(el);
-      const x = mmX + (b.x - minX) * scale;
-      const y = mmY + (b.y - minY) * scale;
+      const x = mmX + offsetX + (b.x - minX) * scale;
+      const y = bodyY + offsetY + (b.y - minY) * scale;
       const w = Math.max(2, b.w * scale);
       const h = Math.max(2, b.h * scale);
-      ctx.fillStyle = el.fill && el.fill !== 'transparent' ? el.fill : (el.stroke || '#888');
-      ctx.globalAlpha = 0.6;
-      ctx.fillRect(x, y, w, h);
+      let color = el.fill && el.fill !== 'transparent' ? el.fill : (el.stroke || '#888');
+      if (el.type === 'connector' || el.type === 'line' || el.type === 'arrow') color = el.stroke || '#888';
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.7;
+      if (w > 3 && h > 3) {
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, Math.min(1.5, w / 4));
+        ctx.fill();
+      } else {
+        ctx.fillRect(x, y, w, h);
+      }
     }
     ctx.globalAlpha = 1;
 
-    // Viewport rectangle
+    // Viewport rectangle with accent highlight
     const tlWorld = this.screenToWorld(0, 0);
     const brWorld = this.screenToWorld(window.innerWidth, window.innerHeight);
-    const vpX = mmX + (tlWorld.x - minX) * scale;
-    const vpY = mmY + (tlWorld.y - minY) * scale;
+    const vpX = mmX + offsetX + (tlWorld.x - minX) * scale;
+    const vpY = bodyY + offsetY + (tlWorld.y - minY) * scale;
     const vpW = (brWorld.x - tlWorld.x) * scale;
     const vpH = (brWorld.y - tlWorld.y) * scale;
+    ctx.fillStyle = 'rgba(74, 158, 255, 0.12)';
+    ctx.fillRect(vpX, vpY, vpW, vpH);
     ctx.strokeStyle = '#4a9eff';
     ctx.lineWidth = 2;
     ctx.strokeRect(vpX, vpY, vpW, vpH);
+    // Viewport corners for better visual
+    ctx.fillStyle = '#4a9eff';
+    const cornerSz = 3;
+    [[vpX, vpY], [vpX + vpW - cornerSz, vpY], [vpX, vpY + vpH - cornerSz], [vpX + vpW - cornerSz, vpY + vpH - cornerSz]].forEach(([cx, cy]) => {
+      ctx.fillRect(cx, cy, cornerSz, cornerSz);
+    });
 
     ctx.restore();
 
     // Cache the minimap region for throttled reuse
     const dpr = window.devicePixelRatio || 1;
     try {
-      this._minimapCache = this.ctx.getImageData(mmX * dpr, mmY * dpr, mmW * dpr, mmH * dpr);
+      this._minimapCache = this.ctx.getImageData(mmX * dpr, mmY * dpr, mmW * dpr, (mmH + headerH) * dpr);
     } catch (e) {
       this._minimapCache = null;
     }
@@ -1113,28 +1177,14 @@ class CanvasRenderer {
   // Hit test minimap for navigation
   hitTestMinimap(screenX, screenY) {
     if (!this.minimapEnabled) return null;
-    const mmW = 180, mmH = 120;
-    const mmX = window.innerWidth - mmW - 16;
-    const mmY = window.innerHeight - mmH - 60;
-    if (screenX >= mmX && screenX <= mmX + mmW && screenY >= mmY && screenY <= mmY + mmH) {
-      // Compute world position from minimap click
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      for (const el of this.elements.values()) {
-        const b = getElementBounds(el);
-        if (b.x < minX) minX = b.x;
-        if (b.y < minY) minY = b.y;
-        if (b.x + b.w > maxX) maxX = b.x + b.w;
-        if (b.y + b.h > maxY) maxY = b.y + b.h;
-      }
-      if (!isFinite(minX)) return null;
-      const pad = 100;
-      minX -= pad; minY -= pad; maxX += pad; maxY += pad;
-      const worldW = maxX - minX || 1;
-      const worldH = maxY - minY || 1;
-      const scale = Math.min(mmW / worldW, mmH / worldH);
+    const e = this._minimapExtents;
+    if (!e) return null;
+    // Include header in click area (but clicks on header scroll to fit-all would be nice, for now same behavior)
+    const hitX1 = e.mmX, hitY1 = e.mmY, hitX2 = e.mmX + e.mmW, hitY2 = e.mmY + e.mmH;
+    if (screenX >= hitX1 && screenX <= hitX2 && screenY >= hitY1 && screenY <= hitY2) {
       return {
-        worldX: minX + (screenX - mmX) / scale,
-        worldY: minY + (screenY - mmY) / scale
+        worldX: e.minX + (screenX - e.mmX - e.offsetX) / e.scale,
+        worldY: e.minY + (screenY - e.mmY - e.offsetY) / e.scale
       };
     }
     return null;

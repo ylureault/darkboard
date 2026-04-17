@@ -5709,3 +5709,289 @@ kbd {
 .sync-dot {
   transition: background-color 0.2s ease, transform 0.2s ease;
 }
+
+/* =========================
+   UX POLISH PASS 4 — Miro-level competitor differentiators
+   ========================= */
+
+/* --- Floating toolbar premium polish --- */
+.floating-toolbar {
+  background: rgba(30, 30, 30, 0.95);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
+  padding: 4px;
+  gap: 1px;
+}
+body.light-theme .floating-toolbar {
+  background: rgba(255, 255, 254, 0.95);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+.ftb-btn {
+  transition: all 0.12s ease;
+  border-radius: 6px;
+  position: relative;
+}
+.ftb-btn::after {
+  content: attr(title);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: rgba(30, 30, 30, 0.95);
+  color: var(--text);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 300;
+}
+.ftb-btn:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.ftb-btn:hover {
+  background: rgba(74, 158, 255, 0.15);
+  color: var(--accent);
+}
+.ftb-sep {
+  width: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 4px 2px;
+}
+body.light-theme .ftb-sep {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* --- Color panel compact premium --- */
+.color-panel {
+  border-radius: 12px;
+  padding: 10px;
+  gap: 6px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.15);
+}
+.color-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 2px solid rgba(255,255,255,0.08);
+  position: relative;
+}
+.color-swatch.selected::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  pointer-events: none;
+  animation: swatchSelect 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes swatchSelect {
+  0% { transform: scale(0.7); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* --- Users panel premium --- */
+.users-panel {
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.users-panel .user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  border: 2px solid var(--panel);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.users-panel .user-avatar:hover {
+  transform: scale(1.15) translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 5;
+}
+
+/* --- Sticky note style enhancements (CSS side, for text editor overlay) --- */
+.text-editor-overlay[data-el-type="sticky"] {
+  font-family: 'Kalam', 'Caveat', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* --- Zoom level indicator premium --- */
+.bb-zoom-level {
+  min-width: 48px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  transition: color 0.2s;
+}
+.bb-zoom-level:hover {
+  color: var(--accent);
+  cursor: pointer;
+}
+
+/* --- Brand badge premium hover --- */
+.brand-badge {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.brand-badge:hover .brand-darkboard {
+  background: linear-gradient(135deg, var(--accent), #6db3ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* --- Share button premium --- */
+.share-btn {
+  background: linear-gradient(135deg, var(--accent) 0%, #3580d9 100%);
+  color: white;
+  font-weight: 600;
+  border: none;
+  box-shadow: 0 2px 8px rgba(74, 158, 255, 0.25);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.share-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(74, 158, 255, 0.4);
+}
+.share-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(74, 158, 255, 0.3);
+}
+
+/* --- Anchor panel premium --- */
+.anchors-panel {
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+.anchor-item {
+  border-radius: 8px;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.anchor-item:hover {
+  background: linear-gradient(90deg, rgba(74, 158, 255, 0.08), transparent);
+}
+
+/* --- Context menu premium depth --- */
+.context-menu {
+  padding: 6px;
+  border-radius: 10px;
+}
+.context-menu-item {
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+/* --- Selection rectangle marker corners --- */
+.selection-handles-glow {
+  filter: drop-shadow(0 0 4px rgba(74,158,255,0.4));
+}
+
+/* --- Chat panel premium header --- */
+.chat-header {
+  background: linear-gradient(180deg, rgba(74,158,255,0.06), transparent);
+  border-bottom: 1px solid var(--panel-border);
+}
+.chat-msg {
+  transition: background 0.15s ease;
+  border-radius: 8px;
+}
+.chat-msg:hover {
+  background: var(--btn-hover);
+}
+
+/* --- Loading overlay with gradient --- */
+#loadingOverlay {
+  background: radial-gradient(ellipse at center, #1e1e1e 0%, #121212 100%);
+}
+body.light-theme #loadingOverlay {
+  background: radial-gradient(ellipse at center, #ffffff 0%, #f2f1ef 100%);
+}
+
+/* --- Template cards premium --- */
+.template-grid .template-card {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--panel-border);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.template-grid .template-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 12px 40px rgba(74, 158, 255, 0.2), 0 2px 6px rgba(0,0,0,0.15);
+}
+
+/* --- Facilitator badge with icon --- */
+.user-item.facilitator::before {
+  content: '★';
+  color: var(--warning);
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+/* --- Vote badge pulse when new --- */
+.vote-badge-new {
+  animation: voteBadgePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes voteBadgePop {
+  0% { transform: scale(0); opacity: 0; }
+  70% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* --- Comment bubble badge improved --- */
+.comment-bubble-count {
+  animation: commentCountBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes commentCountBounce {
+  0% { transform: scale(0); }
+  60% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+/* --- Collab ping animation --- */
+@keyframes collabPing {
+  0% { transform: scale(0.5); opacity: 0.8; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
+/* --- Tooltip text refined --- */
+[data-tooltip]::after,
+.tool-btn[data-tooltip]::after,
+.bb-btn[data-tooltip]::after,
+.ftb-btn::after {
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+/* --- Zoom transition smoothness --- */
+#canvas {
+  transition: none;
+}
+
+/* --- Name dialog typography --- */
+#nameDialog .modal h2 {
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+
+/* --- Scrollbar thinner on panels --- */
+.anchors-list::-webkit-scrollbar,
+.chat-messages::-webkit-scrollbar,
+.users-panel::-webkit-scrollbar {
+  width: 6px;
+}

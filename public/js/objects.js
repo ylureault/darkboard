@@ -982,14 +982,22 @@ function drawSticky(ctx, el, camera) {
   ctx.fillStyle = foldGrad;
   ctx.fill();
 
-  // #107 - Subtle gradient overlay for depth on stickies
+  // #107 - Subtle gradient overlay for depth on stickies + top highlight
   const stickyGrad = ctx.createLinearGradient(el.x, el.y, el.x, el.y + el.height);
-  stickyGrad.addColorStop(0, 'rgba(255,255,255,0.06)');
-  stickyGrad.addColorStop(1, 'rgba(0,0,0,0.04)');
+  stickyGrad.addColorStop(0, 'rgba(255,255,255,0.1)');
+  stickyGrad.addColorStop(0.15, 'rgba(255,255,255,0.03)');
+  stickyGrad.addColorStop(1, 'rgba(0,0,0,0.06)');
   ctx.fillStyle = stickyGrad;
   ctx.beginPath();
   ctx.roundRect(el.x, el.y, el.width, el.height, r);
   ctx.fill();
+
+  // Subtle inner edge highlight (paper look)
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(el.x + 0.5, el.y + 0.5, el.width - 1, el.height - 1, r - 0.5);
+  ctx.stroke();
 
   // #R2-140: Priority level indicator on stickies
   if (el.priority) {
