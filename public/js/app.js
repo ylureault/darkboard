@@ -1513,7 +1513,7 @@ class DarkBoardApp {
           }
           if (el.type === 'sticky') {
             const lines = newPlain.split('\n').length;
-            const minH = Math.max(200, lines * (el.fontSize || 16) * 1.4 + 28);
+            const minH = Math.min(Math.max(200, lines * (el.fontSize || 16) * 1.4 + 28), 800);
             if (minH > el.height) {
               props.height = minH;
               oldProps.height = el.height;

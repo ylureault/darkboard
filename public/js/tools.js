@@ -401,12 +401,6 @@ const Tools = {
         app.renderer.selectionBox = normalizeRect(
           this.dragStart.x, this.dragStart.y, dx, dy
         );
-        app.renderer.selectionBox = {
-          x: app.renderer.selectionBox.x,
-          y: app.renderer.selectionBox.y,
-          w: app.renderer.selectionBox.w,
-          h: app.renderer.selectionBox.h
-        };
       }
 
       app.renderer.markDirty();

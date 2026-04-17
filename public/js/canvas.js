@@ -703,22 +703,24 @@ class CanvasRenderer {
     ctx.fill();
     ctx.setLineDash([]);
 
-    // #106 - Corner resize handles (circular, larger)
-    const corners = [
-      { x: bounds.x, y: bounds.y },
-      { x: bounds.x + bounds.w, y: bounds.y },
-      { x: bounds.x, y: bounds.y + bounds.h },
-      { x: bounds.x + bounds.w, y: bounds.y + bounds.h },
-    ];
+    // #106 - Corner resize handles (circular, larger) — skip for linear elements
+    if (el.type !== 'line' && el.type !== 'arrow' && el.type !== 'connector' && el.type !== 'freehand') {
+      const corners = [
+        { x: bounds.x, y: bounds.y },
+        { x: bounds.x + bounds.w, y: bounds.y },
+        { x: bounds.x, y: bounds.y + bounds.h },
+        { x: bounds.x + bounds.w, y: bounds.y + bounds.h },
+      ];
 
-    ctx.fillStyle = 'white';
-    ctx.strokeStyle = '#4a9eff';
-    ctx.lineWidth = 2 / this.camera.zoom;
-    for (const h of corners) {
-      ctx.beginPath();
-      ctx.arc(h.x, h.y, handleSize / 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+      ctx.fillStyle = 'white';
+      ctx.strokeStyle = '#4a9eff';
+      ctx.lineWidth = 2 / this.camera.zoom;
+      for (const h of corners) {
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, handleSize / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
     }
 
     // Connection anchor points (edge centers) — like Miro
