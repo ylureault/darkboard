@@ -2627,7 +2627,7 @@ class DarkBoardApp {
           <option value="medium" ${el.cardPriority === 'medium' ? 'selected' : ''}>Moyenne</option>
           <option value="low" ${el.cardPriority === 'low' ? 'selected' : ''}>Basse</option>
         </select>
-        <label>Tags (separes par virgule)</label>
+        <label>Tags (séparés par virgule)</label>
         <input type="text" class="card-field" data-field="cardTags" value="${esc((el.cardTags || []).join(', '))}" placeholder="Frontend, Sprint 4..." />
         <label>Story Points</label>
         <input type="number" class="card-field" data-field="cardPoints" value="${esc(el.cardPoints)}" min="0" placeholder="0" />
@@ -2650,7 +2650,7 @@ class DarkBoardApp {
       container.innerHTML = el.cardChecklist.map((item, i) => `
         <div class="list-item-row">
           <input type="checkbox" ${item.checked ? 'checked' : ''} data-chk-idx="${i}" />
-          <input type="text" class="list-item-input" data-chk-text-idx="${i}" value="${this._escapeHtml(item.text || '')}" placeholder="Sous-tache..." />
+          <input type="text" class="list-item-input" data-chk-text-idx="${i}" value="${this._escapeHtml(item.text || '')}" placeholder="Sous-tâche..." />
           <button class="list-item-del" data-chk-del="${i}">&times;</button>
         </div>
       `).join('');
@@ -2756,11 +2756,11 @@ class DarkBoardApp {
             <input type="checkbox" id="chkMode" ${el.checkboxMode ? 'checked' : ''} />
             <label for="chkMode" style="margin:0;text-transform:none;font-size:13px">Mode checklist</label>
           </div>
-          <label>Elements</label>
+          <label>Éléments</label>
           <div class="list-items-editor">
             ${el.listItems.map((item, i) => `
               <div class="list-item-row">
-                <input type="text" class="list-item-input" data-idx="${i}" value="${esc(item.text)}" placeholder="Element..." />
+                <input type="text" class="list-item-input" data-idx="${i}" value="${esc(item.text)}" placeholder="Élément..." />
                 <button class="list-item-del" data-idx="${i}">&times;</button>
               </div>
             `).join('')}
@@ -5164,7 +5164,7 @@ DarkBoardApp.prototype.initDraftSave = function() {
   var self = this;
   this._draftIndicator = document.createElement('div');
   this._draftIndicator.className = 'draft-saved-indicator';
-  this._draftIndicator.textContent = 'Brouillon sauvegarde';
+  this._draftIndicator.textContent = 'Brouillon sauvegardé';
   document.body.appendChild(this._draftIndicator);
   setInterval(function() {
     if (self.renderer.elements.size === 0) return;
@@ -5418,7 +5418,7 @@ DarkBoardApp.prototype._smartSpacing = function() {
     }
     curX += (el.width || 100) + gap;
   }
-  if (ops.length > 0) { this.history.push(ops, inverseOps); this.sync.sendOps(ops); this.renderer.markDirty(); this.showToast('Espacement égalise'); }
+  if (ops.length > 0) { this.history.push(ops, inverseOps); this.sync.sendOps(ops); this.renderer.markDirty(); this.showToast('Espacement égalisé'); }
 };
 
 // #R2-107: Navigate to linked element on click
@@ -5500,7 +5500,7 @@ DarkBoardApp.prototype.duplicateBoard = function() {
   var self = this;
   var newId = getBoardId() + '-copy-' + Date.now().toString(36).slice(-4);
   fetch('/api/boards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: newId }) })
-    .then(function() { self.showToast('Board duplique: ' + newId); window.open('/' + newId, '_blank'); })
+    .then(function() { self.showToast('Board dupliqué : ' + newId); window.open('/' + newId, '_blank'); })
     .catch(function() { self.showToast('Erreur lors de la duplication'); });
 };
 
@@ -5560,13 +5560,13 @@ DarkBoardApp.prototype.shareReadOnly = function() {
 // #R2-129: Board title editing
 DarkBoardApp.prototype.editBoardTitle = function() {
   var newTitle = prompt('Titre du board:', this._boardTitle || getBoardId());
-  if (newTitle !== null && newTitle.trim()) { this._boardTitle = newTitle.trim(); document.title = 'DarkBoard - ' + this._boardTitle; this.showToast('Titre mis a jour'); }
+  if (newTitle !== null && newTitle.trim()) { this._boardTitle = newTitle.trim(); document.title = 'DarkBoard - ' + this._boardTitle; this.showToast('Titre mis à jour'); }
 };
 
 // #R2-130: Board description/notes
 DarkBoardApp.prototype.editBoardDescription = function() {
   var desc = prompt('Notes / Description du board:', this._boardDescription || '');
-  if (desc !== null) { this._boardDescription = desc; this.showToast('Description mise a jour'); }
+  if (desc !== null) { this._boardDescription = desc; this.showToast('Description mise à jour'); }
 };
 
 // #R2-133: Emoji reactions on chat messages
@@ -6231,7 +6231,7 @@ DarkBoardApp.prototype.importCSVToStickies = function(text) {
     this.history.push(ops, inverseOps);
     this.sync.sendOps(ops);
     this.renderer.markDirty();
-    this.showToast(ops.length + ' post-its importes depuis CSV');
+    this.showToast(ops.length + ' post-its importés depuis CSV');
   }
 };
 

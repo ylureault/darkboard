@@ -993,7 +993,7 @@ class Workshop {
     this.app.sync.send({ type: 'timer-start', duration });
 
     this.silentBrainstorm = true;
-    this.app.showToast('Brainstorm silencieux lance pour ' + minutes + ' minutes');
+    this.app.showToast('Brainstorm silencieux lancé pour ' + minutes + ' minutes');
 
     // Monitor timer to auto-reveal when done
     this._brainstormCheckInterval = setInterval(() => {
@@ -1177,7 +1177,7 @@ class Workshop {
       btn.classList.toggle('selected', btn.dataset.emoji === emoji);
     });
 
-    this.app.showToast('Vote enregistre !');
+    this.app.showToast('Vote enregistré !');
   }
 
   syncCheckin(msg) {
@@ -1373,7 +1373,7 @@ class Workshop {
       label: p.label,
       action: () => {
         self.app.sync.send({ type: 'timer-start', duration: p.duration });
-        self.app.showToast('Timer lance: ' + p.label);
+        self.app.showToast('Timer lancé : ' + p.label);
       }
     }));
     buttons.push({ label: 'Personnalise', action: () => self.showTimerModal() });
@@ -1479,14 +1479,14 @@ class Workshop {
         el._origOpacity = el.opacity;
         el.opacity = 0.3 + intensity * 0.7;
       }
-      this.app.showToast('Heatmap de vote activee');
+      this.app.showToast('Heatmap de vote activée');
     } else {
       // Restore original opacities
       for (const [elementId] of Object.entries(results)) {
         const el = this.app.renderer.elements.get(elementId);
         if (el && el._origOpacity !== undefined) { el.opacity = el._origOpacity; delete el._origOpacity; }
       }
-      this.app.showToast('Heatmap de vote desactivee');
+      this.app.showToast('Heatmap de vote désactivée');
     }
     this.app.renderer.markDirty();
   }

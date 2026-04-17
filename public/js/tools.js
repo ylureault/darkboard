@@ -1389,9 +1389,17 @@ const Tools = {
     name: 'eraser',
     cursor: 'crosshair',
     erasing: false,
+    // Accumulate deletions during a single drag so the whole stroke becomes
+    // one undo entry. Without this, erasing 10 elements required 10 undos.
+    _strokeOps: null,
+    _strokeInverse: null,
+    _strokeDeleted: null,
 
     onPointerDown(app, worldX, worldY) {
       this.erasing = true;
+      this._strokeOps = [];
+      this._strokeInverse = [];
+      this._strokeDeleted = new Set();
       this.erase(app, worldX, worldY);
     },
 
@@ -1402,17 +1410,25 @@ const Tools = {
 
     erase(app, worldX, worldY) {
       const hit = app.renderer.hitTest(worldX, worldY);
-      if (hit) {
-        const ops = [{ type: 'delete', elementId: hit.id }];
-        const inverseOps = [{ type: 'add', elementId: hit.id, element: deepClone(hit) }];
-        app.applyOps(ops);
-        app.history.push(ops, inverseOps);
-        app.sync.sendOps(ops);
-      }
+      if (!hit || this._strokeDeleted.has(hit.id)) return;
+      this._strokeDeleted.add(hit.id);
+      const ops = [{ type: 'delete', elementId: hit.id }];
+      const inverseOps = [{ type: 'add', elementId: hit.id, element: deepClone(hit) }];
+      app.applyOps(ops);
+      app.sync.sendOps(ops);
+      this._strokeOps.push(ops[0]);
+      this._strokeInverse.push(inverseOps[0]);
     },
 
     onPointerUp(app) {
       this.erasing = false;
+      if (this._strokeOps && this._strokeOps.length > 0) {
+        app.history.push(this._strokeOps, this._strokeInverse);
+        if (app.ui) app.ui.updateUndoRedoButtons();
+      }
+      this._strokeOps = null;
+      this._strokeInverse = null;
+      this._strokeDeleted = null;
     },
 
     onKeyDown() {},

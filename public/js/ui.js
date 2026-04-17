@@ -520,7 +520,7 @@ class UI {
   importDarkBoard(data) {
     const elements = data.elements || [];
     if (elements.length === 0) {
-      this.app.showToast('Aucun élément a importer');
+      this.app.showToast('Aucun élément à importer');
       return;
     }
 
@@ -1034,7 +1034,7 @@ class UI {
       try {
         boardData = JSON.parse(jsonFiles[0].text);
       } catch(e) {
-        this.app.showToast('Aucune donnée trouvee dans le fichier .rtb');
+        this.app.showToast('Aucune donnée trouvée dans le fichier .rtb');
         return;
       }
     }
@@ -1220,7 +1220,7 @@ class UI {
     }
     // Batch to avoid tripping the 100 ops/sec WS rate limiter on large Miro exports.
     this.app.addElementsBatch(elements);
-    this.app.showToast(`${elements.length} elements importes depuis Miro !`);
+    this.app.showToast(`${elements.length} éléments importés depuis Miro !`);
   }
 
   initThemeToggle() {
@@ -1564,7 +1564,7 @@ class UI {
     });
     this.app.addElement(line);
 
-    const steps = ['Etape 1', 'Etape 2', 'Etape 3', 'Etape 4', 'Etape 5'];
+    const steps = ['Étape 1', 'Étape 2', 'Étape 3', 'Étape 4', 'Étape 5'];
     for (let i = 0; i < steps.length; i++) {
       const x = cx - 400 + i * 200;
       const dot = createElement('circle', {

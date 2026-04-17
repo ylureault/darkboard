@@ -861,8 +861,13 @@ test('194: Board connections set is functional', () => {
 // ============================================================
 
 test('195: MESSAGE_VALIDATORS - anchor operations', () => {
-  assert.ok(MESSAGE_VALIDATORS['anchor-add']({ anchor: { name: 'Start', id: 'a1' } }));
-  assert.ok(!MESSAGE_VALIDATORS['anchor-add']({ anchor: { id: 'a1' } })); // missing name
+  // anchor-add now requires finite numeric x/y; optional numeric zoom.
+  assert.ok(MESSAGE_VALIDATORS['anchor-add']({ anchor: { name: 'Start', id: 'a1', x: 100, y: 200 } }));
+  assert.ok(MESSAGE_VALIDATORS['anchor-add']({ anchor: { name: 'Start', id: 'a1', x: 0, y: 0, zoom: 1.5 } }));
+  assert.ok(!MESSAGE_VALIDATORS['anchor-add']({ anchor: { name: 'Start', id: 'a1' } })); // missing x/y
+  assert.ok(!MESSAGE_VALIDATORS['anchor-add']({ anchor: { id: 'a1', x: 0, y: 0 } })); // missing name
+  assert.ok(!MESSAGE_VALIDATORS['anchor-add']({ anchor: { name: 'Start', x: Infinity, y: 0 } })); // non-finite
+  assert.ok(!MESSAGE_VALIDATORS['anchor-add']({ anchor: { name: 'Start', x: 0, y: 0, zoom: -1 } })); // bad zoom
   assert.ok(!MESSAGE_VALIDATORS['anchor-add']({})); // missing anchor
 
   assert.ok(MESSAGE_VALIDATORS['anchor-update']({ anchorId: 'a1', props: { name: 'Updated' } }));
