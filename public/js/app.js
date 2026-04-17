@@ -2800,7 +2800,6 @@ class DarkBoardApp {
       panel.querySelector('.card-editor-close').addEventListener('click', () => panel.remove());
 
       panel.querySelector('.list-title').addEventListener('input', (e) => {
-        e.target.addEventListener('keydown', (ev) => ev.stopPropagation());
         const ops = [{ type: 'update', elementId: el.id, props: { text: e.target.value } }];
         const inverseOps = [{ type: 'update', elementId: el.id, props: { text: el.text } }];
         el.text = e.target.value;

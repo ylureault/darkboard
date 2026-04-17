@@ -1889,6 +1889,7 @@ body.light-theme .context-menu {
   font-size: 13px;
   width: 200px;
   outline: none;
+  transition: border-color 0.15s;
 }
 
 .view-search:focus { border-color: var(--accent); }
@@ -1902,7 +1903,10 @@ body.light-theme .context-menu {
   font-size: 13px;
   outline: none;
   cursor: pointer;
+  transition: border-color 0.15s;
 }
+.view-filter:focus { border-color: var(--accent); }
+.view-filter:hover { border-color: var(--text-muted); }
 
 .view-close-btn {
   background: none;
@@ -2159,7 +2163,7 @@ body.light-theme .context-menu {
 .kanban-card:hover .kanban-card-goto { display: block; }
 
 /* Light theme overrides for views */
-body.light-theme .view-overlay { background: #f5f4f2; /* #R2-66 warm */ }
+body.light-theme .view-overlay { background: var(--bg); }
 body.light-theme .view-header { background: rgba(255,255,254,0.85); }
 body.light-theme .view-table thead th { background: rgba(255,255,254,0.95); }
 body.light-theme .kanban-column { background: rgba(0,0,0,0.025); border-color: var(--panel-border); }
@@ -3498,6 +3502,10 @@ body.light-theme .mention-dropdown {
   font-size: 20px;
   cursor: pointer;
   padding: 0 4px;
+  transition: color 0.15s;
+}
+.embed-overlay-close:hover {
+  color: var(--danger);
 }
 .embed-overlay-body {
   flex: 1;
@@ -3597,6 +3605,11 @@ body.light-theme .mention-dropdown {
   padding: 8px 10px;
   color: var(--text);
   font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.chat-input-row input:focus {
+  border-color: var(--accent);
 }
 .chat-send {
   background: var(--accent);
