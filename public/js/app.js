@@ -740,6 +740,10 @@ class DarkBoardApp {
 
   setTool(name) {
     if (!Tools[name]) return;
+    if (this.textEditElement) {
+      const editor = document.querySelector('.text-editor-overlay');
+      if (editor) editor.blur();
+    }
     this.currentTool = name;
     this.ui.updateToolbar(name);
     this.renderer.previewElement = null;
@@ -985,13 +989,17 @@ class DarkBoardApp {
     const count = this.clipboard.length;
 
     if (count > 1) {
-      // Smart paste: arrange in grid pattern (5 per row) centered on camera
+      // Build ID remap for internal references
+      const idMap = new Map();
+      for (const orig of this.clipboard) {
+        idMap.set(orig.id, generateId());
+      }
       const perRow = Math.min(count, 5);
       const gap = 16;
       for (let i = 0; i < count; i++) {
         const orig = this.clipboard[i];
         const el = deepClone(orig);
-        el.id = generateId();
+        el.id = idMap.get(orig.id);
         const col = i % perRow;
         const row = Math.floor(i / perRow);
         const elW = el.width || 200;
@@ -1008,6 +1016,17 @@ class DarkBoardApp {
           const dx = el.x - orig.x;
           const dy = el.y - orig.y;
           el.points = el.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+        }
+        if (el.type === 'connector') {
+          if (el.sourceId && idMap.has(el.sourceId)) el.sourceId = idMap.get(el.sourceId);
+          if (el.targetId && idMap.has(el.targetId)) el.targetId = idMap.get(el.targetId);
+        }
+        if (el.mindmapParent && idMap.has(el.mindmapParent)) el.mindmapParent = idMap.get(el.mindmapParent);
+        if (el.mindmapChildren && Array.isArray(el.mindmapChildren)) {
+          el.mindmapChildren = el.mindmapChildren.map(cid => idMap.has(cid) ? idMap.get(cid) : cid);
+        }
+        if (el.children && Array.isArray(el.children)) {
+          el.children = el.children.map(cid => idMap.has(cid) ? idMap.get(cid) : cid);
         }
         el.zIndex = Date.now() + i;
         this.addElement(el);
@@ -1048,13 +1067,22 @@ class DarkBoardApp {
         const newId = generateId();
         idMap.set(orig.id, newId);
       }
-      // Second pass: remap connectors
+      // Second pass: remap connectors and mindmap references
       for (const orig of this.clipboard) {
         const el = deepClone(orig);
         el.id = idMap.get(orig.id);
         if (el.type === 'connector') {
           if (el.sourceId && idMap.has(el.sourceId)) el.sourceId = idMap.get(el.sourceId);
           if (el.targetId && idMap.has(el.targetId)) el.targetId = idMap.get(el.targetId);
+        }
+        if (el.mindmapParent && idMap.has(el.mindmapParent)) {
+          el.mindmapParent = idMap.get(el.mindmapParent);
+        }
+        if (el.mindmapChildren && Array.isArray(el.mindmapChildren)) {
+          el.mindmapChildren = el.mindmapChildren.map(cid => idMap.has(cid) ? idMap.get(cid) : cid);
+        }
+        if (el.children && Array.isArray(el.children)) {
+          el.children = el.children.map(cid => idMap.has(cid) ? idMap.get(cid) : cid);
         }
         newClipboard.push(el);
       }
