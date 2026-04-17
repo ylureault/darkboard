@@ -196,8 +196,13 @@ class CanvasRenderer {
     // Clear
     ctx.clearRect(0, 0, w, h);
 
-    // Background
+    // Background with subtle radial vignette
     ctx.fillStyle = this.bgColor || '#121212';
+    ctx.fillRect(0, 0, w, h);
+    const vg = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.7);
+    vg.addColorStop(0, 'rgba(255,255,255,0.012)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.06)');
+    ctx.fillStyle = vg;
     ctx.fillRect(0, 0, w, h);
 
     // Grid
@@ -353,16 +358,15 @@ class CanvasRenderer {
           }
         }
       }
-      // #R2-24: Hover highlight on elements (subtle border glow)
       if (this._hoveredElementId === el.id && !this.selectedIds.has(el.id)) {
         ctx.save();
-        ctx.shadowColor = 'rgba(74, 158, 255, 0.5)';
-        ctx.shadowBlur = 8 / this.camera.zoom;
-        ctx.strokeStyle = 'rgba(74, 158, 255, 0.35)';
+        ctx.shadowColor = 'rgba(74, 158, 255, 0.6)';
+        ctx.shadowBlur = 12 / this.camera.zoom;
+        ctx.strokeStyle = 'rgba(74, 158, 255, 0.4)';
         ctx.lineWidth = 2 / this.camera.zoom;
         const hb = getElementBounds(el);
         ctx.beginPath();
-        ctx.roundRect(hb.x - 2, hb.y - 2, hb.w + 4, hb.h + 4, 4 / this.camera.zoom);
+        ctx.roundRect(hb.x - 3, hb.y - 3, hb.w + 6, hb.h + 6, 6 / this.camera.zoom);
         ctx.stroke();
         ctx.shadowColor = 'transparent';
         ctx.restore();

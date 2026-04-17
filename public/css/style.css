@@ -5289,3 +5289,223 @@ button:disabled, .tool-btn:disabled {
 body.light-theme .brand-badge:hover {
   box-shadow: 0 4px 20px rgba(0,0,0,0.1);
 }
+
+/* =========================
+   UX POLISH PASS 2 — Refined interactions & visual depth
+   ========================= */
+
+/* --- Tooltip arrow indicator --- */
+.tool-btn[data-tooltip]::before {
+  content: '';
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  border: 4px solid transparent;
+  border-bottom-color: rgba(30, 30, 30, 0.95);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 200;
+}
+.tool-btn[data-tooltip]:hover::before {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.bb-btn[data-tooltip]::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  border: 4px solid transparent;
+  border-top-color: var(--panel);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 200;
+}
+.bb-btn[data-tooltip]:hover::before {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* --- Name dialog glass effect --- */
+#nameDialog {
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+}
+#nameDialog .modal {
+  border: 1px solid rgba(255,255,255,0.08);
+}
+body.light-theme #nameDialog .modal {
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+/* --- Improved selection count badge --- */
+.selection-count {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* --- Bottom bar glass refinement --- */
+.bottom-bar-left, .bottom-bar-right {
+  border: 1px solid rgba(255,255,255,0.06);
+}
+body.light-theme .bottom-bar-left,
+body.light-theme .bottom-bar-right {
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+/* --- Refined color swatch hover --- */
+.color-swatch {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.color-swatch:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 8px rgba(74,158,255,0.3);
+}
+.color-swatch:active {
+  transform: scale(1.05);
+}
+
+/* --- Timer display subtle glow --- */
+.timer-display {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+.timer-display.timer-warning {
+  box-shadow: 0 4px 20px rgba(240,184,64,0.2);
+}
+.timer-display.timer-danger {
+  box-shadow: 0 4px 20px rgba(233,69,96,0.2);
+}
+
+/* --- Users panel avatar pulse for active users --- */
+.users-panel .user-avatar {
+  transition: transform 0.15s ease;
+}
+.users-panel .user-avatar:hover {
+  transform: scale(1.1);
+}
+
+/* --- Facilitator panel action buttons --- */
+.fctl-btn {
+  transition: all 0.15s ease;
+}
+.fctl-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+}
+
+/* --- Sync indicator dot pulse when syncing --- */
+.sync-dot.syncing {
+  animation: syncPulse 1.2s ease-in-out infinite;
+}
+@keyframes syncPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.3); }
+}
+
+/* --- Help overlay refined entrance --- */
+#helpOverlay {
+  animation: helpFadeIn 0.3s ease-out;
+}
+@keyframes helpFadeIn {
+  from { opacity: 0; backdrop-filter: blur(0); }
+  to { opacity: 1; backdrop-filter: blur(10px); }
+}
+#helpOverlay .modal {
+  animation: modalOpen 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+/* --- Keyboard shortcut kbd refinement --- */
+kbd {
+  font-family: var(--font-mono);
+  transition: all 0.1s ease;
+}
+.help-section kbd:hover {
+  background: var(--btn-hover);
+  border-color: var(--accent);
+}
+
+/* --- Vote bar smooth entrance --- */
+.vote-bar {
+  animation: panelSlideIn 0.2s ease-out;
+}
+
+/* --- Isolation banner pulse --- */
+.isolation-banner {
+  animation: isolationPulse 3s ease-in-out infinite;
+}
+@keyframes isolationPulse {
+  0%, 100% { box-shadow: 0 4px 20px rgba(74,158,255,0.15); }
+  50% { box-shadow: 0 4px 20px rgba(74,158,255,0.3); }
+}
+
+/* --- Follow mode banner emphasis --- */
+.follow-banner {
+  animation: followBannerIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes followBannerIn {
+  0% { opacity: 0; transform: translateY(-10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Template modal card hover --- */
+.template-grid .template-card {
+  transition: all 0.2s ease;
+}
+.template-grid .template-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--elevation-3);
+}
+.template-grid .template-card:active {
+  transform: translateY(0);
+}
+
+/* --- Share button pulse on first load --- */
+.share-btn {
+  animation: shareAppear 0.3s ease-out 1s both;
+}
+@keyframes shareAppear {
+  0% { opacity: 0; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* --- Board not found dialog emphasis --- */
+#boardNotFoundDialog .modal {
+  border-left: 4px solid var(--danger);
+}
+
+/* --- Subtle text shadow on dark elements for readability --- */
+.brand-darkboard {
+  text-shadow: 0 1px 8px rgba(74,158,255,0.2);
+}
+
+/* --- Mobile refinements --- */
+@media (max-width: 640px) {
+  .bottom-bar-left, .bottom-bar-right {
+    padding: 4px;
+    border-radius: var(--radius-md);
+  }
+  .bb-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+  .tool-btn {
+    width: 34px;
+    height: 34px;
+  }
+  .tool-btn .shortcut {
+    display: none;
+  }
+  .brand-badge {
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+  .share-btn {
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+}
