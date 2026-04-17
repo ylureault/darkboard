@@ -164,16 +164,19 @@ class SyncClient {
         // This ensures ops are sent to server AND applied locally
         if (this._pendingFlush && this._pendingFlush.length > 0) {
           console.log('Flushing ' + this._pendingFlush.length + ' queued operations after init');
-          for (const msg of this._pendingFlush) {
+          for (const queuedMsg of this._pendingFlush) {
             try {
-              this.ws.send(JSON.stringify(msg));
-              // Re-apply ops locally since init replaced our state
-              if (msg.type === 'op' && msg.ops) {
-                this.app.applyOps(msg.ops);
+              this.ws.send(JSON.stringify(queuedMsg));
+              if (queuedMsg.type === 'op' && queuedMsg.ops) {
+                const safeOps = queuedMsg.ops.filter(op => {
+                  if (op.type === 'add' && this.app.renderer.elements.has(op.elementId)) return false;
+                  return true;
+                });
+                if (safeOps.length > 0) this.app.applyOps(safeOps);
               }
             } catch (e) {
               console.error('SyncClient: flush failed', e);
-              this.offlineQueue.push(msg);
+              this.offlineQueue.push(queuedMsg);
             }
           }
           this._pendingFlush = null;
@@ -429,6 +432,11 @@ class SyncClient {
         this.app.renderer.markDirty();
         break;
       }
+
+      case 'error':
+        console.warn('Server error:', msg.message);
+        this.app.showToast(msg.message || 'Erreur serveur', 'error');
+        break;
     }
   }
 

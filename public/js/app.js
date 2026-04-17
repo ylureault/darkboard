@@ -814,7 +814,7 @@ class DarkBoardApp {
     this.renderer.markDirty();
     this.updateTitle();
     this.updateEmptyHint();
-    // Update tag filter bar
+    if (this.ui) this.ui.updateUndoRedoButtons();
     if (this._updateTagFilterBar) this._updateTagFilterBar();
   }
 
@@ -4699,6 +4699,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // Remove loading overlay
   const loadingOverlay = document.getElementById('loadingOverlay');
   if (loadingOverlay) {
+    loadingOverlay.style.pointerEvents = 'none';
     loadingOverlay.style.opacity = '0';
     setTimeout(() => loadingOverlay.remove(), 300);
   }

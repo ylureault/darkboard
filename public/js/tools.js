@@ -502,13 +502,18 @@ const Tools = {
           app.sync.sendOps(ops);
 
           // Envelope/Frame: move children with container
+          // Use actual displacement (may differ from raw dx/dy due to snapping)
+          const firstOrig = this.originalElements.values().next().value;
+          const firstEl = firstOrig && app.renderer.elements.get(this.originalElements.keys().next().value);
+          const actualDx = firstEl ? firstEl.x - firstOrig.x : dx;
+          const actualDy = firstEl ? firstEl.y - firstOrig.y : dy;
           for (const [id] of this.originalElements) {
             const el = app.renderer.elements.get(id);
             if (el && el.type === 'envelope') {
-              app.moveEnvelopeWithChildren(id, dx, dy);
+              app.moveEnvelopeWithChildren(id, actualDx, actualDy);
             } else if (el && el.type === 'frame') {
               const precomputed = this.frameChildren && this.frameChildren.get(id);
-              app.moveFrameWithChildren(id, dx, dy, precomputed);
+              app.moveFrameWithChildren(id, actualDx, actualDy, precomputed);
             }
           }
 

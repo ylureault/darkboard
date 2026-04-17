@@ -38,6 +38,7 @@ class InputHandler {
     canvas.addEventListener('pointermove', (e) => this.onPointerMove(e));
     canvas.addEventListener('pointerup', (e) => this.onPointerUp(e));
     canvas.addEventListener('pointerleave', (e) => this.onPointerUp(e));
+    canvas.addEventListener('pointercancel', (e) => this.onPointerUp(e));
     canvas.addEventListener('dblclick', (e) => this.onDoubleClick(e));
 
     // Wheel zoom/pan
@@ -226,6 +227,7 @@ class InputHandler {
 
     if (e.button !== 0) return;
     this.pointerDown = true;
+    this.isDragging = true;
 
     const world = this.getWorldPos(e);
     const tool = Tools[this.app.currentTool];
@@ -306,6 +308,7 @@ class InputHandler {
 
     if (!this.pointerDown) return;
     this.pointerDown = false;
+    this.isDragging = false;
 
     const world = this.getWorldPos(e);
     const tool = Tools[this.app.currentTool];
