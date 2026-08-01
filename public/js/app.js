@@ -872,15 +872,6 @@ class DarkBoardApp {
   _doDeleteSelected() {
     if (this.renderer.selectedIds.size === 0) return;
 
-    // Delete connectors attached to selected elements first — but only for the
-    // elements that are actually going to be deleted. A locked element survives,
-    // so its connectors must survive with it.
-    for (const id of this.renderer.selectedIds) {
-      const el = this.renderer.elements.get(id);
-      if (el && el.locked) continue;
-      this.deleteConnectorsFor(id);
-    }
-
     const ops = [];
     const inverseOps = [];
     for (const id of this.renderer.selectedIds) {
@@ -893,6 +884,21 @@ class DarkBoardApp {
     if (ops.length === 0) {
       this.showToast('Objets verrouillés');
       return;
+    }
+
+    // Fold the attached connectors into the same entry so one Ctrl+Z restores
+    // the shapes and their arrows together. A locked element survives, so its
+    // connectors must survive with it.
+    const deleted = new Set(ops.map(o => o.elementId));
+    const collected = { ops: [], inverseOps: [] };
+    for (const id of deleted) {
+      this.deleteConnectorsFor(id, collected);
+    }
+    for (let i = 0; i < collected.ops.length; i++) {
+      if (deleted.has(collected.ops[i].elementId)) continue; // already queued
+      deleted.add(collected.ops[i].elementId);
+      ops.push(collected.ops[i]);
+      inverseOps.push(collected.inverseOps[i]);
     }
     this.applyOps(ops);
     this.history.push(ops, inverseOps);
@@ -1235,8 +1241,12 @@ class DarkBoardApp {
     }
   }
 
-  // Delete element and its connectors
-  deleteConnectorsFor(elementId) {
+  // Delete the connectors anchored to an element.
+  // When `collect` is supplied the ops are appended to it instead of being
+  // committed here, so the caller can fold them into a single undo entry —
+  // otherwise deleting a connected shape took several Ctrl+Z to reverse and
+  // left the board visibly half-restored in between.
+  deleteConnectorsFor(elementId, collect) {
     const connectors = Array.from(this.renderer.elements.values())
       .filter(e => e.type === 'connector' && (e.sourceId === elementId || e.targetId === elementId));
     const ops = [];
@@ -1245,11 +1255,18 @@ class DarkBoardApp {
       ops.push({ type: 'delete', elementId: conn.id });
       inverseOps.push({ type: 'add', elementId: conn.id, element: deepClone(conn) });
     }
-    if (ops.length > 0) {
-      this.applyOps(ops);
-      this.history.push(ops, inverseOps);
-      this.sync.sendOps(ops);
+    if (ops.length === 0) return;
+
+    if (collect) {
+      for (let i = 0; i < ops.length; i++) {
+        collect.ops.push(ops[i]);
+        collect.inverseOps.push(inverseOps[i]);
+      }
+      return;
     }
+    this.applyOps(ops);
+    this.history.push(ops, inverseOps);
+    this.sync.sendOps(ops);
   }
 
   // Envelope containment logic

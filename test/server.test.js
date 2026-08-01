@@ -1137,6 +1137,105 @@ test('212: getAllBoardIds returns all board IDs', () => {
 });
 
 // ============================================================
+// Board id hardening (path traversal)
+// ============================================================
+
+test('isValidBoardId: accepts safe slugs', () => {
+  const { isValidBoardId } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  assert.strictEqual(isValidBoardId('abc123'), true);
+  assert.strictEqual(isValidBoardId('my-board_2'), true);
+  assert.strictEqual(isValidBoardId('A'.repeat(128)), true);
+});
+
+test('isValidBoardId: rejects traversal and unsafe ids', () => {
+  const { isValidBoardId } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const bad = [
+    '../../../tmp/pwned', '..', '.', 'a/b', 'a\\b', 'a.b',
+    '', 'A'.repeat(129), 'a b', 'a b', null, undefined, 42, {},
+  ];
+  for (const id of bad) {
+    assert.strictEqual(isValidBoardId(id), false, `should reject: ${String(id)}`);
+  }
+});
+
+test('BoardStore: createBoard refuses an unsafe id', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+  assert.strictEqual(store.createBoard('../../escape'), null);
+  assert.strictEqual(store.getBoard('../../escape'), null);
+  assert.ok(store.createBoard('safe-id'));
+  store.deleteBoard('safe-id');
+});
+
+test('BoardStore: saveToDisk writes nothing for an unsafe id', () => {
+  const fs = require('fs');
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+  const evil = '../../../tmp/darkboard-traversal-test';
+  // Bypass createBoard's guard to prove the filesystem boundary also holds.
+  store.boards.set(evil, {
+    elements: new Map(), anchors: new Map(), comments: new Map(),
+    tagRegistry: [], connections: new Set(),
+    createdAt: Date.now(), lastModified: Date.now(),
+  });
+  store.saveToDisk(evil);
+  assert.strictEqual(fs.existsSync('/tmp/darkboard-traversal-test.json'), false);
+  store.boards.delete(evil);
+});
+
+// ============================================================
+// Validator hardening
+// ============================================================
+
+test('vote-start validator: rejects a quota that disables the limit', () => {
+  const v = MESSAGE_VALIDATORS['vote-start'];
+  assert.strictEqual(v({}), true, 'quota may be omitted');
+  assert.strictEqual(v({ quota: 3 }), true);
+  assert.strictEqual(v({ quota: 1000 }), true);
+  assert.strictEqual(v({ quota: 0 }), false);
+  assert.strictEqual(v({ quota: -1 }), false);
+  assert.strictEqual(v({ quota: 1001 }), false);
+  assert.strictEqual(v({ quota: 2.5 }), false);
+  assert.strictEqual(v({ quota: 'abc' }), false);
+  assert.strictEqual(v({ quota: Infinity }), false);
+  assert.strictEqual(v({ hideResults: 'yes' }), false);
+});
+
+test('fishbowl validator: bounds editorId and editorName', () => {
+  const v = MESSAGE_VALIDATORS['fishbowl'];
+  assert.strictEqual(v({ active: true }), true);
+  assert.strictEqual(v({ active: false, editorId: 'u1', editorName: 'Yoan' }), true);
+  assert.strictEqual(v({ active: 'yes' }), false);
+  assert.strictEqual(v({ active: true, editorName: 'x'.repeat(10000) }), false);
+  assert.strictEqual(v({ active: true, editorId: 'x'.repeat(10000) }), false);
+});
+
+// ============================================================
+// Persistence round-trip
+// ============================================================
+
+test('BoardStore: voting state survives a save/load round-trip', () => {
+  const { BoardStore } = require(path.join(__dirname, '..', 'lib', 'boards'));
+  const store = new BoardStore();
+  const id = 'srv-persist-voting';
+  const board = store.createBoard(id);
+  board.voting = { active: true, quota: 5, hideResults: true, votes: { e1: 2 }, userVotes: {}, voterDetails: {} };
+  store.saveToDisk(id);
+
+  const reloaded = new BoardStore();
+  const restored = reloaded.getBoard(id);
+  assert.ok(restored, 'board reloaded from disk');
+  assert.ok(restored.voting, 'voting restored');
+  assert.strictEqual(restored.voting.quota, 5);
+  assert.strictEqual(restored.voting.votes.e1, 2);
+  // The timer is deliberately NOT restored — a countdown resumed from a stale
+  // timestamp would be wrong.
+  assert.strictEqual(restored.timer, null);
+
+  reloaded.deleteBoard(id);
+});
+
+// ============================================================
 // Summary
 // ============================================================
 
