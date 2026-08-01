@@ -518,8 +518,21 @@ const Tools = {
             }
           }
 
-          // Update connectors attached to moved elements
-          app.updateConnectors(this.originalElements);
+          // Update connectors attached to moved elements. Children dragged along
+          // with a frame/envelope aren't in originalElements, so include them —
+          // otherwise their connectors stay behind, permanently detached.
+          const movedForConnectors = new Map(this.originalElements);
+          for (const [id] of this.originalElements) {
+            const el = app.renderer.elements.get(id);
+            if (!el) continue;
+            let children = null;
+            if (el.type === 'envelope') children = app.getEnvelopeChildren(id);
+            else if (el.type === 'frame') children = (this.frameChildren && this.frameChildren.get(id)) || app.getFrameChildren(id);
+            if (children) {
+              for (const child of children) movedForConnectors.set(child.id, child);
+            }
+          }
+          app.updateConnectors(movedForConnectors);
 
           // Envelope: check if moved elements landed in/out of envelopes
           app.updateEnvelopeContainment(this.originalElements);
@@ -541,6 +554,9 @@ const Tools = {
           const inverseOps = [{ type: 'update', elementId, props: oldProps }];
           app.history.push(ops, inverseOps);
           app.sync.sendOps(ops);
+          // Resizing moves the element's anchor points, so attached connectors
+          // need re-routing just as they do after a drag.
+          app.updateConnectors(new Map([[elementId, el]]));
         }
       } else if (this.dragType === 'marquee' && app.renderer.selectionBox) {
         const box = app.renderer.selectionBox;

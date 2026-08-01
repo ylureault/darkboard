@@ -2152,6 +2152,29 @@ class DarkBoardApp {
     if (this.updateUrlHash) this.updateUrlHash();
   }
 
+  // Shift an element by a delta, updating every field that holds an absolute
+  // position. Lines/arrows/connectors also store x2/y2 and freehand stores
+  // points[]; moving only x/y warps those shapes instead of translating them.
+  _translateElement(el, dx, dy, ops, inverseOps) {
+    if (!dx && !dy) return false;
+    const props = { x: el.x + dx, y: el.y + dy };
+    const oldProps = { x: el.x, y: el.y };
+    if (el.x2 !== undefined) {
+      props.x2 = el.x2 + dx;
+      props.y2 = el.y2 + dy;
+      oldProps.x2 = el.x2;
+      oldProps.y2 = el.y2;
+    }
+    if (el.points) {
+      oldProps.points = el.points.map(p => ({ x: p.x, y: p.y }));
+      props.points = el.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+    }
+    Object.assign(el, props);
+    ops.push({ type: 'update', elementId: el.id, props });
+    inverseOps.push({ type: 'update', elementId: el.id, props: oldProps });
+    return true;
+  }
+
   // Alignment tools
   alignSelected(mode) {
     if (this.renderer.selectedIds.size < 2) return;
@@ -2162,80 +2185,46 @@ class DarkBoardApp {
     }
     if (elements.length < 2) return;
 
+    // Every mode works off rendered bounds so lines and pen strokes — which have
+    // no width/height and may run bottom-right to top-left — align like anything else.
+    const bounds = elements.map(el => getElementBounds(el));
+    let delta;
+    if (mode === 'top') {
+      const v = Math.min(...bounds.map(b => b.y));
+      delta = (b) => [0, v - b.y];
+    } else if (mode === 'bottom') {
+      const v = Math.max(...bounds.map(b => b.y + b.h));
+      delta = (b) => [0, v - (b.y + b.h)];
+    } else if (mode === 'left') {
+      const v = Math.min(...bounds.map(b => b.x));
+      delta = (b) => [v - b.x, 0];
+    } else if (mode === 'right') {
+      const v = Math.max(...bounds.map(b => b.x + b.w));
+      delta = (b) => [v - (b.x + b.w), 0];
+    } else if (mode === 'centerH') {
+      const v = bounds.reduce((s, b) => s + b.y + b.h / 2, 0) / bounds.length;
+      delta = (b) => [0, v - (b.y + b.h / 2)];
+    } else if (mode === 'centerV') {
+      const v = bounds.reduce((s, b) => s + b.x + b.w / 2, 0) / bounds.length;
+      delta = (b) => [v - (b.x + b.w / 2), 0];
+    } else {
+      return;
+    }
+
     const ops = [];
     const inverseOps = [];
-
-    if (mode === 'top') {
-      const minY = Math.min(...elements.map(el => el.y));
-      for (const el of elements) {
-        if (el.y !== minY) {
-          inverseOps.push({ type: 'update', elementId: el.id, props: { y: el.y } });
-          el.y = minY;
-          ops.push({ type: 'update', elementId: el.id, props: { y: minY } });
-        }
-      }
-    } else if (mode === 'left') {
-      const minX = Math.min(...elements.map(el => el.x));
-      for (const el of elements) {
-        if (el.x !== minX) {
-          inverseOps.push({ type: 'update', elementId: el.id, props: { x: el.x } });
-          el.x = minX;
-          ops.push({ type: 'update', elementId: el.id, props: { x: minX } });
-        }
-      }
-    } else if (mode === 'bottom') {
-      const bounds = elements.map(el => getElementBounds(el));
-      const maxBottom = Math.max(...bounds.map(b => b.y + b.h));
-      for (let i = 0; i < elements.length; i++) {
-        const el = elements[i];
-        const newY = maxBottom - bounds[i].h;
-        if (el.y !== newY) {
-          inverseOps.push({ type: 'update', elementId: el.id, props: { y: el.y } });
-          el.y = newY;
-          ops.push({ type: 'update', elementId: el.id, props: { y: newY } });
-        }
-      }
-    } else if (mode === 'right') {
-      const bounds = elements.map(el => getElementBounds(el));
-      const maxRight = Math.max(...bounds.map(b => b.x + b.w));
-      for (let i = 0; i < elements.length; i++) {
-        const el = elements[i];
-        const newX = maxRight - bounds[i].w;
-        if (el.x !== newX) {
-          inverseOps.push({ type: 'update', elementId: el.id, props: { x: el.x } });
-          el.x = newX;
-          ops.push({ type: 'update', elementId: el.id, props: { x: newX } });
-        }
-      }
-    } else if (mode === 'centerH') {
-      const bounds = elements.map(el => getElementBounds(el));
-      const centerY = bounds.reduce((s, b) => s + b.y + b.h / 2, 0) / bounds.length;
-      for (let i = 0; i < elements.length; i++) {
-        const el = elements[i];
-        const newY = centerY - bounds[i].h / 2;
-        if (el.y !== newY) {
-          inverseOps.push({ type: 'update', elementId: el.id, props: { y: el.y } });
-          el.y = newY;
-          ops.push({ type: 'update', elementId: el.id, props: { y: newY } });
-        }
-      }
-    } else if (mode === 'centerV') {
-      const bounds = elements.map(el => getElementBounds(el));
-      const centerX = bounds.reduce((s, b) => s + b.x + b.w / 2, 0) / bounds.length;
-      for (let i = 0; i < elements.length; i++) {
-        const el = elements[i];
-        const newX = centerX - bounds[i].w / 2;
-        if (el.x !== newX) {
-          inverseOps.push({ type: 'update', elementId: el.id, props: { x: el.x } });
-          el.x = newX;
-          ops.push({ type: 'update', elementId: el.id, props: { x: newX } });
-        }
+    const moved = new Map();
+    for (let i = 0; i < elements.length; i++) {
+      const [dx, dy] = delta(bounds[i]);
+      if (this._translateElement(elements[i], dx, dy, ops, inverseOps)) {
+        moved.set(elements[i].id, elements[i]);
       }
     }
 
     if (ops.length > 0) {
       this.history.push(ops, inverseOps);
       this.sync.sendOps(ops);
+      this.updateConnectors(moved);
       this.renderer.markDirty();
     }
   }
@@ -2248,48 +2237,39 @@ class DarkBoardApp {
     }
     if (elements.length < 3) return;
 
+    // Pair each element with its bounds — el.width/height is 0 for lines and
+    // pen strokes, which would collapse the gap maths.
+    const items = elements.map(el => ({ el, b: getElementBounds(el) }));
     const ops = [];
     const inverseOps = [];
+    const moved = new Map();
 
-    if (direction === 'horizontal') {
-      elements.sort((a, b) => a.x - b.x);
-      const first = elements[0];
-      const last = elements[elements.length - 1];
-      const totalSpan = (last.x + last.width) - first.x;
-      const totalWidths = elements.reduce((s, el) => s + el.width, 0);
-      const gap = (totalSpan - totalWidths) / (elements.length - 1);
-      let currentX = first.x + first.width + gap;
-      for (let i = 1; i < elements.length - 1; i++) {
-        const el = elements[i];
-        if (el.x !== currentX) {
-          inverseOps.push({ type: 'update', elementId: el.id, props: { x: el.x } });
-          el.x = currentX;
-          ops.push({ type: 'update', elementId: el.id, props: { x: currentX } });
-        }
-        currentX += el.width + gap;
+    const spread = (axis, size) => {
+      items.sort((p, q) => p.b[axis] - q.b[axis]);
+      const first = items[0].b;
+      const last = items[items.length - 1].b;
+      const totalSpan = (last[axis] + last[size]) - first[axis];
+      const totalSize = items.reduce((s, o) => s + o.b[size], 0);
+      const gap = (totalSpan - totalSize) / (items.length - 1);
+      let cursor = first[axis] + first[size] + gap;
+      for (let i = 1; i < items.length - 1; i++) {
+        const { el, b } = items[i];
+        const d = cursor - b[axis];
+        const ok = axis === 'x'
+          ? this._translateElement(el, d, 0, ops, inverseOps)
+          : this._translateElement(el, 0, d, ops, inverseOps);
+        if (ok) moved.set(el.id, el);
+        cursor += b[size] + gap;
       }
-    } else if (direction === 'vertical') {
-      elements.sort((a, b) => a.y - b.y);
-      const first = elements[0];
-      const last = elements[elements.length - 1];
-      const totalSpan = (last.y + last.height) - first.y;
-      const totalHeights = elements.reduce((s, el) => s + el.height, 0);
-      const gap = (totalSpan - totalHeights) / (elements.length - 1);
-      let currentY = first.y + first.height + gap;
-      for (let i = 1; i < elements.length - 1; i++) {
-        const el = elements[i];
-        if (el.y !== currentY) {
-          inverseOps.push({ type: 'update', elementId: el.id, props: { y: el.y } });
-          el.y = currentY;
-          ops.push({ type: 'update', elementId: el.id, props: { y: currentY } });
-        }
-        currentY += el.height + gap;
-      }
-    }
+    };
+
+    if (direction === 'horizontal') spread('x', 'w');
+    else if (direction === 'vertical') spread('y', 'h');
 
     if (ops.length > 0) {
       this.history.push(ops, inverseOps);
       this.sync.sendOps(ops);
+      this.updateConnectors(moved);
       this.renderer.markDirty();
     }
   }
@@ -2765,12 +2745,27 @@ class DarkBoardApp {
       });
 
       container.querySelectorAll('[data-chk-text-idx]').forEach(input => {
+        // Snapshot before the first keystroke so the whole edit undoes at once.
+        let baseline = null;
+        input.addEventListener('focus', () => { baseline = deepClone(el.cardChecklist); });
         input.addEventListener('input', () => {
           const idx = parseInt(input.dataset.chkTextIdx);
+          if (baseline === null) baseline = deepClone(el.cardChecklist);
           el.cardChecklist[idx].text = input.value;
-          const ops = [{ type: 'update', elementId: el.id, props: { cardChecklist: deepClone(el.cardChecklist) } }];
-          this.sync.sendOps(ops);
+          this.sync.sendOps([{ type: 'update', elementId: el.id, props: { cardChecklist: deepClone(el.cardChecklist) } }]);
           this.renderer.markDirty();
+        });
+        input.addEventListener('blur', () => {
+          if (baseline === null) return;
+          const current = deepClone(el.cardChecklist);
+          if (JSON.stringify(current) !== JSON.stringify(baseline)) {
+            this.history.push(
+              [{ type: 'update', elementId: el.id, props: { cardChecklist: current } }],
+              [{ type: 'update', elementId: el.id, props: { cardChecklist: baseline } }]
+            );
+            if (this.ui) this.ui.updateUndoRedoButtons();
+          }
+          baseline = null;
         });
         input.addEventListener('keydown', (e) => e.stopPropagation());
       });
@@ -2792,10 +2787,13 @@ class DarkBoardApp {
 
     panel.querySelector('.card-add-check').addEventListener('click', () => {
       if (!el.cardChecklist) el.cardChecklist = [];
+      const old = deepClone(el.cardChecklist);
       el.cardChecklist.push({ text: '', checked: false });
       const ops = [{ type: 'update', elementId: el.id, props: { cardChecklist: deepClone(el.cardChecklist) } }];
+      this.history.push(ops, [{ type: 'update', elementId: el.id, props: { cardChecklist: old } }]);
       this.sync.sendOps(ops);
       this.renderer.markDirty();
+      if (this.ui) this.ui.updateUndoRedoButtons();
       renderChecklist();
     });
 
@@ -2803,27 +2801,47 @@ class DarkBoardApp {
 
     document.body.appendChild(panel);
 
+    // Each field commits at most one undo entry per editing session; flushed
+    // here too since closing the panel doesn't reliably fire blur.
+    const fieldCommits = [];
     panel.querySelector('.card-editor-close').addEventListener('click', () => {
+      for (const commit of fieldCommits) commit();
       panel.remove();
     });
 
-    // Save changes on input
     panel.querySelectorAll('.card-field').forEach(field => {
-      const saveField = () => {
-        const key = field.dataset.field;
-        let value = field.value;
-        if (key === 'cardTags') {
-          value = value.split(',').map(t => t.trim()).filter(t => t);
-        }
-        const ops = [{ type: 'update', elementId: el.id, props: { [key]: value } }];
-        const inverseOps = [{ type: 'update', elementId: el.id, props: { [key]: el[key] } }];
+      const key = field.dataset.field;
+      const parse = (raw) => key === 'cardTags'
+        ? raw.split(',').map(t => t.trim()).filter(t => t)
+        : raw;
+
+      // The value this field last committed — the target an undo restores to.
+      let baseline = el[key] === undefined ? null : deepClone(el[key]);
+
+      // Live-sync every keystroke so collaborators see typing as it happens,
+      // but don't record an undo entry per character.
+      field.addEventListener('input', () => {
+        const value = parse(field.value);
         el[key] = value;
-        this.history.push(ops, inverseOps);
-        this.sync.sendOps(ops);
+        this.sync.sendOps([{ type: 'update', elementId: el.id, props: { [key]: value } }]);
         this.renderer.markDirty();
+      });
+
+      const commit = () => {
+        const value = parse(field.value);
+        if (JSON.stringify(value) === JSON.stringify(baseline)) return;
+        el[key] = value;
+        this.history.push(
+          [{ type: 'update', elementId: el.id, props: { [key]: value } }],
+          [{ type: 'update', elementId: el.id, props: { [key]: baseline } }]
+        );
+        baseline = deepClone(value);
+        this.renderer.markDirty();
+        if (this.ui) this.ui.updateUndoRedoButtons();
       };
-      field.addEventListener('change', saveField);
-      field.addEventListener('input', saveField);
+      fieldCommits.push(commit);
+      field.addEventListener('change', commit);
+      field.addEventListener('blur', commit);
       field.addEventListener('keydown', (e) => e.stopPropagation());
     });
   }
