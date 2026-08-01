@@ -129,7 +129,9 @@ app.post('/api/boards', (req, res) => {
   if (boardStore.getBoard(boardId)) {
     return res.status(409).json({ error: 'Board already exists', id: boardId });
   }
-  boardStore.createBoard(boardId);
+  if (!boardStore.createBoard(boardId)) {
+    return res.status(400).json({ error: 'Invalid board id. Use letters, digits, hyphens or underscores (max 128).' });
+  }
   res.status(201).json({ id: boardId, url: `/board/${boardId}` });
 });
 
@@ -139,8 +141,9 @@ app.get('/api/board/:id', (req, res) => {
   if (!board) {
     return res.status(404).json({ error: 'Board not found' });
   }
-  // #R2-197: ETag based on element count + last modified
-  const etag = `"${board.elements.size}-${board.lastModified || 0}"`;
+  // #R2-197: ETag covers everything in the response body — anchors and comments
+  // change without bumping lastModified, so counting them keeps the tag honest.
+  const etag = `"${board.elements.size}-${board.anchors.size}-${board.comments.size}-${board.lastModified || 0}"`;
   res.setHeader('ETag', etag);
   if (req.headers['if-none-match'] === etag) {
     return res.sendStatus(304);

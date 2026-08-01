@@ -5107,17 +5107,10 @@ body.light-theme .brand-badge {
 .share-btn:active { transform: scale(0.94); }
 .anchor-toggle-btn:active { transform: scale(0.94); }
 
-/* --- Snappier tool button activation --- */
-.tool-btn { transition: all 0.12s ease; position: relative; overflow: hidden; }
+/* --- Snappier tool button press ---
+   The active-tool glow itself is `activeToolGlow` further up; don't override it
+   here or the breathing indicator degrades to a one-shot pulse. */
 .tool-btn:active { transform: scale(0.9); transition-duration: 0.06s; }
-.tool-btn.active {
-  animation: toolActivePulse 0.35s cubic-bezier(0.34,1.56,0.64,1);
-}
-@keyframes toolActivePulse {
-  0% { box-shadow: 0 0 0 0 var(--accent-40); }
-  50% { box-shadow: 0 0 16px var(--accent-40), 0 0 4px rgba(74,158,255,0.4); }
-  100% { box-shadow: 0 0 12px var(--accent-40), 0 0 2px rgba(74,158,255,0.3); }
-}
 
 /* --- Shortcut label hover reveal --- */
 .tool-btn .shortcut {
@@ -5126,11 +5119,7 @@ body.light-theme .brand-badge {
 .tool-btn:hover .shortcut { opacity: 0.9; }
 .tool-btn.active .shortcut { opacity: 1; color: rgba(255,255,255,0.7); }
 
-/* --- Enhanced context menu entrance --- */
-@keyframes contextMenuIn {
-  0% { opacity: 0; transform: scale(0.92) translateY(-4px); }
-  100% { opacity: 1; transform: scale(1) translateY(0); }
-}
+/* --- Enhanced context menu entrance (keyframes defined once, above) --- */
 .context-menu {
   animation: contextMenuIn 0.15s cubic-bezier(0.34,1.56,0.64,1);
 }
@@ -5187,34 +5176,17 @@ body.light-theme .brand-badge {
   to { opacity: 0.6; transform: translate(-50%, -50%) translateY(0); }
 }
 
-/* --- Light theme scrollbar --- */
+/* --- Light theme scrollbar ---
+   Note: do NOT set `scrollbar-color` here. In Chromium 121+ / Firefox any
+   non-auto value switches to the standard scrollbar model and disables every
+   ::-webkit-scrollbar rule in this file. */
 body.light-theme ::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.12);
 }
 body.light-theme ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.25);
 }
-body.light-theme * {
-  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
-}
 
-/* --- Anchor item hover glow --- */
-.anchor-item:hover {
-  box-shadow: inset 0 0 12px rgba(74, 158, 255, 0.08);
-}
-
-/* --- Selection count badge springier animation --- */
-@keyframes selectionPop {
-  0% { opacity: 0; transform: translateX(-50%) scale(0.6); }
-  70% { opacity: 1; transform: translateX(-50%) scale(1.12); }
-  100% { opacity: 1; transform: translateX(-50%) scale(1); }
-}
-
-/* --- Panel slide-in refined timing --- */
-@keyframes panelSlideIn {
-  0% { opacity: 0; transform: translateY(8px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
 
 /* --- Color panel smooth transitions --- */
 .color-panel { transition: opacity 0.15s ease-out; }
@@ -5263,11 +5235,6 @@ button:disabled, .tool-btn:disabled {
   animation: panelSlideIn 0.15s ease-out;
 }
 
-/* --- Smooth cursor transitions on canvas --- */
-#canvas {
-  transition: cursor 0s;
-}
-
 /* --- Chat panel slide in from right --- */
 .chat-panel {
   animation: chatSlideIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -5293,42 +5260,6 @@ body.light-theme .brand-badge:hover {
 /* =========================
    UX POLISH PASS 2 — Refined interactions & visual depth
    ========================= */
-
-/* --- Tooltip arrow indicator --- */
-.tool-btn[data-tooltip]::before {
-  content: '';
-  position: absolute;
-  top: calc(100% + 2px);
-  left: 50%;
-  transform: translateX(-50%) translateY(4px);
-  border: 4px solid transparent;
-  border-bottom-color: rgba(30, 30, 30, 0.95);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s ease, transform 0.15s ease;
-  z-index: 200;
-}
-.tool-btn[data-tooltip]:hover::before {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-.bb-btn[data-tooltip]::before {
-  content: '';
-  position: absolute;
-  bottom: calc(100% + 4px);
-  left: 50%;
-  transform: translateX(-50%) translateY(4px);
-  border: 4px solid transparent;
-  border-top-color: var(--panel);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s ease, transform 0.15s ease;
-  z-index: 200;
-}
-.bb-btn[data-tooltip]:hover::before {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
 
 /* --- Name dialog glass effect --- */
 #nameDialog {
@@ -5380,14 +5311,6 @@ body.light-theme .bottom-bar-right {
   box-shadow: 0 4px 20px rgba(233,69,96,0.2);
 }
 
-/* --- Users panel avatar pulse for active users --- */
-.users-panel .user-avatar {
-  transition: transform 0.15s ease;
-}
-.users-panel .user-avatar:hover {
-  transform: scale(1.1);
-}
-
 /* --- Facilitator panel action buttons --- */
 .fctl-btn {
   transition: all 0.15s ease;
@@ -5397,14 +5320,13 @@ body.light-theme .bottom-bar-right {
   box-shadow: 0 3px 10px rgba(0,0,0,0.2);
 }
 
-/* --- Sync indicator dot pulse when syncing --- */
-.sync-dot.syncing {
+/* --- Sync indicator dot pulse when syncing / degraded --- */
+.sync-dot.syncing,
+#syncDot.warning {
   animation: syncPulse 1.2s ease-in-out infinite;
 }
-@keyframes syncPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(1.3); }
-}
+#syncDot.warning { background: var(--warning); }
+#syncDot.error { background: var(--danger); }
 
 /* --- Help overlay refined entrance --- */
 #helpOverlay {
@@ -5431,15 +5353,6 @@ kbd {
 /* --- Vote bar smooth entrance --- */
 .vote-bar {
   animation: panelSlideIn 0.2s ease-out;
-}
-
-/* --- Isolation banner pulse --- */
-.isolation-banner {
-  animation: isolationPulse 3s ease-in-out infinite;
-}
-@keyframes isolationPulse {
-  0%, 100% { box-shadow: 0 4px 20px rgba(74,158,255,0.15); }
-  50% { box-shadow: 0 4px 20px rgba(74,158,255,0.3); }
 }
 
 /* --- Follow mode banner emphasis --- */
@@ -5677,10 +5590,13 @@ kbd {
 /* --- Subtle line-height polish in toasts --- */
 .toast {
   line-height: 1.4;
+  align-items: center;
 }
 
-/* --- Better scroll behavior --- */
-* {
+/* --- Better scroll behavior ---
+   Scoped to the page. Panels that are scrolled programmatically (the chat pins
+   itself to the bottom on each message) must keep instant scrolling. */
+html, body {
   scroll-behavior: smooth;
 }
 
@@ -5692,11 +5608,6 @@ kbd {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-}
-
-/* --- Toast alignment fix with emoji/text --- */
-.toast {
-  align-items: center;
 }
 
 /* --- Sync indicator improved --- */
@@ -5730,32 +5641,11 @@ body.light-theme .floating-toolbar {
   border-color: rgba(0, 0, 0, 0.08);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.08);
 }
+/* No CSS tooltip here: .ftb-btn is in the `overflow: hidden` ripple group, which
+   would clip it, and the buttons already carry native `title` attributes. */
 .ftb-btn {
   transition: all 0.12s ease;
   border-radius: 6px;
-  position: relative;
-}
-.ftb-btn::after {
-  content: attr(title);
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%) translateY(4px);
-  background: rgba(30, 30, 30, 0.95);
-  color: var(--text);
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s ease, transform 0.15s ease;
-  z-index: 300;
-}
-.ftb-btn:hover::after {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
 }
 .ftb-btn:hover {
   background: rgba(74, 158, 255, 0.15);
@@ -5781,28 +5671,11 @@ body.light-theme .ftb-sep {
   width: 22px;
   height: 22px;
   border-radius: 6px;
-  border: 2px solid rgba(255,255,255,0.08);
-  position: relative;
-}
-.color-swatch.selected::after {
-  content: '';
-  position: absolute;
-  inset: -3px;
-  border: 2px solid var(--accent);
-  border-radius: 8px;
-  pointer-events: none;
-  animation: swatchSelect 0.3s cubic-bezier(0.34,1.56,0.64,1);
-}
-@keyframes swatchSelect {
-  0% { transform: scale(0.7); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
 }
 
 /* --- Users panel premium --- */
 .users-panel {
   border-radius: 12px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
 .users-panel .user-avatar {
   width: 28px;
@@ -5822,11 +5695,6 @@ body.light-theme .ftb-sep {
   transform: scale(1.15) translateY(-2px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   z-index: 5;
-}
-
-/* --- Sticky note style enhancements (CSS side, for text editor overlay) --- */
-.text-editor-overlay[data-el-type="sticky"] {
-  font-family: 'Kalam', 'Caveat', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 /* --- Zoom level indicator premium --- */
@@ -5854,8 +5722,8 @@ body.light-theme .ftb-sep {
   color: transparent;
 }
 
-/* --- Share button premium --- */
-.share-btn {
+/* --- Share button premium (the real element is #shareBtn.bb-btn-accent) --- */
+#shareBtn {
   background: linear-gradient(135deg, var(--accent) 0%, #3580d9 100%);
   color: white;
   font-weight: 600;
@@ -5863,28 +5731,23 @@ body.light-theme .ftb-sep {
   box-shadow: 0 2px 8px rgba(74, 158, 255, 0.25);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.share-btn:hover {
+#shareBtn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(74, 158, 255, 0.4);
 }
-.share-btn:active {
-  transform: translateY(0);
+#shareBtn:active {
+  transform: translateY(0) scale(0.97);
   box-shadow: 0 2px 6px rgba(74, 158, 255, 0.3);
 }
 
 /* --- Anchor panel premium --- */
 .anchors-panel {
   border-radius: 12px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 .anchor-item {
   border-radius: 8px;
   transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.anchor-item:hover {
-  background: linear-gradient(90deg, rgba(74, 158, 255, 0.08), transparent);
 }
 
 /* --- Context menu premium depth --- */
@@ -5895,11 +5758,6 @@ body.light-theme .ftb-sep {
 .context-menu-item {
   border-radius: 6px;
   font-weight: 500;
-}
-
-/* --- Selection rectangle marker corners --- */
-.selection-handles-glow {
-  filter: drop-shadow(0 0 4px rgba(74,158,255,0.4));
 }
 
 /* --- Chat panel premium header --- */
@@ -5913,6 +5771,11 @@ body.light-theme .ftb-sep {
 }
 .chat-msg:hover {
   background: var(--btn-hover);
+}
+/* Your own messages keep their accent background — the text is hard-coded
+   white, so falling back to the neutral hover colour makes it unreadable. */
+.chat-msg.self:hover {
+  background: var(--accent);
 }
 
 /* --- Loading overlay with gradient --- */
@@ -5935,54 +5798,6 @@ body.light-theme #loadingOverlay {
   box-shadow: 0 12px 40px rgba(74, 158, 255, 0.2), 0 2px 6px rgba(0,0,0,0.15);
 }
 
-/* --- Facilitator badge with icon --- */
-.user-item.facilitator::before {
-  content: '★';
-  color: var(--warning);
-  font-size: 12px;
-  margin-right: 4px;
-}
-
-/* --- Vote badge pulse when new --- */
-.vote-badge-new {
-  animation: voteBadgePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-@keyframes voteBadgePop {
-  0% { transform: scale(0); opacity: 0; }
-  70% { transform: scale(1.3); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
-}
-
-/* --- Comment bubble badge improved --- */
-.comment-bubble-count {
-  animation: commentCountBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-@keyframes commentCountBounce {
-  0% { transform: scale(0); }
-  60% { transform: scale(1.2); }
-  100% { transform: scale(1); }
-}
-
-/* --- Collab ping animation --- */
-@keyframes collabPing {
-  0% { transform: scale(0.5); opacity: 0.8; }
-  100% { transform: scale(3); opacity: 0; }
-}
-
-/* --- Tooltip text refined --- */
-[data-tooltip]::after,
-.tool-btn[data-tooltip]::after,
-.bb-btn[data-tooltip]::after,
-.ftb-btn::after {
-  font-weight: 500;
-  letter-spacing: 0.2px;
-}
-
-/* --- Zoom transition smoothness --- */
-#canvas {
-  transition: none;
-}
-
 /* --- Name dialog typography --- */
 #nameDialog .modal h2 {
   font-weight: 700;
@@ -5991,7 +5806,6 @@ body.light-theme #loadingOverlay {
 
 /* --- Scrollbar thinner on panels --- */
 .anchors-list::-webkit-scrollbar,
-.chat-messages::-webkit-scrollbar,
-.users-panel::-webkit-scrollbar {
+.chat-messages::-webkit-scrollbar {
   width: 6px;
 }

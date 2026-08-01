@@ -373,8 +373,8 @@ class CanvasRenderer {
       }
       renderElement(ctx, el, this.selectedIds.has(el.id), this.camera);
       if (this._flashMap && this._flashMap.has(el.id)) {
-        const elapsed = Date.now() - this._flashMap.get(el.id);
-        const t = Math.min(1, elapsed / 500);
+        const elapsed = performance.now() - this._flashMap.get(el.id);
+        const t = Math.min(1, elapsed / FLASH_DURATION_MS);
         const alpha = 1 - t;
         if (alpha > 0) {
           ctx.save();
@@ -622,20 +622,11 @@ class CanvasRenderer {
       ctx.restore();
     }
 
-    // Minimap (rendered in screen space, after ctx.restore) — #179: throttled to every 1000ms
+    // Minimap (rendered in screen space, after ctx.restore).
+    // Chrome and the viewport rectangle are drawn every frame so the blue box
+    // tracks panning; only the element layer is cached (see drawMinimap).
     if (this.minimapEnabled) {
-      const now = performance.now();
-      if (now - this._lastMinimapRender >= 1000) {
-        this._lastMinimapRender = now;
-        this.drawMinimap();
-      } else if (this._minimapCache) {
-        // Re-draw the cached minimap between throttle intervals
-        const dpr = window.devicePixelRatio || 1;
-        const mmW = 180, mmH = 120;
-        const mmX = window.innerWidth - mmW - 16;
-        const mmY = window.innerHeight - mmH - 60;
-        this.ctx.putImageData(this._minimapCache, mmX * dpr, mmY * dpr);
-      }
+      this.drawMinimap();
     }
   }
 
@@ -993,16 +984,23 @@ class CanvasRenderer {
     return null;
   }
 
-  drawMinimap() {
-    const ctx = this.ctx;
-    const mmW = 200;
-    const mmH = 140;
-    const mmX = window.innerWidth - mmW - 16;
-    const mmY = window.innerHeight - mmH - 60;
-    const headerH = 22;
+  // Single source of truth for minimap geometry — used by both the renderer
+  // and hit testing so they can never drift apart.
+  _getMinimapRect() {
+    const mmW = 200, mmH = 140, headerH = 22;
+    const totalH = mmH + headerH;
+    return {
+      mmW, mmH, headerH, totalH,
+      mmX: window.innerWidth - mmW - 16,
+      mmY: window.innerHeight - totalH - 56,
+    };
+  }
 
+  // Recompute the world bounds and repaint the element layer into an offscreen
+  // canvas. Throttled by the caller — the layer only changes when the board does.
+  _rebuildMinimapLayer(rect) {
+    const { mmW, mmH } = rect;
 
-    // Compute world bounds of all elements
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const el of this.elements.values()) {
       const b = getElementBounds(el);
@@ -1011,21 +1009,83 @@ class CanvasRenderer {
       if (b.x + b.w > maxX) maxX = b.x + b.w;
       if (b.y + b.h > maxY) maxY = b.y + b.h;
     }
+    if (!isFinite(minX)) {
+      this._minimapExtents = null;
+      this._minimapLayer = null;
+      return;
+    }
+
+    const pad = 100;
+    minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+    const worldW = maxX - minX || 1;
+    const worldH = maxY - minY || 1;
+    const scale = Math.min(mmW / worldW, mmH / worldH);
+    this._minimapExtents = {
+      minX, minY, scale,
+      offsetX: (mmW - worldW * scale) / 2,
+      offsetY: (mmH - worldH * scale) / 2,
+    };
+    const { offsetX, offsetY } = this._minimapExtents;
+
+    const dpr = window.devicePixelRatio || 1;
+    let layer = this._minimapLayer;
+    if (!layer) layer = this._minimapLayer = document.createElement('canvas');
+    const pxW = Math.round(mmW * dpr), pxH = Math.round(mmH * dpr);
+    if (layer.width !== pxW || layer.height !== pxH) {
+      layer.width = pxW;
+      layer.height = pxH;
+    }
+    const lc = layer.getContext('2d');
+    lc.setTransform(dpr, 0, 0, dpr, 0, 0);
+    lc.clearRect(0, 0, mmW, mmH);
+    lc.globalAlpha = 0.7;
+    for (const el of this.elements.values()) {
+      const b = getElementBounds(el);
+      const x = offsetX + (b.x - minX) * scale;
+      const y = offsetY + (b.y - minY) * scale;
+      const w = Math.max(2, b.w * scale);
+      const h = Math.max(2, b.h * scale);
+      const isLinear = el.type === 'connector' || el.type === 'line' || el.type === 'arrow';
+      lc.fillStyle = (!isLinear && el.fill && el.fill !== 'transparent')
+        ? el.fill
+        : (el.stroke || '#888');
+      if (w > 3 && h > 3) {
+        lc.beginPath();
+        lc.roundRect(x, y, w, h, Math.min(1.5, w / 4));
+        lc.fill();
+      } else {
+        lc.fillRect(x, y, w, h);
+      }
+    }
+    lc.globalAlpha = 1;
+  }
+
+  drawMinimap() {
+    const ctx = this.ctx;
+    const rect = this._getMinimapRect();
+    const { mmW, mmH, headerH, totalH, mmX, mmY } = rect;
+    const bodyY = mmY + headerH;
+
+    const now = performance.now();
+    if (now - this._lastMinimapRender >= 400) {
+      this._lastMinimapRender = now;
+      this._rebuildMinimapLayer(rect);
+    }
 
     ctx.save();
-    // Shadow for depth
+
+    // Panel
     ctx.shadowColor = 'rgba(0,0,0,0.35)';
     ctx.shadowBlur = 20;
     ctx.shadowOffsetY = 4;
-
-    // Background with rounded corners
     ctx.fillStyle = 'rgba(30,30,30,0.9)';
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(mmX, mmY, mmW, mmH + headerH, 10);
+    ctx.roundRect(mmX, mmY, mmW, totalH, 10);
     ctx.fill();
     ctx.shadowColor = 'transparent';
+    ctx.shadowOffsetY = 0;
     ctx.stroke();
 
     // Header
@@ -1036,93 +1096,53 @@ class CanvasRenderer {
     ctx.fillStyle = 'rgba(255,255,255,0.8)';
     ctx.font = '600 11px -apple-system, BlinkMacSystemFont, sans-serif';
     ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
     ctx.fillText('Vue d\'ensemble', mmX + 10, mmY + headerH / 2);
 
-    // Element count indicator
     const count = this.elements.size;
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.font = '10px -apple-system, sans-serif';
-    const countText = `${count} élément${count !== 1 ? 's' : ''}`;
-    const countW = ctx.measureText(countText).width;
-    ctx.fillText(countText, mmX + mmW - countW - 10, mmY + headerH / 2);
+    ctx.textAlign = 'right';
+    ctx.fillText(`${count} élément${count !== 1 ? 's' : ''}`, mmX + mmW - 10, mmY + headerH / 2);
+    ctx.textAlign = 'left';
 
-    const bodyY = mmY + headerH;
-
-    if (!isFinite(minX)) {
+    const ext = this._minimapExtents;
+    if (!ext) {
       ctx.fillStyle = 'rgba(255,255,255,0.3)';
       ctx.font = '11px -apple-system, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('Tableau vide', mmX + mmW / 2, bodyY + mmH / 2);
-      ctx.textAlign = 'left';
       ctx.restore();
       return;
     }
 
-    const pad = 100;
-    minX -= pad; minY -= pad; maxX += pad; maxY += pad;
-    const worldW = maxX - minX || 1;
-    const worldH = maxY - minY || 1;
-    const scale = Math.min(mmW / worldW, mmH / worldH);
-    const offsetX = (mmW - worldW * scale) / 2;
-    const offsetY = (mmH - worldH * scale) / 2;
-
-    // Clip to body area
     ctx.beginPath();
     ctx.rect(mmX, bodyY, mmW, mmH);
     ctx.clip();
 
-    // Cache extents for hit testing
-    this._minimapExtents = { mmX, mmY: bodyY, mmW, mmH, minX, minY, scale, offsetX, offsetY };
-
-    // Draw elements with type-aware colors
-    for (const el of this.elements.values()) {
-      const b = getElementBounds(el);
-      const x = mmX + offsetX + (b.x - minX) * scale;
-      const y = bodyY + offsetY + (b.y - minY) * scale;
-      const w = Math.max(2, b.w * scale);
-      const h = Math.max(2, b.h * scale);
-      let color = el.fill && el.fill !== 'transparent' ? el.fill : (el.stroke || '#888');
-      if (el.type === 'connector' || el.type === 'line' || el.type === 'arrow') color = el.stroke || '#888';
-      ctx.fillStyle = color;
-      ctx.globalAlpha = 0.7;
-      if (w > 3 && h > 3) {
-        ctx.beginPath();
-        ctx.roundRect(x, y, w, h, Math.min(1.5, w / 4));
-        ctx.fill();
-      } else {
-        ctx.fillRect(x, y, w, h);
-      }
+    if (this._minimapLayer) {
+      ctx.drawImage(this._minimapLayer, mmX, bodyY, mmW, mmH);
     }
-    ctx.globalAlpha = 1;
 
-    // Viewport rectangle with accent highlight
+    // Viewport rectangle — recomputed every frame so it tracks panning live
     const tlWorld = this.screenToWorld(0, 0);
     const brWorld = this.screenToWorld(window.innerWidth, window.innerHeight);
-    const vpX = mmX + offsetX + (tlWorld.x - minX) * scale;
-    const vpY = bodyY + offsetY + (tlWorld.y - minY) * scale;
-    const vpW = (brWorld.x - tlWorld.x) * scale;
-    const vpH = (brWorld.y - tlWorld.y) * scale;
+    const vpX = mmX + ext.offsetX + (tlWorld.x - ext.minX) * ext.scale;
+    const vpY = bodyY + ext.offsetY + (tlWorld.y - ext.minY) * ext.scale;
+    const vpW = (brWorld.x - tlWorld.x) * ext.scale;
+    const vpH = (brWorld.y - tlWorld.y) * ext.scale;
     ctx.fillStyle = 'rgba(74, 158, 255, 0.12)';
     ctx.fillRect(vpX, vpY, vpW, vpH);
     ctx.strokeStyle = '#4a9eff';
     ctx.lineWidth = 2;
     ctx.strokeRect(vpX, vpY, vpW, vpH);
-    // Viewport corners for better visual
     ctx.fillStyle = '#4a9eff';
-    const cornerSz = 3;
-    [[vpX, vpY], [vpX + vpW - cornerSz, vpY], [vpX, vpY + vpH - cornerSz], [vpX + vpW - cornerSz, vpY + vpH - cornerSz]].forEach(([cx, cy]) => {
-      ctx.fillRect(cx, cy, cornerSz, cornerSz);
-    });
+    const cs = 3;
+    for (const [cx, cy] of [[vpX, vpY], [vpX + vpW - cs, vpY], [vpX, vpY + vpH - cs], [vpX + vpW - cs, vpY + vpH - cs]]) {
+      ctx.fillRect(cx, cy, cs, cs);
+    }
 
     ctx.restore();
-
-    // Cache the minimap region for throttled reuse
-    const dpr = window.devicePixelRatio || 1;
-    try {
-      this._minimapCache = this.ctx.getImageData(mmX * dpr, mmY * dpr, mmW * dpr, (mmH + headerH) * dpr);
-    } catch (e) {
-      this._minimapCache = null;
-    }
   }
 
   // Snap a position to grid if enabled

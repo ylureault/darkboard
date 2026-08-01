@@ -741,7 +741,7 @@ class DarkBoardApp {
   setTool(name) {
     if (!Tools[name]) return;
     if (this.textEditElement) {
-      const editor = document.querySelector('.text-editor-overlay');
+      const editor = document.querySelector('.text-edit-overlay');
       if (editor) editor.blur();
     }
     this.currentTool = name;
@@ -872,8 +872,12 @@ class DarkBoardApp {
   _doDeleteSelected() {
     if (this.renderer.selectedIds.size === 0) return;
 
-    // Delete connectors attached to selected elements first
+    // Delete connectors attached to selected elements first — but only for the
+    // elements that are actually going to be deleted. A locked element survives,
+    // so its connectors must survive with it.
     for (const id of this.renderer.selectedIds) {
+      const el = this.renderer.elements.get(id);
+      if (el && el.locked) continue;
       this.deleteConnectorsFor(id);
     }
 
@@ -960,13 +964,19 @@ class DarkBoardApp {
     if (this.ui) this.ui.updateUndoRedoButtons();
   }
 
+  // Flash the elements touched by an undo/redo. Capped so a bulk operation
+  // doesn't start hundreds of animations at once.
   _flashOpsTargets(ops) {
     if (!ops) return;
+    const MAX_FLASH = 24;
+    let flashed = 0;
     for (const op of ops) {
-      if (op.type !== 'delete') {
-        const el = this.renderer.elements.get(op.elementId);
-        if (el) this._flashCreatedElement(el);
-      }
+      if (flashed >= MAX_FLASH) break;
+      if (op.type === 'delete') continue;
+      const el = this.renderer.elements.get(op.elementId);
+      if (!el) continue;
+      this._flashCreatedElement(el);
+      flashed++;
     }
   }
 
@@ -1149,7 +1159,10 @@ class DarkBoardApp {
       if (el) {
         const oldProps = {};
         for (const key of Object.keys(props)) {
-          oldProps[key] = el[key];
+          // A previously-unset property reads back as undefined, and JSON.stringify
+          // drops undefined keys — the inverse op would reach other clients empty
+          // and the undo would only apply locally. Encode "unset" as null instead.
+          oldProps[key] = el[key] === undefined ? null : el[key];
         }
         ops.push({ type: 'update', elementId: id, props: { ...props } });
         inverseOps.push({ type: 'update', elementId: id, props: oldProps });
@@ -1247,6 +1260,20 @@ class DarkBoardApp {
     const ops = [];
     const inverseOps = [];
 
+    // Snapshot each envelope's membership before touching it, then emit a single
+    // op per envelope at the end. Emitting one op per mutation was wrong: moving
+    // an element inside the envelope it already belongs to produced a remove
+    // followed by an add, and since History.undo() replays inverses in order the
+    // "add" inverse (children WITHOUT the id) won — so undo silently evicted it.
+    const childrenBefore = new Map();
+    const touched = new Set();
+    const snapshot = (env) => {
+      if (!childrenBefore.has(env.id)) {
+        childrenBefore.set(env.id, env.children ? [...env.children] : []);
+      }
+      touched.add(env.id);
+    };
+
     for (const [id] of movedElements) {
       const el = this.renderer.elements.get(id);
       if (!el || el.type === 'envelope') continue;
@@ -1254,10 +1281,8 @@ class DarkBoardApp {
       // Remove from any previous envelope
       for (const env of envelopes) {
         if (env.children && env.children.includes(id)) {
-          const oldChildren = [...env.children];
+          snapshot(env);
           env.children = env.children.filter(c => c !== id);
-          ops.push({ type: 'update', elementId: env.id, props: { children: [...env.children] } });
-          inverseOps.push({ type: 'update', elementId: env.id, props: { children: oldChildren } });
         }
       }
 
@@ -1266,14 +1291,23 @@ class DarkBoardApp {
         if (isInsideEnvelope(el, env)) {
           if (!env.children) env.children = [];
           if (!env.children.includes(id)) {
-            const oldChildren = [...env.children];
+            snapshot(env);
             env.children.push(id);
-            ops.push({ type: 'update', elementId: env.id, props: { children: [...env.children] } });
-            inverseOps.push({ type: 'update', elementId: env.id, props: { children: oldChildren } });
           }
           break; // Only belong to one envelope
         }
       }
+    }
+
+    for (const envId of touched) {
+      const env = this.renderer.elements.get(envId);
+      if (!env) continue;
+      const before = childrenBefore.get(envId) || [];
+      const after = env.children || [];
+      const unchanged = before.length === after.length && before.every((c, i) => c === after[i]);
+      if (unchanged) continue;
+      ops.push({ type: 'update', elementId: envId, props: { children: [...after] } });
+      inverseOps.push({ type: 'update', elementId: envId, props: { children: [...before] } });
     }
 
     if (ops.length > 0) {
@@ -1422,9 +1456,15 @@ class DarkBoardApp {
       editor.style.fontWeight = 'bold';
       editor.style.padding = (8 * zoom) + 'px';
     } else if (el.type === 'card') {
+      // Cards use their own panel, not the inline overlay (which hasn't been
+      // added to the DOM yet at this point). Clear the marker set at the top of
+      // this method — otherwise it stays truthy for the rest of the session and
+      // permanently suppresses the floating selection toolbar.
+      this.textEditElement = null;
       this.showCardEditor(el);
       return;
     } else if (el.type === 'list') {
+      this.textEditElement = null;
       this.showListEditor(el);
       return;
     } else if (el.type === 'connector') {
@@ -1535,7 +1575,17 @@ class DarkBoardApp {
       editor.select();
     }
 
+    // Set by Escape so the blur handler tears the editor down without saving.
+    let discardEdit = false;
+
     const finishEdit = () => {
+      if (discardEdit) {
+        this.hideFormattingToolbar();
+        editor.remove();
+        this.textEditElement = null;
+        this.renderer.markDirty();
+        return;
+      }
       if (useRichText) {
         const newHtml = editor.innerHTML;
         const newPlain = editor.textContent || editor.innerText || '';
@@ -1657,6 +1707,8 @@ class DarkBoardApp {
       if (e.key === 'Escape') {
         this._createStickyBelow = null;
         this._createStickyRight = null;
+        // Escape abandons the edit — the blur handler must not write it back.
+        discardEdit = true;
         editor.blur();
         this.setTool('select');
         e.stopPropagation();
@@ -2059,6 +2111,11 @@ class DarkBoardApp {
         el.groupId = null;
         ops.push({ type: 'update', elementId: id, props: { groupId: null } });
       }
+    }
+    if (ops.length === 0) {
+      // Nothing was grouped — don't burn an undo slot on a no-op.
+      this.showToast('Aucun groupe dans la sélection');
+      return;
     }
     this.history.push(ops, inverseOps);
     this.sync.sendOps(ops);
@@ -3761,23 +3818,31 @@ class DarkBoardApp {
     }, 1000);
   }
 
+  // Brief glow ring on a newly created / restored element. Drawn on the canvas
+  // (see CanvasRenderer) so it tracks pan and zoom.
   _flashCreatedElement(el) {
     if (!el || !el.id) return;
-    if (!this.renderer._flashMap) this.renderer._flashMap = new Map();
-    this.renderer._flashMap.set(el.id, Date.now());
-    this.renderer.markDirty();
-    const animate = () => {
-      if (!this.renderer._flashMap || !this.renderer._flashMap.has(el.id)) return;
-      this.renderer.markDirty();
-      const elapsed = Date.now() - this.renderer._flashMap.get(el.id);
-      if (elapsed < 500) {
-        requestAnimationFrame(animate);
-      } else {
-        this.renderer._flashMap.delete(el.id);
-        this.renderer.markDirty();
+    const r = this.renderer;
+    if (!r._flashMap) r._flashMap = new Map();
+    r._flashMap.set(el.id, performance.now());
+    r.markDirty();
+    this._startFlashLoop();
+  }
+
+  // A single rAF loop drives every active flash, so flashing N elements at once
+  // costs one loop rather than N.
+  _startFlashLoop() {
+    const r = this.renderer;
+    if (r._flashRaf) return;
+    const tick = () => {
+      const now = performance.now();
+      for (const [id, started] of r._flashMap) {
+        if (now - started >= FLASH_DURATION_MS) r._flashMap.delete(id);
       }
+      r.markDirty();
+      r._flashRaf = r._flashMap.size > 0 ? requestAnimationFrame(tick) : null;
     };
-    requestAnimationFrame(animate);
+    r._flashRaf = requestAnimationFrame(tick);
   }
 
   // Stub: milestone check
@@ -4556,21 +4621,28 @@ class DarkBoardApp {
     if (this.updateUrlHash) this.updateUrlHash();
   }
 
+  // Elements ordered by their true stacking order. Unlike the renderer's sort,
+  // this does NOT boost the current selection — reordering the selection needs
+  // to see where it actually sits relative to its neighbours.
+  _elementsByZIndex() {
+    return Array.from(this.renderer.elements.values())
+      .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+  }
+
   // #R2-34: Bring forward one step
   bringForward() {
     if (this.renderer.selectedIds.size === 0) return;
-    const sorted = this.renderer.getSortedElements();
+    const sorted = this._elementsByZIndex();
     const ops = [], inverseOps = [];
     for (const id of this.renderer.selectedIds) {
       const el = this.renderer.elements.get(id);
       if (!el) continue;
       const idx = sorted.indexOf(el);
-      if (idx < sorted.length - 1) {
-        const above = sorted[idx + 1];
-        inverseOps.push({ type: 'update', elementId: id, props: { zIndex: el.zIndex || 0 } });
-        el.zIndex = (above.zIndex || 0) + 1;
-        ops.push({ type: 'update', elementId: id, props: { zIndex: el.zIndex } });
-      }
+      if (idx === -1 || idx >= sorted.length - 1) continue;
+      const above = sorted[idx + 1];
+      inverseOps.push({ type: 'update', elementId: id, props: { zIndex: el.zIndex || 0 } });
+      el.zIndex = (above.zIndex || 0) + 1;
+      ops.push({ type: 'update', elementId: id, props: { zIndex: el.zIndex } });
     }
     if (ops.length > 0) { this.history.push(ops, inverseOps); this.sync.sendOps(ops); this.renderer.markDirty(); }
   }
@@ -4578,18 +4650,17 @@ class DarkBoardApp {
   // #R2-34: Send backward one step
   sendBackward() {
     if (this.renderer.selectedIds.size === 0) return;
-    const sorted = this.renderer.getSortedElements();
+    const sorted = this._elementsByZIndex();
     const ops = [], inverseOps = [];
     for (const id of this.renderer.selectedIds) {
       const el = this.renderer.elements.get(id);
       if (!el) continue;
       const idx = sorted.indexOf(el);
-      if (idx > 0) {
-        const below = sorted[idx - 1];
-        inverseOps.push({ type: 'update', elementId: id, props: { zIndex: el.zIndex || 0 } });
-        el.zIndex = (below.zIndex || 0) - 1;
-        ops.push({ type: 'update', elementId: id, props: { zIndex: el.zIndex } });
-      }
+      if (idx <= 0) continue;
+      const below = sorted[idx - 1];
+      inverseOps.push({ type: 'update', elementId: id, props: { zIndex: el.zIndex || 0 } });
+      el.zIndex = (below.zIndex || 0) - 1;
+      ops.push({ type: 'update', elementId: id, props: { zIndex: el.zIndex } });
     }
     if (ops.length > 0) { this.history.push(ops, inverseOps); this.sync.sendOps(ops); this.renderer.markDirty(); }
   }
@@ -4877,36 +4948,8 @@ DarkBoardApp.prototype._showToolCursorHint = function(toolName) {
   this.renderer.canvas.addEventListener('mousemove', handler, { once: true });
 };
 
-// #R2-45: Element creation animation (scale from 0.8 to 1.0) - replaces #131
-DarkBoardApp.prototype._flashCreatedElement = function(el) {
-  if (!el || el.x === undefined) return;
-  var self = this;
-  // Add scale-in CSS animation if not present
-  if (!document.getElementById('r2CreateAnimStyle')) {
-    var style = document.createElement('style');
-    style.id = 'r2CreateAnimStyle';
-    style.textContent = '@keyframes elementScaleIn{0%{transform:translate(-50%,-50%) scale(0.8);opacity:0.6}100%{transform:translate(-50%,-50%) scale(1);opacity:0}}' +
-      '.element-scale-in{position:fixed;pointer-events:none;z-index:9997;border:2px solid rgba(74,158,255,0.6);border-radius:6px;background:rgba(74,158,255,0.08);animation:elementScaleIn 0.35s ease-out forwards;}' +
-      '.btn-flash{animation:btnFlashAnim 0.3s ease-out!important}@keyframes btnFlashAnim{0%{background:rgba(74,158,255,0.4)}100%{background:inherit}}' +
-      '@keyframes syncPulse{0%{box-shadow:0 0 0 0 rgba(74,158,255,0.4)}70%{box-shadow:0 0 0 6px rgba(74,158,255,0)}100%{box-shadow:0 0 0 0 rgba(74,158,255,0)}}' +
-      '#syncDot.warning{animation:syncPulse 1.5s infinite}';
-    document.head.appendChild(style);
-  }
-  requestAnimationFrame(function() {
-    var screen = self.renderer.worldToScreen(el.x + (el.width || 100) / 2, el.y + (el.height || 100) / 2);
-    var zoom = self.renderer.camera.zoom;
-    var w = (el.width || 100) * zoom;
-    var h = (el.height || 100) * zoom;
-    var flash = document.createElement('div');
-    flash.className = 'element-scale-in';
-    flash.style.left = screen.x + 'px';
-    flash.style.top = screen.y + 'px';
-    flash.style.width = w + 'px';
-    flash.style.height = h + 'px';
-    document.body.appendChild(flash);
-    setTimeout(function() { flash.remove(); }, 400);
-  });
-};
+// #R2-45: Element creation flash — rendered on the canvas so it follows pan/zoom.
+// (Styles that used to be injected here now live in style.css.)
 
 // #132 - Delete animation (visual shrink before removal)
 // Intercept _doDeleteSelected to add brief visual feedback

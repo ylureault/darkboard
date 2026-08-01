@@ -1417,13 +1417,31 @@ const Tools = {
     erase(app, worldX, worldY) {
       const hit = app.renderer.hitTest(worldX, worldY);
       if (!hit || this._strokeDeleted.has(hit.id)) return;
+      // Locked and hidden elements are protected from Delete, so the eraser
+      // must respect them too.
+      if (hit.locked || hit.hidden) return;
       this._strokeDeleted.add(hit.id);
+
       const ops = [{ type: 'delete', elementId: hit.id }];
       const inverseOps = [{ type: 'add', elementId: hit.id, element: deepClone(hit) }];
+
+      // Erasing a shape must also remove the connectors anchored to it,
+      // otherwise they are left dangling in space permanently.
+      for (const el of app.renderer.elements.values()) {
+        if (el.type !== 'connector') continue;
+        if (el.sourceId !== hit.id && el.targetId !== hit.id) continue;
+        if (this._strokeDeleted.has(el.id)) continue;
+        this._strokeDeleted.add(el.id);
+        ops.push({ type: 'delete', elementId: el.id });
+        inverseOps.push({ type: 'add', elementId: el.id, element: deepClone(el) });
+      }
+
       app.applyOps(ops);
       app.sync.sendOps(ops);
-      this._strokeOps.push(ops[0]);
-      this._strokeInverse.push(inverseOps[0]);
+      for (let i = 0; i < ops.length; i++) {
+        this._strokeOps.push(ops[i]);
+        this._strokeInverse.push(inverseOps[i]);
+      }
     },
 
     onPointerUp(app) {

@@ -1,6 +1,9 @@
 // #198: utils.js - Core utility functions for DarkBoard.
 // Provides ID generation, session management, geometry helpers, bounding box calculations, and math utilities.
 
+// How long the "element created / restored" glow ring stays on screen.
+const FLASH_DURATION_MS = 500;
+
 /**
  * Generate a random 12-character hexadecimal ID.
  * @returns {string} A unique identifier string
