@@ -219,8 +219,21 @@ class SyncClient {
         }
         break;
 
+      case 'selection':
+        if (msg.userId === this.app.myUserId) break;
+        if (!msg.ids || msg.ids.length === 0) {
+          this.app.renderer.remoteSelections.delete(msg.userId);
+        } else {
+          this.app.renderer.remoteSelections.set(msg.userId, {
+            ids: msg.ids, name: msg.name, color: msg.color
+          });
+        }
+        this.app.renderer.markDirty();
+        break;
+
       case 'user-leave':
         this.app.renderer.remoteUsers.delete(msg.userId);
+        this.app.renderer.remoteSelections.delete(msg.userId);
         this.app.updateUsersPanel();
         this.updateOnlineCount();
         this.app.renderer.markDirty();
@@ -530,6 +543,22 @@ class SyncClient {
       boardId: getBoardId(),
       x, y
     }));
+  }
+
+  // Broadcast which elements this user has selected, so collaborators can see
+  // what everyone is working on. Only sends when the set actually changes.
+  sendSelection(ids) {
+    const key = ids.join(',');
+    if (key === this._lastSelectionKey) return;
+    this._lastSelectionKey = key;
+    if (!this.connected || !this.ws) return;
+    try {
+      this.ws.send(JSON.stringify({
+        type: 'selection',
+        boardId: getBoardId(),
+        ids: ids.slice(0, 500)
+      }));
+    } catch (e) { /* a dropped presence frame is not worth queueing */ }
   }
 
   sendLaser(x, y) {

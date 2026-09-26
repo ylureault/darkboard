@@ -5809,3 +5809,133 @@ body.light-theme #loadingOverlay {
 .chat-messages::-webkit-scrollbar {
   width: 6px;
 }
+
+/* =========================
+   CONTROL GROUPS — one button + flyout instead of a wall of icons
+   ========================= */
+.ctl-group { position: relative; display: inline-flex; }
+.ctl-group-btn { position: relative; }
+.ctl-group-btn .grp-chevron {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 8px;
+  height: 8px;
+  opacity: 0.45;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.ctl-group-btn:hover .grp-chevron { opacity: 0.85; }
+.ctl-group.open .grp-chevron { transform: rotate(180deg); opacity: 1; }
+.ctl-group-action .ctl-group-btn .grp-chevron { position: static; margin-left: 2px; width: 10px; height: 10px; }
+
+.ctl-flyout {
+  position: absolute;
+  z-index: 250;
+  min-width: 170px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-4);
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+}
+.ctl-group.open .ctl-flyout { display: flex; animation: contextMenuIn 0.14s cubic-bezier(0.34,1.56,0.64,1); }
+.ctl-group-tool .ctl-flyout { top: calc(100% + 8px); left: 50%; transform: translateX(-50%); }
+.ctl-group-action .ctl-flyout { bottom: calc(100% + 8px); right: 0; }
+
+.ctl-flyout-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 4px 8px 6px;
+}
+
+/* Members become full-width rows with their label spelled out, so the flyout
+   teaches the tool names the compact icons never could. */
+.ctl-flyout-item {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  height: auto !important;
+  padding: 8px 10px !important;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  overflow: visible !important;
+  transition: background 0.12s ease, padding-left 0.12s ease;
+}
+.ctl-flyout-item:hover { background: var(--btn-hover); padding-left: 13px !important; }
+.ctl-flyout-item.active { background: var(--accent-20); color: var(--accent); }
+.ctl-flyout-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+.ctl-flyout-item::after { content: attr(data-label); }
+.ctl-flyout-item .shortcut {
+  position: static !important;
+  margin-left: auto;
+  opacity: 0.55;
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+/* Tool buttons hide their label in the bar; inside the flyout it must show. */
+.ctl-flyout-item > span:not(.shortcut) { display: inline !important; }
+
+/* --- Facilitator panel: sectioned, collapsible, never clipped --- */
+.facilitator-panel { max-height: calc(100vh - 160px); display: flex; flex-direction: column; }
+.fctl-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s ease;
+}
+.fctl-header:hover { color: var(--accent); }
+.fctl-collapse {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 2px;
+  display: inline-flex;
+  line-height: 0;
+}
+.fctl-collapse .grp-chevron {
+  width: 14px;
+  height: 14px;
+  opacity: 0.7;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.facilitator-panel.collapsed .fctl-collapse .grp-chevron { transform: rotate(-90deg); }
+.facilitator-panel .facilitator-controls {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  min-height: 0;
+  transition: opacity 0.18s ease;
+}
+.facilitator-panel.collapsed .facilitator-controls {
+  display: none;
+}
+.fctl-section {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  opacity: 0.75;
+  padding: 12px 4px 4px;
+}
+.fctl-section:first-child { padding-top: 4px; }

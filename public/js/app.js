@@ -4405,6 +4405,11 @@ class DarkBoardApp {
       } else {
         this._hideFloatingToolbar();
       }
+      // Same tick mirrors the selection to collaborators — sendSelection is a
+      // no-op unless the set actually changed.
+      if (this.sync && this.sync.sendSelection) {
+        this.sync.sendSelection([...this.renderer.selectedIds]);
+      }
     };
     this.refreshFloatingToolbar = checkSelection;
     // Selection changes in many places, so this is polled rather than pushed.
@@ -4906,6 +4911,10 @@ class DarkBoardApp {
 // Boot
 window.addEventListener('DOMContentLoaded', () => {
   window.app = new DarkBoardApp();
+  // Fold related controls into grouped buttons once every listener is bound.
+  if (typeof initControlGroups === 'function') {
+    try { initControlGroups(window.app); } catch (e) { console.error('Control groups failed:', e); }
+  }
   // Remove loading overlay
   const loadingOverlay = document.getElementById('loadingOverlay');
   if (loadingOverlay) {

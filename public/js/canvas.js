@@ -16,6 +16,7 @@ class CanvasRenderer {
     this.snapGridSize = 20;
     this.minimapEnabled = localStorage.getItem('darkboard-minimap') !== '0';
     this.laserPointers = new Map(); // userId -> {x, y, color}
+    this.remoteSelections = new Map(); // userId -> { ids, name, color }
     this.comments = []; // anchored comments
     this.alignmentGuides = []; // { type: 'h'|'v', x?, y? }
     this.snapGuideThreshold = 10; // #84 - configurable snap guide threshold (px)
@@ -451,6 +452,9 @@ class CanvasRenderer {
       }
     }
 
+    // Other people's selections, drawn under your own so yours stays legible.
+    this.drawRemoteSelections(ctx);
+
     // Selection indicators
     for (const id of this.selectedIds) {
       const el = this.elements.get(id);
@@ -710,6 +714,54 @@ class CanvasRenderer {
       }
       ctx.stroke();
     }
+  }
+
+  // Outline what each collaborator has selected, in their own colour, with a
+  // name tag on the first element so you can tell at a glance who is on what.
+  drawRemoteSelections(ctx) {
+    if (!this.remoteSelections || this.remoteSelections.size === 0) return;
+    const z = this.camera.zoom;
+    ctx.save();
+    for (const [, sel] of this.remoteSelections) {
+      const color = sel.color || '#4a9eff';
+      let tagged = false;
+      for (const id of sel.ids) {
+        const el = this.elements.get(id);
+        if (!el || el.hidden) continue;
+        const b = getElementBounds(el);
+        if (!b || !isFinite(b.x) || !isFinite(b.w)) continue;
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2 / z;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.roundRect(b.x - 4 / z, b.y - 4 / z, b.w + 8 / z, b.h + 8 / z, 6 / z);
+        ctx.stroke();
+
+        if (!tagged) {
+          tagged = true;
+          const label = sel.name || 'Invité';
+          const fs = 11 / z;
+          ctx.font = `600 ${fs}px -apple-system, BlinkMacSystemFont, sans-serif`;
+          const padX = 6 / z;
+          const padY = 3 / z;
+          const tw = ctx.measureText(label).width;
+          const bw = tw + padX * 2;
+          const bh = fs + padY * 2;
+          const bx = b.x - 4 / z;
+          const by = b.y - 4 / z - bh - 3 / z;
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.roundRect(bx, by, bw, bh, 4 / z);
+          ctx.fill();
+          ctx.fillStyle = isLightColor(color) ? '#1a1a1a' : '#ffffff';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(label, bx + padX, by + bh / 2);
+        }
+      }
+    }
+    ctx.restore();
   }
 
   drawSelectionBox(ctx, el) {
@@ -1002,7 +1054,7 @@ class CanvasRenderer {
     return {
       mmW, mmH, headerH, totalH,
       mmX: window.innerWidth - mmW - 16,
-      mmY: window.innerHeight - totalH - 56,
+      mmY: window.innerHeight - totalH - 104,
     };
   }
 

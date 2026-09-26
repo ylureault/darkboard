@@ -89,6 +89,9 @@ class UI {
     if (tool) {
       this.app.renderer.canvas.style.cursor = tool.cursor;
     }
+    // Lets the grouped toolbar buttons mirror whichever tool is active, however
+    // it was chosen (click, flyout or keyboard shortcut).
+    document.dispatchEvent(new CustomEvent('darkboard:toolchange', { detail: { tool: toolName } }));
   }
 
   initColorPanel() {
