@@ -456,12 +456,11 @@ class InputHandler {
       if (e.key === 'd' && e.shiftKey) { e.preventDefault(); this.app.duplicateSelectedInPlace(); return; }
       if (e.key === 'd') { e.preventDefault(); this.app.duplicateSelected(); return; }
 
-      // #88 - Ctrl+Shift+L: lock/unlock selected elements
-      if (e.key === 'l' && e.shiftKey) { e.preventDefault(); this.app.toggleLockSelected(); return; }
+      // #88 - Ctrl+Shift+L: lock/unlock selected elements.
+      // With Shift held e.key is already 'L', so only the uppercase form can match.
       if (e.key === 'L' && e.shiftKey) { e.preventDefault(); this.app.toggleLockSelected(); return; }
 
       // #96 - Ctrl+Shift+A: deselect all
-      if (e.key === 'a' && e.shiftKey) { e.preventDefault(); this.app.renderer.selectedIds.clear(); this.app.renderer.markDirty(); return; }
       if (e.key === 'A' && e.shiftKey) { e.preventDefault(); this.app.renderer.selectedIds.clear(); this.app.renderer.markDirty(); return; }
 
       // Ctrl+F: Search & replace
@@ -583,7 +582,7 @@ class InputHandler {
 
     // Tool shortcuts (match toolbar labels)
     const toolMap = {
-      v: 'select', h: 'hand', r: 'rect', c: 'circle', o: 'circle',
+      v: 'select', h: 'hand', r: 'rect', o: 'circle',
       l: 'line', a: 'arrow', d: 'draw', s: 'sticky',
       t: 'text', e: 'eraser', f: 'frame', g: 'envelope',
       k: 'connector', m: 'card', i: 'list',
@@ -591,6 +590,14 @@ class InputHandler {
     };
 
     const lower = e.key.toLowerCase();
+
+    // C: colour panel. The toolbar has advertised "Couleurs (C)" all along, but
+    // C was mapped to the circle tool (which already answers to O), so the
+    // shortcut never worked.
+    if (lower === 'c') {
+      const btn = document.getElementById('colorPanelToggle');
+      if (btn) { btn.click(); return; }
+    }
 
     // N key: toggle anchors panel
     if (lower === 'n') {

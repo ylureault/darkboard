@@ -1424,33 +1424,6 @@ body.light-theme .anchors-panel {
   border-color: var(--accent);
 }
 
-/* =========================
-   ZOOM CONTROLS
-   ========================= */
-/* Old zoom-controls replaced by bottom-bar-left */
-.zoom-controls {
-  display: none;
-}
-
-.zoom-btn {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  color: var(--text);
-  font-size: 18px;
-  transition: background 0.15s;
-}
-
-.zoom-btn:hover {
-  background: var(--btn-hover);
-}
-
 .zoom-level {
   font-size: 13px;
   color: var(--text-muted);
@@ -1461,41 +1434,6 @@ body.light-theme .anchors-panel {
 
 .zoom-level:hover {
   color: var(--text);
-}
-
-/* =========================
-   SHARE / ACTION BUTTONS (right sidebar stack)
-   ========================= */
-.share-btn {
-  position: fixed;
-  right: 12px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 10px;
-  padding: 7px 12px;
-  z-index: 100;
-  cursor: pointer;
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 600;
-  transition: all 0.2s;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
-  white-space: nowrap;
-}
-
-.share-btn:hover {
-  background: var(--btn-hover);
-  border-color: var(--accent);
-  transform: translateX(-2px);
-}
-
-.share-btn svg {
-  width: 15px;
-  height: 15px;
-  flex-shrink: 0;
 }
 
 /* =========================
@@ -1521,12 +1459,6 @@ body.light-theme .anchors-panel {
 .toast.show {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
-}
-
-/* Sync status indicator */
-/* Old sync-indicator replaced by bb-sync inside bottom-bar-left */
-.sync-indicator {
-  display: none;
 }
 
 .sync-dot {
@@ -1750,37 +1682,6 @@ body.light-theme .context-menu {
 
 .anchor-search-item .anchor-icon {
   color: var(--accent);
-}
-
-/* =========================
-   DAY/NIGHT THEME TOGGLE
-   ========================= */
-/* Old theme-toggle replaced by bb-btn inside bottom-bar-left */
-.theme-toggle {
-  display: none;
-}
-
-.theme-toggle:hover {
-  background: var(--btn-hover);
-  transform: scale(1.1);
-}
-
-.theme-toggle svg {
-  width: 20px;
-  height: 20px;
-}
-
-/* =========================
-   TEMPLATE BUTTON & MODAL
-   ========================= */
-/* Old template-btn replaced by bb-btn inside bottom-bar-left */
-.template-btn {
-  display: none;
-  z-index: 100;
-}
-
-.template-btn:hover {
-  background: var(--btn-hover);
 }
 
 .modal-lg {
@@ -2795,35 +2696,6 @@ body.light-theme .search-panel {
   margin-bottom: 8px;
   padding-bottom: 6px;
   border-bottom: 1px solid var(--panel-border);
-}
-
-.help-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--text-muted);
-  padding: 3px 0;
-  line-height: 1.3;
-}
-
-.help-row kbd {
-  background: var(--btn);
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
-  padding: 1px 6px;
-  font-size: 11px;
-  font-family: var(--font-mono); /* #R2-55 better monospace font */
-  color: var(--text);
-  white-space: nowrap;
-  min-width: 20px;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-/* Old help-btn replaced by bb-btn inside bottom-bar-left */
-.help-btn {
-  display: none;
 }
 
 /* MODAL ANIMATIONS - already defined above, removed duplicate */
@@ -5104,7 +4976,6 @@ body.light-theme .brand-badge {
 .search-btn:active { transform: scale(0.95); }
 .confirm-actions button { transition: all 0.12s ease; }
 .confirm-actions button:active { transform: scale(0.96); }
-.share-btn:active { transform: scale(0.94); }
 .anchor-toggle-btn:active { transform: scale(0.94); }
 
 /* --- Snappier tool button press ---
@@ -5375,11 +5246,6 @@ kbd {
 .template-grid .template-card:active {
   transform: translateY(0);
 }
-
-/* --- Share button pulse on first load --- */
-.share-btn {
-  animation: shareAppear 0.3s ease-out 1s both;
-}
 @keyframes shareAppear {
   0% { opacity: 0; transform: scale(0.8); }
   100% { opacity: 1; transform: scale(1); }
@@ -5580,13 +5446,6 @@ kbd {
   letter-spacing: -0.3px;
 }
 
-/* --- Zoom display compact --- */
-#zoomDisplay {
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.3px;
-  font-weight: 600;
-}
-
 /* --- Subtle line-height polish in toasts --- */
 .toast {
   line-height: 1.4;
@@ -5608,14 +5467,6 @@ html, body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-}
-
-/* --- Sync indicator improved --- */
-.sync-indicator {
-  transition: all 0.15s ease;
-}
-.sync-indicator:hover {
-  background: var(--btn-hover);
 }
 .sync-dot {
   transition: background-color 0.2s ease, transform 0.2s ease;

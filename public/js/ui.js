@@ -397,14 +397,6 @@ class UI {
     });
   }
 
-  // #145 - Export all (JSON + PNG sequentially)
-  exportAll() {
-    this.exportJSON();
-    setTimeout(() => {
-      this.exportPNG();
-      this.app.showToast('Export complet (JSON + PNG) terminé !', 'success');
-    }, 500);
-  }
 
   exportJSON() {
     const elements = Array.from(this.app.renderer.elements.values());

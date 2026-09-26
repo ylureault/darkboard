@@ -3720,27 +3720,6 @@ class DarkBoardApp {
     }
   }
 
-  // --- Feature: Duplicate with smart offset (Ctrl+D) ---
-  duplicateSelectedWithOffset() {
-    this.copySelected();
-    if (this.clipboard.length === 0) return;
-    this.renderer.selectedIds.clear();
-    const offset = 20;
-    for (const orig of this.clipboard) {
-      const el = deepClone(orig);
-      el.id = generateId();
-      el.x += offset;
-      el.y += offset;
-      if (el.x2 !== undefined) { el.x2 += offset; el.y2 += offset; }
-      if (el.points) {
-        el.points = el.points.map(p => ({ x: p.x + offset, y: p.y + offset }));
-      }
-      el.zIndex = Date.now();
-      this.addElement(el);
-      this.renderer.selectedIds.add(el.id);
-    }
-    this.renderer.markDirty();
-  }
 
   // #82 - Duplicate in place (offset 0,0)
   duplicateSelectedInPlace() {
@@ -3758,36 +3737,6 @@ class DarkBoardApp {
     this.renderer.markDirty();
   }
 
-  // --- Feature: Paste at specific location (for middle-click paste) ---
-  pasteAt(worldX, worldY) {
-    if (this.clipboard.length === 0) return;
-    // Calculate centroid of clipboard elements
-    let cx = 0, cy = 0;
-    for (const el of this.clipboard) {
-      cx += el.x + (el.width || 0) / 2;
-      cy += el.y + (el.height || 0) / 2;
-    }
-    cx /= this.clipboard.length;
-    cy /= this.clipboard.length;
-
-    this.renderer.selectedIds.clear();
-    for (const orig of this.clipboard) {
-      const el = deepClone(orig);
-      el.id = generateId();
-      el.x += worldX - cx;
-      el.y += worldY - cy;
-      if (el.x2 !== undefined) { el.x2 += worldX - cx; el.y2 += worldY - cy; }
-      if (el.points) {
-        const dx = worldX - cx, dy = worldY - cy;
-        el.points = el.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
-      }
-      el.zIndex = Date.now();
-      this.addElement(el);
-      this.renderer.selectedIds.add(el.id);
-    }
-    this.showToast(`${this.clipboard.length} \u00e9l\u00e9ments coll\u00e9s`);
-    this.renderer.markDirty();
-  }
 
   // --- Feature: Bring to front / Send to back ---
   bringToFront() {
@@ -4503,10 +4452,12 @@ class DarkBoardApp {
         this.deleteSelected();
         break;
       case 'bringFront':
-        this.updateSelectedElements({ zIndex: Date.now() });
+        // Reuse the canonical implementations: assigning one zIndex to the whole
+        // selection collapsed its internal stacking order.
+        this.bringToFront();
         break;
       case 'sendBack':
-        this.updateSelectedElements({ zIndex: 1 });
+        this.sendToBack();
         break;
       case 'lock': {
         const id = this.renderer.selectedIds.values().next().value;
@@ -4836,12 +4787,6 @@ class DarkBoardApp {
     this.showToast('Fond modifié');
   }
 
-  // #R2-40: Reset zoom to 100%
-  resetZoom() {
-    this.renderer.camera.zoom = 1;
-    this.renderer.markDirty();
-    this.updateZoomDisplay();
-  }
 
   // #R2-43: Snap indicator lines flash briefly then fade (enhance existing)
   showSnapGuideFade() {
