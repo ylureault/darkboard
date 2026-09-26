@@ -4399,7 +4399,6 @@ class DarkBoardApp {
   // ===== FLOATING TOOLBAR =====
   initFloatingToolbar() {
     this._floatingToolbar = null;
-    // Listen for selection changes
     const checkSelection = () => {
       if (this.renderer.selectedIds.size > 0 && !this.textEditElement) {
         this._showFloatingToolbar();
@@ -4407,8 +4406,12 @@ class DarkBoardApp {
         this._hideFloatingToolbar();
       }
     };
-    // Check periodically (selection changes happen in many places)
-    setInterval(checkSelection, 300);
+    this.refreshFloatingToolbar = checkSelection;
+    // Selection changes in many places, so this is polled rather than pushed.
+    // At 300ms the bar lagged visibly behind a selection and, worse, lingered
+    // after deselecting long enough to swallow a click aimed at the canvas
+    // underneath it. The check is cheap (bounds over the selection only).
+    setInterval(checkSelection, 80);
   }
 
   _showFloatingToolbar() {

@@ -592,53 +592,59 @@ function check(name, ok, detail) {
     app.renderer.selectedIds.clear();
     app.setTool('select');
     app.renderer.camera.x = 0; app.renderer.camera.y = 0; app.renderer.camera.zoom = 1;
+    const c = app.renderer.screenToWorld(window.innerWidth / 2, window.innerHeight / 2);
+    window.__dragOrigin = { x: Math.round(c.x - 100), y: Math.round(c.y - 60) };
     app.renderer.elements.set('drag1', {
-      id: 'drag1', type: 'rect', x: 0, y: 0, width: 200, height: 120,
+      id: 'drag1', type: 'rect', x: window.__dragOrigin.x, y: window.__dragOrigin.y, width: 200, height: 120,
       fill: '#4a9eff', stroke: '#4a9eff', strokeWidth: 2, zIndex: 1,
     });
     app.history.undoStack.length = 0;
     app.renderer.markDirty();
   });
   const dragStart = await page.evaluate(() => {
-    const s = window.app.renderer.worldToScreen(100, 60);
+    const o = window.__dragOrigin;
+    const s = window.app.renderer.worldToScreen(o.x + 100, o.y + 60);
     const x = Math.round(s.x), y = Math.round(s.y);
     const top = document.elementFromPoint(x, y);
     return {
       x, y,
       topId: top ? (top.id || top.className || top.tagName) : null,
-      hits: !!window.app.renderer.hitTest(100, 60),
+      hits: !!window.app.renderer.hitTest(o.x + 100, o.y + 60),
     };
   });
   check('the drag target is on open canvas (nothing covering it)',
     dragStart.topId === 'canvas' && dragStart.hits, JSON.stringify(dragStart));
   await page.mouse.move(dragStart.x, dragStart.y);
   await page.mouse.down();
-  await page.mouse.move(dragStart.x + 120, dragStart.y + 90, { steps: 8 });
+  await page.mouse.move(dragStart.x + 120, dragStart.y + 90, { steps: 10 });
   await page.mouse.up();
-  await page.waitForTimeout(250);
+  await page.waitForTimeout(400);
   const dragged = await page.evaluate(() => {
     const el = window.app.renderer.elements.get('drag1');
-    return { x: Math.round(el.x), y: Math.round(el.y), depth: window.app.history.undoStack.length };
+    const o = window.__dragOrigin;
+    return { dx: Math.round(el.x - o.x), dy: Math.round(el.y - o.y), depth: window.app.history.undoStack.length };
   });
   check('dragging moves the element and records one undo entry',
-    dragged.x > 80 && dragged.y > 60 && dragged.depth === 1, JSON.stringify(dragged));
+    dragged.dx > 0 && dragged.dy > 0 && dragged.depth === 1, JSON.stringify(dragged));
 
   await page.keyboard.press('Control+z');
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(350);
   const undone = await page.evaluate(() => {
     const el = window.app.renderer.elements.get('drag1');
-    return { x: Math.round(el.x), y: Math.round(el.y) };
+    const o = window.__dragOrigin;
+    return { dx: Math.round(el.x - o.x), dy: Math.round(el.y - o.y) };
   });
   check('Ctrl+Z restores the pre-drag position',
-    undone.x === 0 && undone.y === 0, JSON.stringify(undone));
+    undone.dx === 0 && undone.dy === 0, JSON.stringify(undone));
 
   await page.keyboard.press('Control+y');
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(350);
   const redone = await page.evaluate(() => {
     const el = window.app.renderer.elements.get('drag1');
-    return { x: Math.round(el.x) };
+    const o = window.__dragOrigin;
+    return { dx: Math.round(el.x - o.x) };
   });
-  check('Ctrl+Y re-applies the drag', redone.x > 80, JSON.stringify(redone));
+  check('Ctrl+Y re-applies the drag', redone.dx === dragged.dx, JSON.stringify({ redone, dragged }));
 
   // --- no pending drag state after the pointer leaves mid-drag ---
   await page.mouse.move(dragStart.x, dragStart.y);
@@ -650,6 +656,94 @@ function check(name, ok, detail) {
   check('drag state is cleared when the pointer leaves the canvas',
     await page.evaluate(() => window.app.input.isDragging === false &&
       window.app.input.pointerDown === false));
+
+  // --- dragging a frame with children + connectors is ONE undo entry ---
+  await page.evaluate(() => {
+    const app = window.app;
+    if (app.searchPanel) app.closeSearchPanel();
+    document.querySelectorAll('.card-editor-panel,.tour-overlay,.tour-tooltip,.tour-highlight,.confirm-overlay').forEach((n) => n.remove());
+    const help = document.getElementById('helpOverlay');
+    if (help) help.style.display = 'none';
+    app.renderer.elements.clear();
+    app.renderer.selectedIds.clear();
+    app.setTool('select');
+    app.renderer.camera.x = 0; app.renderer.camera.y = 0; app.renderer.camera.zoom = 1;
+    // Anchor the frame near the viewport centre so its title bar is well clear
+    // of the toolbar and of the edge auto-scroll margin.
+    const c = app.renderer.screenToWorld(window.innerWidth / 2, window.innerHeight / 2);
+    const fx = Math.round(c.x - 200), fy = Math.round(c.y - 100);
+    window.__frameOrigin = { x: fx, y: fy };
+    app.renderer.elements.set('fr', {
+      id: 'fr', type: 'frame', x: fx, y: fy, width: 400, height: 300,
+      text: 'Frame', fill: 'transparent', stroke: '#4a9eff', strokeWidth: 2, zIndex: 1,
+    });
+    app.renderer.elements.set('kid', {
+      id: 'kid', type: 'rect', x: fx + 40, y: fy + 60, width: 100, height: 60,
+      fill: '#FFD966', stroke: '#FFD966', strokeWidth: 2, zIndex: 2,
+    });
+    app.renderer.elements.set('out', {
+      id: 'out', type: 'rect', x: fx + 900, y: fy + 60, width: 100, height: 60,
+      fill: '#4ecdc4', stroke: '#4ecdc4', strokeWidth: 2, zIndex: 3,
+    });
+    app.renderer.elements.set('cn', {
+      id: 'cn', type: 'connector', x: fx + 140, y: fy + 90, x2: fx + 900, y2: fy + 90,
+      sourceId: 'kid', targetId: 'out', stroke: '#888', strokeWidth: 2, zIndex: 4,
+    });
+    app.history.undoStack.length = 0;
+    if (app.refreshFloatingToolbar) app.refreshFloatingToolbar();
+    app.renderer.markDirty();
+  });
+  await page.waitForTimeout(250);
+  const framePick = await page.evaluate(() => {
+    const app = window.app;
+    const o = window.__frameOrigin;
+    // The frame's title bar sits just above its body and is hit-testable.
+    const wx = o.x + 200, wy = o.y - 10;
+    const s = app.renderer.worldToScreen(wx, wy);
+    const x = Math.round(s.x), y = Math.round(s.y);
+    const hit = app.renderer.hitTest(wx, wy);
+    const top = document.elementFromPoint(x, y);
+    return {
+      x, y,
+      grabbed: hit ? hit.id : null,
+      topId: top ? (top.id || top.className || top.tagName) : null,
+    };
+  });
+  check('the frame title bar is grabbable on open canvas',
+    framePick.grabbed === 'fr' && framePick.topId === 'canvas', JSON.stringify(framePick));
+
+  const beforeFrameDrag = await page.evaluate(() => {
+    const g = (id) => { const e = window.app.renderer.elements.get(id); return { x: Math.round(e.x), y: Math.round(e.y) }; };
+    return { fr: g('fr'), kid: g('kid'), cn: g('cn') };
+  });
+  await page.mouse.move(framePick.x, framePick.y);
+  await page.mouse.down();
+  await page.mouse.move(framePick.x + 100, framePick.y + 70, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(450);
+  const afterFrameDrag = await page.evaluate(() => {
+    const g = (id) => { const e = window.app.renderer.elements.get(id); return { x: Math.round(e.x), y: Math.round(e.y) }; };
+    return { fr: g('fr'), kid: g('kid'), cn: g('cn'), depth: window.app.history.undoStack.length };
+  });
+  check('dragging a frame moves its child and re-routes its connector',
+    afterFrameDrag.fr.x !== beforeFrameDrag.fr.x &&
+    afterFrameDrag.kid.x !== beforeFrameDrag.kid.x &&
+    afterFrameDrag.cn.x !== beforeFrameDrag.cn.x,
+    JSON.stringify({ before: beforeFrameDrag, after: afterFrameDrag }));
+  check('dragging a frame with children and a connector is one undo entry',
+    afterFrameDrag.depth === 1, JSON.stringify(afterFrameDrag));
+
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(350);
+  const afterFrameUndo = await page.evaluate(() => {
+    const g = (id) => { const e = window.app.renderer.elements.get(id); return { x: Math.round(e.x), y: Math.round(e.y) }; };
+    return { fr: g('fr'), kid: g('kid'), cn: g('cn') };
+  });
+  check('one Ctrl+Z restores frame, child and connector together',
+    afterFrameUndo.fr.x === beforeFrameDrag.fr.x &&
+    afterFrameUndo.kid.x === beforeFrameDrag.kid.x &&
+    afterFrameUndo.cn.x === beforeFrameDrag.cn.x,
+    JSON.stringify({ before: beforeFrameDrag, afterUndo: afterFrameUndo }));
 
   await page.waitForTimeout(400);
   await browser.close();

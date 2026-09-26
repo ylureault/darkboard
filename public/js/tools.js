@@ -110,6 +110,25 @@ const Tools = {
             }
             app.renderer.markDirty();
             if (app.updateUrlHash) app.updateUrlHash();
+
+            // Also arm a move: the header is the natural handle for dragging a
+            // frame, and returning here left the pointer with no drag state, so
+            // a frame could only be moved by grabbing its thin border.
+            if (!hit.locked) {
+              this.dragType = 'move';
+              this.dragStart = { x: worldX, y: worldY };
+              this.originalElements = new Map();
+              for (const id of app.renderer.selectedIds) {
+                const el = app.renderer.elements.get(id);
+                if (el && !el.locked) this.originalElements.set(id, deepClone(el));
+              }
+              this.frameChildren = new Map();
+              for (const [id, orig] of this.originalElements) {
+                if (orig.type === 'frame') {
+                  this.frameChildren.set(id, app.getFrameChildren(id));
+                }
+              }
+            }
             return;
           }
         }
@@ -479,6 +498,10 @@ const Tools = {
         const dx = worldX - this.dragStart.x;
         const dy = worldY - this.dragStart.y;
         if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+          // Moving children, re-routing connectors and updating envelope
+          // membership each push their own history entry; group them so the
+          // whole drag reverses in one Ctrl+Z.
+          app.history.beginBatch();
           const ops = [];
           const inverseOps = [];
           for (const [id, orig] of this.originalElements) {
@@ -536,6 +559,8 @@ const Tools = {
 
           // Envelope: check if moved elements landed in/out of envelopes
           app.updateEnvelopeContainment(this.originalElements);
+          app.history.endBatch();
+          if (app.ui) app.ui.updateUndoRedoButtons();
         }
       } else if (this.dragType === 'resize' && this.dragStart) {
         const { elementId } = this.resizeHandle;
