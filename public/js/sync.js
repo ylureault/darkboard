@@ -546,11 +546,25 @@ class SyncClient {
   }
 
   // Broadcast which elements this user has selected, so collaborators can see
-  // what everyone is working on. Only sends when the set actually changes.
+  // what everyone is working on. Skipped when the set is unchanged, and floored
+  // to a few frames a second: a marquee drag changes the selection on every
+  // pointer move, which would otherwise be a steady stream of messages.
   sendSelection(ids) {
     const key = ids.join(',');
     if (key === this._lastSelectionKey) return;
+    const now = Date.now();
+    if (now - (this._lastSelectionSent || 0) < 250) {
+      // Re-check shortly so the final state of a drag is never left unsent.
+      if (!this._selectionRetry) {
+        this._selectionRetry = setTimeout(() => {
+          this._selectionRetry = null;
+          if (this.app) this.sendSelection([...this.app.renderer.selectedIds]);
+        }, 250);
+      }
+      return;
+    }
     this._lastSelectionKey = key;
+    this._lastSelectionSent = now;
     if (!this.connected || !this.ws) return;
     try {
       this.ws.send(JSON.stringify({

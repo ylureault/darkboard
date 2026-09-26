@@ -3249,8 +3249,27 @@ class DarkBoardApp {
 
   // #124 - Improved toasts with icons and type parameter
   showToast(message, type = 'info') {
-    // Queue multiple toasts and show them stacked
+    // Never stack the same message twice. A burst from one source — a server
+    // rejecting a run of messages, say — used to paint a wall of identical
+    // toasts over the board. Repeats reset the visible one and count up on it.
+    const existing = this._toastQueue.find(t => t._message === message && !t._dismissing);
+    if (existing) {
+      existing._repeats = (existing._repeats || 1) + 1;
+      const badge = existing.querySelector('.toast-repeat');
+      if (badge) badge.textContent = '×' + existing._repeats;
+      else {
+        const b = document.createElement('span');
+        b.className = 'toast-repeat';
+        b.textContent = '×' + existing._repeats;
+        existing.appendChild(b);
+      }
+      clearTimeout(existing._dismissTimer);
+      existing._dismissTimer = setTimeout(existing._dismiss, 3500);
+      return;
+    }
+
     const toast = document.createElement('div');
+    toast._message = message;
     toast.className = `toast show toast-${type}`;
     const iconMap = { success: '<span class="toast-icon toast-icon-success">&#10003;</span>', error: '<span class="toast-icon toast-icon-error">&#10005;</span>', info: '<span class="toast-icon toast-icon-info">i</span>' };
     toast.innerHTML = (iconMap[type] || iconMap.info) + '<span>' + this._escapeHtml(message) + '</span>';
@@ -3278,7 +3297,9 @@ class DarkBoardApp {
     // Animate in
     requestAnimationFrame(() => { toast.style.opacity = '1'; });
 
-    setTimeout(() => {
+    // Stored so a repeat of the same message can restart the countdown.
+    toast._dismiss = () => {
+      toast._dismissing = true;
       toast.style.opacity = '0';
       setTimeout(() => {
         toast.remove();
@@ -3286,9 +3307,10 @@ class DarkBoardApp {
         if (idx !== -1) this._toastQueue.splice(idx, 1);
         this._repositionToasts();
       }, 300);
-    }, 3500);
+    };
+    toast._dismissTimer = setTimeout(toast._dismiss, 3500);
 
-    // Also update the original toast element for backward compatibility
+    // Legacy single-toast element kept in sync for anything still reading it.
     const origToast = document.getElementById('toast');
     if (origToast) {
       origToast.textContent = message;

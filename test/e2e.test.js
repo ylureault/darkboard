@@ -39,6 +39,11 @@ function check(name, ok, detail) {
 
   const browser = await chromium.launch({ executablePath: EXEC, args: ['--no-sandbox'] });
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  // The welcome tour retries until the user joins, so removing its nodes after
+  // load races it back onto the canvas. Mark it done before anything boots.
+  await page.addInitScript(() => {
+    try { localStorage.setItem('darkboard-tour-done', '1'); } catch (e) {}
+  });
 
   page.on('console', (m) => {
     if (m.type() === 'error') errors.push('console.error: ' + m.text());
@@ -599,8 +604,10 @@ function check(name, ok, detail) {
       fill: '#4a9eff', stroke: '#4a9eff', strokeWidth: 2, zIndex: 1,
     });
     app.history.undoStack.length = 0;
+    if (app.refreshFloatingToolbar) app.refreshFloatingToolbar();
     app.renderer.markDirty();
   });
+  await page.waitForTimeout(250);
   const dragStart = await page.evaluate(() => {
     const o = window.__dragOrigin;
     const s = window.app.renderer.worldToScreen(o.x + 100, o.y + 60);
