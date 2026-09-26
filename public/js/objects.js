@@ -663,7 +663,7 @@ function renderElement(ctx, el, selected, camera) {
   // Tag pills — rendered for ANY element type with tags (not just stickies).
   // Drawn after the element body but before ctx.restore so they inherit
   // the same camera/rotation transform.
-  if (el.tags && el.tags.length > 0 && _cameraZoom >= 0.5 &&
+  if (el.tags && el.tags.length > 0 && (camera ? camera.zoom : 1) >= 0.5 &&
       el.type !== 'connector' && el.type !== 'line' && el.type !== 'arrow' &&
       el.type !== 'freehand') {
     drawTagPills(ctx, el);

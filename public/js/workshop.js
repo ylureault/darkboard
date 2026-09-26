@@ -597,12 +597,22 @@ class Workshop {
   }
 
   addAnchorHere() {
+    this.addAnchor('Ancre ' + (this.anchors.size + 1),
+      this.app.renderer.camera.x,
+      this.app.renderer.camera.y,
+      this.app.renderer.camera.zoom);
+  }
+
+  // Create an anchor at an explicit view. Used by addAnchorHere and by the
+  // DarkBoard JSON importer when restoring a board's anchors.
+  addAnchor(name, x, y, zoom) {
+    if (typeof name !== 'string' || !name.trim()) return;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
     const anchor = {
       id: generateId(),
-      name: 'Ancre ' + (this.anchors.size + 1),
-      x: this.app.renderer.camera.x,
-      y: this.app.renderer.camera.y,
-      zoom: this.app.renderer.camera.zoom
+      name: name.slice(0, 200),
+      x, y,
+      zoom: (Number.isFinite(zoom) && zoom > 0 && zoom <= 100) ? zoom : 1
     };
     this.app.sync.send({ type: 'anchor-add', anchor });
   }
@@ -817,23 +827,31 @@ class Workshop {
     const matrixY = cam.y - matrixH / 2;
 
     const ops = [];
+    const inverseOps = [];
     const frameId = generateId();
+    let zBase = Date.now();
+
+    // applyOps keys elements off op.elementId, and elements are measured with
+    // width/height/text — using element-only ops with w/h/label collapsed every
+    // created element into a single `undefined` map slot.
+    const addEl = (el) => {
+      el.zIndex = zBase++;
+      ops.push({ type: 'add', elementId: el.id, element: el });
+      inverseOps.push({ type: 'delete', elementId: el.id });
+    };
 
     // Create the frame
-    ops.push({
-      type: 'add',
-      element: {
-        id: frameId,
-        type: 'frame',
-        x: matrixX,
-        y: matrixY,
-        w: matrixW,
-        h: matrixH,
-        label: 'Matrice de priorisation',
-        fill: 'rgba(30,30,30,0.5)',
-        stroke: '#555',
-        strokeWidth: 2
-      }
+    addEl({
+      id: frameId,
+      type: 'frame',
+      x: matrixX,
+      y: matrixY,
+      width: matrixW,
+      height: matrixH,
+      text: 'Matrice de priorisation',
+      fill: 'rgba(30,30,30,0.5)',
+      stroke: '#555',
+      strokeWidth: 2
     });
 
     // Quadrant labels as text elements
@@ -856,39 +874,31 @@ class Workshop {
 
     // Create quadrant labels and position elements
     for (const q of quadrants) {
-      // Add label text
-      ops.push({
-        type: 'add',
-        element: {
-          id: generateId(),
-          type: 'text',
-          x: q.x + 8,
-          y: q.y + 4,
-          w: quadW - 16,
-          h: 24,
-          text: q.label,
-          fontSize: 13,
-          fontWeight: 'bold',
-          fill: q.color,
-          stroke: 'none'
-        }
+      // Quadrant background first so the label sits on top of it
+      addEl({
+        id: generateId(),
+        type: 'rect',
+        x: q.x,
+        y: q.y,
+        width: quadW,
+        height: quadH,
+        fill: q.color + '10',
+        stroke: q.color + '40',
+        strokeWidth: 1
       });
 
-      // Add quadrant background
-      ops.push({
-        type: 'add',
-        element: {
-          id: generateId(),
-          type: 'rect',
-          x: q.x,
-          y: q.y,
-          w: quadW,
-          h: quadH,
-          fill: q.color + '10',
-          stroke: q.color + '40',
-          strokeWidth: 1,
-          rx: 8
-        }
+      addEl({
+        id: generateId(),
+        type: 'text',
+        x: q.x + 8,
+        y: q.y + 4,
+        width: quadW - 16,
+        height: 24,
+        text: q.label,
+        fontSize: 13,
+        fontWeight: 'bold',
+        fill: q.color,
+        stroke: 'none'
       });
 
       // Position items in grid within quadrant
@@ -898,20 +908,20 @@ class Workshop {
       const cellH = (quadH - itemPadding * 2 - 24) / Math.max(1, Math.ceil(q.items.length / cols));
 
       q.items.forEach((item, i) => {
+        const el = this.app.renderer.elements.get(item.id);
+        if (!el) return;
         const col = i % cols;
         const row = Math.floor(i / cols);
-        const newX = q.x + itemPadding + col * cellW + cellW / 2 - (item.element.w || 140) / 2;
-        const newY = q.y + itemPadding + 24 + row * cellH + cellH / 2 - (item.element.h || 140) / 2;
-        ops.push({
-          type: 'update',
-          id: item.id,
-          props: { x: newX, y: newY }
-        });
+        const newX = q.x + itemPadding + col * cellW + cellW / 2 - (el.width || 140) / 2;
+        const newY = q.y + itemPadding + 24 + row * cellH + cellH / 2 - (el.height || 140) / 2;
+        ops.push({ type: 'update', elementId: item.id, props: { x: newX, y: newY } });
+        inverseOps.push({ type: 'update', elementId: item.id, props: { x: el.x, y: el.y } });
       });
     }
 
     // Send all ops
     this.app.applyOps(ops);
+    this.app.history.push(ops, inverseOps);
     this.app.sync.sendOps(ops);
     this.app.showToast('Matrice de priorisation créée !');
   }
@@ -1111,6 +1121,7 @@ class Workshop {
     const cols = Math.max(1, Math.ceil(Math.sqrt(allClusters.length)));
 
     const ops = [];
+    const inverseOps = [];
 
     allClusters.forEach((cluster, ci) => {
       const col = ci % cols;
@@ -1119,21 +1130,22 @@ class Workshop {
       const frameY = startY + row * (clusterH + gap);
 
       // Create frame
-      ops.push({
-        type: 'add',
-        element: {
-          id: generateId(),
-          type: 'frame',
-          x: frameX,
-          y: frameY,
-          w: clusterW,
-          h: clusterH,
-          label: cluster.label,
-          fill: 'rgba(74,158,255,0.05)',
-          stroke: 'rgba(74,158,255,0.3)',
-          strokeWidth: 1
-        }
-      });
+      const frameId = generateId();
+      const frameEl = {
+        id: frameId,
+        type: 'frame',
+        x: frameX,
+        y: frameY,
+        width: clusterW,
+        height: clusterH,
+        text: cluster.label,
+        fill: 'rgba(74,158,255,0.05)',
+        stroke: 'rgba(74,158,255,0.3)',
+        strokeWidth: 1,
+        zIndex: Date.now() + ops.length
+      };
+      ops.push({ type: 'add', elementId: frameId, element: frameEl });
+      inverseOps.push({ type: 'delete', elementId: frameId });
 
       // Position items within frame
       const itemCols = Math.max(1, Math.ceil(Math.sqrt(cluster.items.length)));
@@ -1142,22 +1154,26 @@ class Workshop {
       const cellH = (clusterH - itemPad * 2 - 30) / Math.max(1, Math.ceil(cluster.items.length / itemCols));
 
       cluster.items.forEach((item, ii) => {
+        const el = this.app.renderer.elements.get(item.id);
+        if (!el) return;
         const c = ii % itemCols;
         const r = Math.floor(ii / itemCols);
-        const elW = item.element.w || 140;
-        const elH = item.element.h || 140;
+        const elW = el.width || 140;
+        const elH = el.height || 140;
         ops.push({
           type: 'update',
-          id: item.id,
+          elementId: item.id,
           props: {
             x: frameX + itemPad + c * cellW + cellW / 2 - elW / 2,
             y: frameY + itemPad + 30 + r * cellH + cellH / 2 - elH / 2
           }
         });
+        inverseOps.push({ type: 'update', elementId: item.id, props: { x: el.x, y: el.y } });
       });
     });
 
     this.app.applyOps(ops);
+    this.app.history.push(ops, inverseOps);
     this.app.sync.sendOps(ops);
     this.app.showToast(allClusters.length + ' clusters créés !');
   }
@@ -1506,21 +1522,25 @@ class Workshop {
       { title: 'A ameliorer', color: '#ff6b6b' },
       { title: 'Actions', color: '#4a9eff' }
     ];
+    // Collect first, then add in one batch — six addElement() calls meant six WS
+    // ops and six undo entries, so undoing the template left half of it behind.
+    const created = [];
     for (let i = 0; i < columns.length; i++) {
       const col = columns[i];
       const x = startX + i * (colW + gap);
       const frame = createFrame(x, startY, colW, colH, col.title);
       frame.stroke = col.color;
       frame.fill = col.color + '08';
-      this.app.addElement(frame);
+      created.push(frame);
       // Add a starter sticky
       const sticky = createSticky(x + 20, startY + 50);
       sticky.fill = col.color + '40';
       sticky.text = '';
       sticky.width = 150;
       sticky.height = 150;
-      this.app.addElement(sticky);
+      created.push(sticky);
     }
+    this.app.addElementsBatch(created);
     this.app.showToast('Template rétrospective créé !');
   }
 }

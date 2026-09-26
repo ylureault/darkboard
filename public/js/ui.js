@@ -358,19 +358,22 @@ class UI {
     const headers = ['id', 'type', 'x', 'y', 'width', 'height', 'text', 'fill', 'stroke', 'tags', 'children'];
     const rows = [headers.join(',')];
 
+    // Quote every free-form field. Fills are often rgba(74, 158, 255, 0.05),
+    // which used to inject three extra commas and shift the whole row.
+    const q = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
     for (const el of elements) {
       const row = [
-        el.id,
-        el.type,
+        q(el.id),
+        q(el.type),
         Math.round(el.x),
         Math.round(el.y),
         Math.round(el.width || 0),
         Math.round(el.height || 0),
-        '"' + (el.text || '').replace(/"/g, '""') + '"',
-        el.fill || '',
-        el.stroke || '',
-        el.tags ? el.tags.map(t => t.label).join(';') : '',
-        el.children ? el.children.join(';') : ''
+        q(el.text || ''),
+        q(el.fill || ''),
+        q(el.stroke || ''),
+        q(el.tags ? el.tags.map(t => t.label).join(';') : ''),
+        q(el.children ? el.children.join(';') : '')
       ];
       rows.push(row.join(','));
     }
@@ -518,11 +521,25 @@ class UI {
   }
 
   importDarkBoard(data) {
-    const elements = data.elements || [];
+    const raw = data.elements || [];
+    // An arbitrary JSON array used to reach this point unchecked: elements with
+    // no x/y made minX stay Infinity, every coordinate became NaN, and the junk
+    // was still broadcast to everyone and saved server-side. Validate first.
+    const KNOWN_TYPES = new Set(['sticky', 'text', 'rect', 'circle', 'diamond', 'triangle',
+      'line', 'arrow', 'connector', 'freehand', 'frame', 'envelope', 'card', 'list',
+      'image', 'mindmap', 'embed', 'zoomZone']);
+    const elements = raw.filter(el =>
+      el && typeof el === 'object' && !Array.isArray(el)
+      && typeof el.type === 'string' && KNOWN_TYPES.has(el.type)
+      && Number.isFinite(el.x) && Number.isFinite(el.y));
+
     if (elements.length === 0) {
-      this.app.showToast('Aucun élément à importer');
+      this.app.showToast(raw.length > 0
+        ? 'Fichier non reconnu : aucun élément DarkBoard valide'
+        : 'Aucun élément à importer', 'error');
       return;
     }
+    const skipped = raw.length - elements.length;
 
     // Find bounding box to center imported content
     let minX = Infinity, minY = Infinity;
@@ -569,7 +586,23 @@ class UI {
     // Send all elements in a single sync op to avoid tripping the
     // per-client 100 ops/sec rate limiter on large imports.
     this.app.addElementsBatch(prepared);
-    this.app.showToast(`${prepared.length} éléments importés !`);
+
+    // The exporter writes `anchors`, so read them back — otherwise a round-trip
+    // silently loses every presentation anchor.
+    let anchorCount = 0;
+    if (Array.isArray(data.anchors) && this.app.workshop) {
+      for (const a of data.anchors) {
+        if (!a || typeof a.name !== 'string') continue;
+        if (!Number.isFinite(a.x) || !Number.isFinite(a.y)) continue;
+        this.app.workshop.addAnchor(a.name, a.x + offsetX, a.y + offsetY, a.zoom);
+        anchorCount++;
+      }
+    }
+
+    let msg = `${prepared.length} éléments importés !`;
+    if (anchorCount > 0) msg += ` ${anchorCount} ancre${anchorCount > 1 ? 's' : ''}.`;
+    if (skipped > 0) msg += ` ${skipped} ignoré${skipped > 1 ? 's' : ''}.`;
+    this.app.showToast(msg);
   }
 
   importDraftIO(data) {
@@ -732,9 +765,26 @@ class UI {
       return;
     }
 
+    // Recentre on the current view, like every other importer — laying out from
+    // a hardcoded origin dropped the import off-screen after any pan.
+    const imported = ops.map(op => op.element);
+    let minX = Infinity, minY = Infinity;
+    for (const el of imported) {
+      if (el.x < minX) minX = el.x;
+      if (el.y < minY) minY = el.y;
+    }
+    const offsetX = this.app.renderer.camera.x - minX - 200;
+    const offsetY = this.app.renderer.camera.y - minY - 200;
+    for (const el of imported) {
+      el.x += offsetX;
+      el.y += offsetY;
+      if (el.x2 !== undefined) { el.x2 += offsetX; el.y2 += offsetY; }
+      if (el.points) el.points = el.points.map(p => ({ x: p.x + offsetX, y: p.y + offsetY }));
+    }
+
     // Batch via the shared helper so history + WS stay consistent with other imports.
-    this.app.addElementsBatch(ops.map(op => op.element));
-    this.app.showToast(`${ops.length} éléments importés depuis Markdown`);
+    this.app.addElementsBatch(imported);
+    this.app.showToast(`${imported.length} éléments importés depuis Markdown`);
   }
 
   // ========================= CSV IMPORT =========================
@@ -828,6 +878,11 @@ class UI {
       else if (rawType === 'connector' || rawType === 'line' || rawType === 'arrow' || rawType === 'fleche') dbType = 'connector';
       else if (rawType === 'envelope' || rawType === 'enveloppe') dbType = 'envelope';
       else if (rawType === 'list' || rawType === 'liste') dbType = 'list';
+      // These used to fall through to the sticky default, silently changing the
+      // element's type on a CSV round-trip.
+      else if (rawType === 'triangle') dbType = 'triangle';
+      else if (rawType === 'freehand' || rawType === 'draw' || rawType === 'dessin') dbType = 'freehand';
+      else if (rawType === 'mindmap') dbType = 'mindmap';
 
       // Position: use CSV values or auto-layout in grid
       const autoCol = i % perRow;
@@ -868,6 +923,17 @@ class UI {
         groupId: null,
         tags: []
       };
+
+      // Linear types are drawn from absolute endpoints; without x2/y2 they are
+      // invisible, un-hittable and impossible to delete. CSV carries no
+      // endpoints, so derive them from the element box.
+      if (dbType === 'connector' || dbType === 'line' || dbType === 'arrow') {
+        el.x2 = x + width;
+        el.y2 = y + height;
+      }
+      if (dbType === 'freehand') {
+        el.points = [{ x: x, y: y }, { x: x + width, y: y + height }];
+      }
 
       // Parse tags
       const tagsStr = getVal(row, 'tags');
@@ -2139,11 +2205,12 @@ class UI {
       if (e.target === overlay) hide();
     });
 
-    // Show help on first visit
-    if (!localStorage.getItem('darkboard-onboarded')) {
-      localStorage.setItem('darkboard-onboarded', '1');
-      setTimeout(show, 800);
-    }
+    // Deliberately no auto-open on first visit. A full-screen reference modal
+    // over a blank board is the worst of the three onboarding surfaces we have:
+    // it used to land on top of the join dialog and make "Rejoindre"
+    // unclickable, and once that was fixed it simply covered the canvas the
+    // moment the user arrived. First-run guidance is the welcome tour plus the
+    // empty-board hint; this panel stays one click (or `?`) away.
   }
 
   showHelp() {

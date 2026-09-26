@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "test": "node test/darkboard.test.js && node test/server.test.js"
+    "test": "node test/darkboard.test.js && node test/server.test.js",
+    "test:e2e": "node test/e2e.test.js"
   },
   "dependencies": {
     "compression": "^1.8.1",

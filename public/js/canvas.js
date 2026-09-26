@@ -180,7 +180,17 @@ class CanvasRenderer {
       // #176: Skip frame if less than ~16.67ms (60fps cap) since last render
       if (this.dirty && (timestamp - this._lastFrameTime >= 16)) {
         this._lastFrameTime = timestamp;
-        this.render();
+        // A throw here used to escape the rAF callback, so the loop was never
+        // rescheduled and the board froze permanently until a reload. One bad
+        // element must not brick the whole canvas.
+        try {
+          this.render();
+        } catch (err) {
+          if (!this._renderErrorLogged) {
+            this._renderErrorLogged = true;
+            console.error('Render error (canvas keeps running):', err);
+          }
+        }
         this.dirty = false;
       }
       requestAnimationFrame(loop);
@@ -1067,8 +1077,12 @@ class CanvasRenderer {
     const bodyY = mmY + headerH;
 
     const now = performance.now();
-    if (now - this._lastMinimapRender >= 400) {
+    // Throttle the (O(n)) rebuild, but never let the element count go stale —
+    // otherwise clearing the board leaves the old mapping live and clicks
+    // navigate using dead extents.
+    if (now - this._lastMinimapRender >= 400 || this._minimapLayerCount !== this.elements.size) {
       this._lastMinimapRender = now;
+      this._minimapLayerCount = this.elements.size;
       this._rebuildMinimapLayer(rect);
     }
 
@@ -1194,19 +1208,19 @@ class CanvasRenderer {
     return null;
   }
 
-  // Hit test minimap for navigation
+  // Hit test minimap for navigation. Geometry comes from _getMinimapRect() so it
+  // always matches what was drawn; the extents only carry the world mapping.
   hitTestMinimap(screenX, screenY) {
     if (!this.minimapEnabled) return null;
-    const e = this._minimapExtents;
-    if (!e) return null;
-    // Include header in click area (but clicks on header scroll to fit-all would be nice, for now same behavior)
-    const hitX1 = e.mmX, hitY1 = e.mmY, hitX2 = e.mmX + e.mmW, hitY2 = e.mmY + e.mmH;
-    if (screenX >= hitX1 && screenX <= hitX2 && screenY >= hitY1 && screenY <= hitY2) {
-      return {
-        worldX: e.minX + (screenX - e.mmX - e.offsetX) / e.scale,
-        worldY: e.minY + (screenY - e.mmY - e.offsetY) / e.scale
-      };
-    }
-    return null;
+    const ext = this._minimapExtents;
+    if (!ext) return null;
+    const { mmX, mmY, mmW, mmH, headerH } = this._getMinimapRect();
+    const bodyY = mmY + headerH;
+    if (screenX < mmX || screenX > mmX + mmW) return null;
+    if (screenY < bodyY || screenY > bodyY + mmH) return null;
+    return {
+      worldX: ext.minX + (screenX - mmX - ext.offsetX) / ext.scale,
+      worldY: ext.minY + (screenY - bodyY - ext.offsetY) / ext.scale,
+    };
   }
 }

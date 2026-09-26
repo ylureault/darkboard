@@ -270,6 +270,9 @@ class InputHandler {
   }
 
   onPointerUp(e) {
+    // Always drop the drag flag, whatever path we take out of here — leaving it
+    // set strands edge auto-scroll in an "always dragging" state.
+    this.isDragging = false;
     if (this.isPanning) {
       this.isPanning = false;
       const tool = Tools[this.app.currentTool];
@@ -308,7 +311,6 @@ class InputHandler {
 
     if (!this.pointerDown) return;
     this.pointerDown = false;
-    this.isDragging = false;
 
     const world = this.getWorldPos(e);
     const tool = Tools[this.app.currentTool];
@@ -621,8 +623,13 @@ class InputHandler {
       // Number keys for direct anchor navigation
       if (e.key >= '1' && e.key <= '9') {
         const idx = parseInt(e.key) - 1;
-        this.app.ui.presentationIndex = idx;
-        this.app.ui.navigateToAnchor(idx);
+        const anchors = this.app.workshop ? [...this.app.workshop.anchors.values()] : [];
+        // Only commit the index if that slide exists, otherwise presentationIndex
+        // points past the end and the next arrow press jumps to the last slide.
+        if (idx < anchors.length) {
+          this.app.ui.presentationIndex = idx;
+          this.app.ui.navigateToAnchor(idx);
+        }
         return;
       }
       return; // Ignore all other keys during presentation

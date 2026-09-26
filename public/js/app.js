@@ -1953,8 +1953,15 @@ class DarkBoardApp {
   toggleSearchPanel() {
     if (!this.searchPanel) this.createSearchPanel();
     const visible = this.searchPanel.style.display !== 'none';
-    this.searchPanel.style.display = visible ? 'none' : 'flex';
-    if (!visible) { const si = this.searchPanel.querySelector('.search-input'); if (si) si.focus(); }
+    if (visible) {
+      // Same teardown as the close button — hiding the panel without clearing
+      // left every match glowing on the canvas indefinitely.
+      this.closeSearchPanel();
+      return;
+    }
+    this.searchPanel.style.display = 'flex';
+    const si = this.searchPanel.querySelector('.search-input');
+    if (si) si.focus();
   }
 
   closeSearchPanel() {
@@ -2042,21 +2049,67 @@ class DarkBoardApp {
     this.animateToView(b.x + b.w / 2, b.y + b.h / 2);
   }
 
+  // Apply a replacement inside rich text without ever regexing raw HTML.
+  // Running the regex over the markup either missed matches that span inline
+  // tags (leaving richText stale, so the edit was invisible since renderers
+  // prefer richText) or matched tag names and style attributes and corrupted
+  // the formatting. Returns the new HTML, or null when nothing matched.
+  _replaceInRichText(html, re, replacement) {
+    if (!html) return null;
+    let doc;
+    try {
+      doc = new DOMParser().parseFromString(html, 'text/html');
+    } catch (e) {
+      return null;
+    }
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+    let changed = false;
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    for (const node of nodes) {
+      re.lastIndex = 0;
+      const next = node.nodeValue.replace(re, replacement);
+      if (next !== node.nodeValue) {
+        node.nodeValue = next;
+        changed = true;
+      }
+    }
+    return changed ? doc.body.innerHTML : null;
+  }
+
+  // Compute the {props, oldProps} for replacing text on one element, keeping
+  // richText consistent with the plain text.
+  _buildReplaceProps(el, re, replace) {
+    const oldText = el.text || '';
+    const newText = oldText.replace(re, replace);
+    if (newText === oldText) return null;
+    const props = { text: newText };
+    const oldProps = { text: el.text };
+    if (el.richText) {
+      oldProps.richText = el.richText;
+      const nextHtml = this._replaceInRichText(el.richText, re, replace);
+      // No text node matched even though the plain text changed — the match
+      // straddles inline markup. Drop richText so the new plain text renders
+      // instead of silently showing the old wording.
+      props.richText = nextHtml !== null ? nextHtml : null;
+    }
+    return { props, oldProps };
+  }
+
   replaceOne(search, replace) {
     if (this.searchResults.length === 0 || !search) return;
     const id = this.searchResults[this.searchIndex];
     const el = this.renderer.elements.get(id);
     if (!el) return;
     const re = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-    const oldText = el.text;
-    const newText = (el.text || '').replace(re, replace);
-    if (newText !== oldText) {
-      const props = { text: newText };
-      const oldProps = { text: oldText };
-      if (el.richText) { oldProps.richText = el.richText; el.richText = el.richText.replace(re, replace); props.richText = el.richText; }
-      el.text = newText;
-      this.history.push([{ type: 'update', elementId: id, props }], [{ type: 'update', elementId: id, props: oldProps }]);
-      this.sync.sendOps([{ type: 'update', elementId: id, props }]);
+    const built = this._buildReplaceProps(el, re, replace);
+    if (built) {
+      Object.assign(el, built.props);
+      this.history.push(
+        [{ type: 'update', elementId: id, props: built.props }],
+        [{ type: 'update', elementId: id, props: built.oldProps }]
+      );
+      this.sync.sendOps([{ type: 'update', elementId: id, props: built.props }]);
     }
     this.performSearch(search);
     this.searchPanel.querySelector('.search-count').textContent = this.searchResults.length > 0 ? `${this.searchIndex + 1}/${this.searchResults.length}` : '0/0';
@@ -2069,16 +2122,12 @@ class DarkBoardApp {
     let count = 0;
     const ops = [], inverseOps = [];
     for (const [id, el] of this.renderer.elements) {
-      const oldText = el.text || '';
-      const newText = oldText.replace(re, replace);
-      if (newText !== oldText) {
-        count++;
-        const p = { text: newText }, op = { text: oldText };
-        if (el.richText) { op.richText = el.richText; el.richText = el.richText.replace(re, replace); p.richText = el.richText; }
-        el.text = newText;
-        ops.push({ type: 'update', elementId: id, props: p });
-        inverseOps.push({ type: 'update', elementId: id, props: op });
-      }
+      const built = this._buildReplaceProps(el, re, replace);
+      if (!built) continue;
+      count++;
+      Object.assign(el, built.props);
+      ops.push({ type: 'update', elementId: id, props: built.props });
+      inverseOps.push({ type: 'update', elementId: id, props: built.oldProps });
     }
     if (ops.length > 0) { this.history.push(ops, inverseOps); this.sync.sendOps(ops); }
     this.showToast(`${count} remplacement(s) effectué(s)`);
@@ -4870,6 +4919,13 @@ window.addEventListener('DOMContentLoaded', () => {
 // #123 - First-time welcome tour
 DarkBoardApp.prototype.initWelcomeTour = function() {
   if (localStorage.getItem('darkboard-tour-done')) return;
+  // Don't highlight the toolbar while the join dialog is still up — the tour
+  // overlay would sit on top of it and block the name field.
+  if (!this._joined) {
+    var retry = this._tourRetries = (this._tourRetries || 0) + 1;
+    if (retry <= 120) setTimeout(this.initWelcomeTour.bind(this), 500);
+    return;
+  }
   localStorage.setItem('darkboard-tour-done', '1');
   var steps = [
     { selector: '.tool-btn[data-tool="select"]', title: 'Sélection', desc: 'Cliquez pour sélectionner et déplacer des éléments.' },
