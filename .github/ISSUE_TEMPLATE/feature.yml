@@ -1,0 +1,23 @@
+name: Idée ou amélioration
+description: Proposer une fonctionnalité ou une amélioration
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Le problème
+      description: Quelle situation d'atelier est aujourd'hui pénible ?
+      placeholder: "Quand j'anime une rétro à 12, je n'arrive pas à…"
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Ce que vous imaginez
+      description: Même vague. Le problème compte plus que la solution.
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Participation
+      options:
+        - label: J'aimerais l'implémenter moi-même

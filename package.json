@@ -1,8 +1,32 @@
 {
   "name": "darkboard",
   "version": "1.0.0",
-  "description": "DarkBoard - Collaborative whiteboard, no registration required",
+  "description": "Tableau blanc collaboratif temps réel, sans inscription. Pensé pour animer des ateliers.",
+  "keywords": [
+    "whiteboard",
+    "collaboration",
+    "realtime",
+    "websocket",
+    "canvas",
+    "workshop",
+    "retrospective",
+    "brainstorming",
+    "facilitation"
+  ],
+  "homepage": "https://darkboard.insuffle.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ylureault/darkboard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ylureault/darkboard/issues"
+  },
+  "author": "Insuffle (https://insuffle.com)",
+  "license": "MIT",
   "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",

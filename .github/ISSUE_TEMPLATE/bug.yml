@@ -1,0 +1,44 @@
+name: Bug
+description: Quelque chose ne marche pas comme prévu
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de prendre le temps. Les erreurs de console (F12 → Console) sont
+        souvent ce qui permet de trouver la cause en quelques minutes.
+  - type: textarea
+    id: what
+    attributes:
+      label: Ce qui se passe
+      description: Et ce que vous attendiez à la place.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Pour le reproduire
+      placeholder: |
+        1. Ouvrir un tableau
+        2. Créer un post-it
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: console
+    attributes:
+      label: Erreurs de console
+      description: F12 → Console. Laissez vide s'il n'y en a pas.
+      render: text
+  - type: input
+    id: env
+    attributes:
+      label: Navigateur et système
+      placeholder: Firefox 142 sur macOS 15
+  - type: checkboxes
+    id: collab
+    attributes:
+      label: Contexte
+      options:
+        - label: Plusieurs personnes étaient sur le tableau en même temps
+        - label: Cela arrive à chaque fois

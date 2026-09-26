@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Essayer DarkBoard
+    url: https://darkboard.insuffle.com
+    about: L'instance publique, sans installation.
+  - name: Insuffle
+    url: https://insuffle.com
+    about: Accompagnement et formation des équipes produit.
+  - name: Faille de sécurité
+    url: https://insuffle.com
+    about: N'ouvrez pas d'issue publique — contactez-nous directement.
