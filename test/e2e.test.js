@@ -44,6 +44,15 @@ function check(name, ok, detail) {
   await page.addInitScript(() => {
     try { localStorage.setItem('darkboard-tour-done', '1'); } catch (e) {}
   });
+  // Keep the run hermetic: third-party analytics must never be able to fail the
+  // suite (which treats any console error as a failure) or slow it down.
+  // Answered with an empty 200 rather than aborted: a blocked request logs a
+  // network error, and this suite treats any console error as a failure.
+  const stubAnalytics = (route) => route.fulfill({
+    status: 200, contentType: 'application/javascript', body: '',
+  });
+  await page.route('**://*.googletagmanager.com/**', stubAnalytics);
+  await page.route('**://*.google-analytics.com/**', stubAnalytics);
 
   page.on('console', (m) => {
     if (m.type() === 'error') errors.push('console.error: ' + m.text());
